@@ -485,129 +485,6 @@ create policy "Users can insert own sale items"
 alter table public.product_units add column if not exists sale_id uuid references public.sales(id) on delete set null;
 create index if not exists product_units_sale_id_idx on public.product_units(sale_id);
 
--- Atomically records a sale: inserts the sale, its line items, reduces
--- product stock, marks any selected serial/IMEI units as sold, and — for
--- invoices — charges the customer's balance (receipts settle instantly
--- so they charge and immediately pay off the same amount, net zero, purely
--- so it still shows up in the customer's transaction history).
--- p_items shape: [{ "product_id": uuid, "quantity": int, "unit_price": numeric, "unit_ids": [uuid, ...]? }]
-drop function if exists public.create_sale(uuid, text, text, text, date, date, text, jsonb);
-
-create or replace function public.create_sale(
-  p_customer_id uuid,
-  p_type text,
-  p_reference text,
-  p_notes text,
-  p_sale_date date,
-  p_due_date date,
-  p_deposit_to text,
-  p_items jsonb
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_owner_id uuid := auth.uid();
-  v_sale_id uuid;
-  v_item jsonb;
-  v_total numeric(12,2) := 0;
-  v_unit_id uuid;
-  v_product_id uuid;
-  v_product_owner uuid;
-  v_stock integer;
-  v_tracks_serial boolean;
-begin
-  if v_owner_id is null then
-    raise exception 'Not authenticated';
-  end if;
-
-  if p_type not in ('invoice', 'receipt') then
-    raise exception 'Invalid sale type';
-  end if;
-
-  if p_items is null or jsonb_array_length(p_items) = 0 then
-    raise exception 'A sale needs at least one line item';
-  end if;
-
-  select coalesce(sum((item->>'quantity')::int * (item->>'unit_price')::numeric), 0)
-  into v_total
-  from jsonb_array_elements(p_items) as item;
-
-  insert into public.sales (owner_id, customer_id, type, reference, notes, sale_date, due_date, deposit_to, total_amount)
-  values (
-    v_owner_id, p_customer_id, p_type, p_reference, p_notes,
-    coalesce(p_sale_date, current_date), p_due_date, p_deposit_to, v_total
-  )
-  returning id into v_sale_id;
-
-  for v_item in select * from jsonb_array_elements(p_items)
-  loop
-    v_product_id := (v_item->>'product_id')::uuid;
-
-    select owner_id, stock_quantity, tracks_serial
-    into v_product_owner, v_stock, v_tracks_serial
-    from public.products
-    where id = v_product_id;
-
-    if v_product_owner is null or v_product_owner <> v_owner_id then
-      raise exception 'Invalid product on this sale';
-    end if;
-
-    if v_stock < (v_item->>'quantity')::int then
-      raise exception 'Not enough stock for one of the products on this sale';
-    end if;
-
-    insert into public.sale_items (owner_id, sale_id, product_id, quantity, unit_price, subtotal)
-    values (
-      v_owner_id,
-      v_sale_id,
-      v_product_id,
-      (v_item->>'quantity')::int,
-      (v_item->>'unit_price')::numeric,
-      (v_item->>'quantity')::int * (v_item->>'unit_price')::numeric
-    );
-
-    update public.products
-    set stock_quantity = stock_quantity - (v_item->>'quantity')::int
-    where id = v_product_id;
-
-    if v_tracks_serial and (v_item ? 'unit_ids') then
-      for v_unit_id in select (jsonb_array_elements_text(v_item->'unit_ids'))::uuid
-      loop
-        update public.product_units
-        set status = 'sold', sale_id = v_sale_id
-        where id = v_unit_id
-          and owner_id = v_owner_id
-          and product_id = v_product_id
-          and status = 'in_stock';
-
-        if not found then
-          raise exception 'One of the selected serial/IMEI units is no longer in stock';
-        end if;
-      end loop;
-    end if;
-  end loop;
-
-  if p_customer_id is not null then
-    if p_type = 'invoice' then
-      insert into public.customer_transactions (owner_id, customer_id, type, amount, note)
-      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Invoice ' || p_reference, 'Invoice'));
-    elsif p_type = 'receipt' then
-      insert into public.customer_transactions (owner_id, customer_id, type, amount, note)
-      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'));
-      insert into public.customer_transactions (owner_id, customer_id, type, amount, note)
-      values (v_owner_id, p_customer_id, 'payment', v_total, 'Paid in full at time of sale');
-    end if;
-  end if;
-
-  return v_sale_id;
-end;
-$$;
-
-grant execute on function public.create_sale(uuid, text, text, text, date, date, text, jsonb) to authenticated;
-
 -- Cash & bank accounts ---------------------------------------------------
 
 create table if not exists public.accounts (
@@ -682,7 +559,13 @@ group by a.id, a.owner_id, a.name, a.type, a.opening_balance;
 
 grant select on public.account_balances to authenticated;
 
--- Sales receipts now deposit into a real account instead of a free-text label.
+-- Atomically records a sale: inserts the sale, its line items, reduces
+-- product stock, marks any selected serial/IMEI units as sold, and — for
+-- invoices — charges the customer's balance (receipts settle instantly
+-- so they charge and immediately pay off the same amount, net zero, purely
+-- so it still shows up in the customer's transaction history). Sales
+-- receipts deposit into a real account rather than a free-text label.
+-- p_items shape: [{ "product_id": uuid, "quantity": int, "unit_price": numeric, "unit_ids": [uuid, ...]? }]
 alter table public.sales add column if not exists deposit_account_id uuid references public.accounts(id) on delete set null;
 
 drop function if exists public.create_sale(uuid, text, text, text, date, date, text, jsonb);
@@ -816,6 +699,9 @@ $$;
 grant execute on function public.create_sale(uuid, text, text, text, date, date, uuid, jsonb) to authenticated;
 
 -- Receive payment: a customer pays down their balance, money lands in an account.
+drop function if exists public.receive_payment(uuid, uuid, numeric, text);
+drop function if exists public.receive_payment(uuid, uuid, numeric, text, date);
+
 create or replace function public.receive_payment(
   p_customer_id uuid,
   p_account_id uuid,
@@ -867,6 +753,9 @@ $$;
 grant execute on function public.receive_payment(uuid, uuid, numeric, text, date) to authenticated;
 
 -- Pay bill: pay down a supplier balance, money leaves an account.
+drop function if exists public.pay_bill(uuid, uuid, numeric, text);
+drop function if exists public.pay_bill(uuid, uuid, numeric, text, date);
+
 create or replace function public.pay_bill(
   p_supplier_id uuid,
   p_account_id uuid,
