@@ -1,40 +1,19 @@
-import { useEffect, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Plus, Receipt, ScanLine, Layers, AlertCircle, ChevronDown } from 'lucide-react'
 import { usePurchases } from '../../hooks/usePurchases'
-import { useProducts } from '../../hooks/useProducts'
-import { useSuppliers } from '../../hooks/useSuppliers'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
-import NewPurchaseModal from '../../components/purchases/NewPurchaseModal'
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
 }
 
 export default function Purchases() {
-  const { purchases, loading, error, createPurchase } = usePurchases()
-  const { products, refetch: refetchProducts } = useProducts()
-  const { suppliers } = useSuppliers()
-  const [modalOpen, setModalOpen] = useState(false)
+  const { purchases, loading, error } = usePurchases()
   const [expanded, setExpanded] = useState(null)
   const navigate = useNavigate()
-  const location = useLocation()
-
-  useEffect(() => {
-    if (location.state?.autoOpen) {
-      setModalOpen(true)
-      navigate(location.pathname, { replace: true, state: {} })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const handleSubmit = async (payload) => {
-    const result = await createPurchase(payload)
-    if (!result.error) refetchProducts()
-    return result
-  }
 
   const totalSpent = purchases.reduce((sum, p) => sum + Number(p.total_amount), 0)
   const unitsReceived = purchases.reduce(
@@ -59,7 +38,7 @@ export default function Purchases() {
             Record supplier bills to bring stock into your inventory.
           </p>
         </div>
-        <Button onClick={() => setModalOpen(true)} variant="primary">
+        <Button onClick={() => navigate('/dashboard/purchases/new')} variant="primary">
           <Plus size={16} /> Record a bill
         </Button>
       </div>
@@ -107,7 +86,7 @@ export default function Purchases() {
             <p className="mt-1 max-w-xs text-xs text-ink-400">
               Record your first bill to bring stock into your inventory.
             </p>
-            <Button onClick={() => setModalOpen(true)} variant="outline" className="mt-5">
+            <Button onClick={() => navigate('/dashboard/purchases/new')} variant="outline" className="mt-5">
               <Plus size={15} /> Record a bill
             </Button>
           </div>
@@ -116,6 +95,7 @@ export default function Purchases() {
             {purchases.map((p, i) => {
               const itemCount = p.purchase_items.reduce((s, it) => s + it.quantity, 0)
               const isOpen = expanded === p.id
+              const billDate = p.bill_date || p.created_at
               return (
                 <motion.li
                   key={p.id}
@@ -134,10 +114,11 @@ export default function Purchases() {
                       </span>
                       <div>
                         <p className="text-sm font-medium text-ink-900 dark:text-cream-50">
-                          {p.reference || `Bill · ${formatDate(p.created_at)}`}
+                          {p.reference || `Bill · ${formatDate(billDate)}`}
                         </p>
                         <p className="text-xs text-ink-400">
-                          {p.suppliers?.name || 'No supplier'} · {itemCount} unit{itemCount === 1 ? '' : 's'} · {formatDate(p.created_at)}
+                          {p.suppliers?.name || 'No supplier'} · {itemCount} unit{itemCount === 1 ? '' : 's'} · {formatDate(billDate)}
+                          {p.due_date ? ` · Due ${formatDate(p.due_date)}` : ''}
                         </p>
                       </div>
                     </div>
@@ -190,14 +171,6 @@ export default function Purchases() {
           </ul>
         )}
       </div>
-
-      <NewPurchaseModal
-        open={modalOpen}
-        onClose={() => setModalOpen(false)}
-        onSubmit={handleSubmit}
-        products={products}
-        suppliers={suppliers}
-      />
     </div>
   )
 }

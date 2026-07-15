@@ -32,7 +32,7 @@ export function usePurchases() {
     fetchPurchases()
   }, [fetchPurchases])
 
-  const createPurchase = async ({ supplierId, reference, notes, items }) => {
+  const createPurchase = async ({ supplierId, reference, notes, items, billDate, dueDate }) => {
     if (!user) return { error: new Error('Not signed in') }
 
     const { data, error: rpcError } = await supabase.rpc('create_purchase', {
@@ -40,6 +40,8 @@ export function usePurchases() {
       p_reference: reference || null,
       p_notes: notes || null,
       p_items: items,
+      p_bill_date: billDate || null,
+      p_due_date: dueDate || null,
     })
 
     if (rpcError) return { error: rpcError }

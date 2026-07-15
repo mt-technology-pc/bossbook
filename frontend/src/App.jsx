@@ -9,6 +9,7 @@ import CustomerDetail from './pages/dashboard/CustomerDetail'
 import Suppliers from './pages/dashboard/Suppliers'
 import SupplierDetail from './pages/dashboard/SupplierDetail'
 import Purchases from './pages/dashboard/Purchases'
+import NewPurchase from './pages/dashboard/NewPurchase'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import DashboardLayout from './layouts/DashboardLayout'
@@ -19,6 +20,15 @@ function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/about" element={<About />} />
       <Route path="/login" element={<Login />} />
+
+      <Route
+        path="/dashboard/purchases/new"
+        element={
+          <ProtectedRoute>
+            <NewPurchase />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/dashboard"

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 
 const actions = [
-  { label: 'Create purchase', desc: 'Record a supplier bill', icon: ShoppingBag, to: '/dashboard/purchases' },
+  { label: 'Create purchase', desc: 'Record a supplier bill', icon: ShoppingBag, to: '/dashboard/purchases/new', direct: true },
   { label: 'Create invoice', desc: 'Bill a customer', icon: Receipt, to: '/dashboard/invoices', soon: true },
   { label: 'Add product', desc: 'Add to your catalog', icon: Package, to: '/dashboard/inventory' },
   { label: 'Add customer', desc: 'Save a new customer', icon: Contact, to: '/dashboard/customers' },
@@ -29,7 +29,8 @@ export default function CreateMenu({ className }) {
 
   const handleSelect = (action) => {
     setOpen(false)
-    navigate(action.to, action.soon ? undefined : { state: { autoOpen: true } })
+    if (action.soon || action.direct) navigate(action.to)
+    else navigate(action.to, { state: { autoOpen: true } })
   }
 
   return (

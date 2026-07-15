@@ -148,6 +148,9 @@ create table if not exists public.purchases (
   created_at timestamptz not null default now()
 );
 
+alter table public.purchases add column if not exists bill_date date not null default current_date;
+alter table public.purchases add column if not exists due_date date;
+
 create index if not exists purchases_owner_id_idx on public.purchases(owner_id);
 
 alter table public.purchases enable row level security;
@@ -228,11 +231,15 @@ create policy "Users can update own product units"
 -- Atomically records a bill: inserts the purchase, its line items, bumps
 -- product stock, and registers any serial/IMEI units in one transaction.
 -- p_items shape: [{ "product_id": uuid, "quantity": int, "unit_cost": numeric, "serials": [text, ...]? }]
+drop function if exists public.create_purchase(uuid, text, text, jsonb);
+
 create or replace function public.create_purchase(
   p_supplier_id uuid,
   p_reference text,
   p_notes text,
-  p_items jsonb
+  p_items jsonb,
+  p_bill_date date default current_date,
+  p_due_date date default null
 )
 returns uuid
 language plpgsql
@@ -259,8 +266,8 @@ begin
   into v_total
   from jsonb_array_elements(p_items) as item;
 
-  insert into public.purchases (owner_id, supplier_id, reference, notes, total_amount)
-  values (v_owner_id, p_supplier_id, p_reference, p_notes, v_total)
+  insert into public.purchases (owner_id, supplier_id, reference, notes, total_amount, bill_date, due_date)
+  values (v_owner_id, p_supplier_id, p_reference, p_notes, v_total, coalesce(p_bill_date, current_date), p_due_date)
   returning id into v_purchase_id;
 
   for v_item in select * from jsonb_array_elements(p_items)
@@ -301,7 +308,7 @@ begin
 end;
 $$;
 
-grant execute on function public.create_purchase(uuid, text, text, jsonb) to authenticated;
+grant execute on function public.create_purchase(uuid, text, text, jsonb, date, date) to authenticated;
 
 -- Supplier balances -----------------------------------------------------
 -- Purchases already represent what you owe a supplier (the bill total).
