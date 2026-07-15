@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Plus, ShoppingBag, Receipt, Package, Contact, Truck,
+  Plus, ShoppingBag, Receipt, FileText, Package, Contact, Truck, HandCoins,
 } from 'lucide-react'
 
 const actions = [
+  { label: 'Create invoice', desc: 'Bill a customer on credit', icon: FileText, to: '/dashboard/sales/new-invoice', direct: true },
+  { label: 'Create sales receipt', desc: 'Record a cash or bank sale', icon: Receipt, to: '/dashboard/sales/new-receipt', direct: true },
+  { label: 'Receive payment', desc: 'Collect against a customer balance', icon: HandCoins, to: '/dashboard/sales/receive-payment', direct: true },
   { label: 'Create purchase', desc: 'Record a supplier bill', icon: ShoppingBag, to: '/dashboard/purchases/new', direct: true },
-  { label: 'Create invoice', desc: 'Bill a customer', icon: Receipt, to: '/dashboard/invoices', soon: true },
+  { label: 'Pay a bill', desc: 'Pay down a supplier balance', icon: HandCoins, to: '/dashboard/suppliers', plain: true },
   { label: 'Add product', desc: 'Add to your catalog', icon: Package, to: '/dashboard/inventory' },
   { label: 'Add customer', desc: 'Save a new customer', icon: Contact, to: '/dashboard/customers' },
   { label: 'Add supplier', desc: 'Save a new supplier', icon: Truck, to: '/dashboard/suppliers' },
@@ -29,7 +32,7 @@ export default function CreateMenu({ className }) {
 
   const handleSelect = (action) => {
     setOpen(false)
-    if (action.soon || action.direct) navigate(action.to)
+    if (action.soon || action.direct || action.plain) navigate(action.to)
     else navigate(action.to, { state: { autoOpen: true } })
   }
 

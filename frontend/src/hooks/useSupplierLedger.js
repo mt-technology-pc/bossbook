@@ -45,14 +45,17 @@ export function useSupplierLedger(supplierId) {
     fetchLedger()
   }, [fetchLedger])
 
-  const addPayment = async ({ amount, note }) => {
+  const addPayment = async ({ accountId, amount, note }) => {
     if (!user) return { error: new Error('Not signed in') }
 
-    const { error: insertError } = await supabase
-      .from('supplier_payments')
-      .insert({ owner_id: user.id, supplier_id: supplierId, amount, note: note || null })
+    const { error: rpcError } = await supabase.rpc('pay_bill', {
+      p_supplier_id: supplierId,
+      p_account_id: accountId,
+      p_amount: amount,
+      p_note: note || null,
+    })
 
-    if (insertError) return { error: insertError }
+    if (rpcError) return { error: rpcError }
 
     await fetchLedger()
     return { data: true }

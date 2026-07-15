@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../../context/AuthContext'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
+import { useSales } from '../../hooks/useSales'
 import { formatCurrency } from '../../lib/currency'
 import RadialStat from '../../components/dashboard/RadialStat'
 import AccountsPanel from '../../components/dashboard/AccountsPanel'
@@ -24,18 +25,27 @@ export default function Overview() {
   const { fullName, user } = useAuth()
   const { products } = useProducts()
   const { customers } = useCustomers()
+  const { sales } = useSales()
   const navigate = useNavigate()
 
   const firstName = (fullName || user?.email?.split('@')[0] || 'there').split(' ')[0]
 
-  const stockValue = products.reduce((sum, p) => sum + p.price * p.stock_quantity, 0)
   const stockUnits = products.reduce((sum, p) => sum + p.stock_quantity, 0)
   const serialTrackedCount = products.filter((p) => p.tracks_serial).length
 
+  const now = new Date()
+  const revenueThisMonth = sales
+    .filter((s) => {
+      const d = new Date(s.sale_date)
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+    })
+    .reduce((sum, s) => sum + Number(s.total_amount), 0)
+  const invoiceCount = sales.filter((s) => s.type === 'invoice').length
+
   const stats = [
-    { icon: TrendingUp, label: 'Revenue this month', value: formatCurrency(0) },
+    { icon: TrendingUp, label: 'Revenue this month', value: formatCurrency(revenueThisMonth) },
     { icon: Package, label: 'Items in stock', value: stockUnits },
-    { icon: Receipt, label: 'Open invoices', value: '0' },
+    { icon: Receipt, label: 'Invoices recorded', value: invoiceCount },
     { icon: ScanLine, label: 'Serial numbers tracked', value: serialTrackedCount },
   ]
 
@@ -43,13 +53,13 @@ export default function Overview() {
     { icon: Users, label: 'Staff', value: 1, target: 5, caption: 'toward first 5' },
     { icon: Package, label: 'Products', value: products.length, target: 20, caption: 'toward first 20' },
     { icon: Contact, label: 'Customers', value: customers.length, target: 20, caption: 'toward first 20' },
-    { icon: Receipt, label: 'Invoices', value: 0, target: 10, caption: 'toward first 10' },
+    { icon: Receipt, label: 'Invoices', value: invoiceCount, target: 10, caption: 'toward first 10' },
   ]
 
   const checklist = [
     { label: 'Create your account', done: true },
     { label: 'Add your first product', done: products.length > 0 },
-    { label: 'Create your first invoice', done: false },
+    { label: 'Create your first invoice', done: invoiceCount > 0 },
     { label: 'Invite a team member', done: false },
   ]
   const doneCount = checklist.filter((c) => c.done).length
@@ -71,7 +81,7 @@ export default function Overview() {
       icon: Receipt,
       title: 'Create an invoice',
       desc: 'Bill a customer in a few clicks.',
-      onClick: () => navigate('/dashboard/invoices'),
+      onClick: () => navigate('/dashboard/sales/new-invoice'),
     },
   ]
 

@@ -6,12 +6,12 @@ import {
 } from 'lucide-react'
 
 const links = [
+  { label: 'Sales', icon: Receipt, to: '/dashboard/sales' },
   { label: 'Inventory', icon: Package, to: '/dashboard/inventory' },
   { label: 'Purchases', icon: ShoppingBag, to: '/dashboard/purchases' },
   { label: 'Customers', icon: Contact, to: '/dashboard/customers' },
   { label: 'Suppliers', icon: Truck, to: '/dashboard/suppliers' },
   { label: 'Serial tracking', icon: ScanLine, to: '/dashboard/serial-tracking', soon: true },
-  { label: 'Invoices', icon: Receipt, to: '/dashboard/invoices', soon: true },
   { label: 'Reports', icon: BarChart3, to: '/dashboard/reports', soon: true },
   { label: 'Team', icon: Users, to: '/dashboard/team', soon: true },
   { label: 'Settings', icon: Settings, to: '/dashboard/settings', soon: true },

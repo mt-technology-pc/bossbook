@@ -2,15 +2,35 @@ import { useState } from 'react'
 import { AlertCircle } from 'lucide-react'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
+import SearchSelect from '../ui/SearchSelect'
+import { useAccounts } from '../../hooks/useAccounts'
 import { formatCurrency } from '../../lib/currency'
 
 export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }) {
+  const { accounts, addAccount, refetch: refetchAccounts } = useAccounts()
+  const [accountId, setAccountId] = useState('')
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  const accountOptions = accounts.map((a) => ({
+    id: a.account_id,
+    label: a.name,
+    sublabel: `${a.type === 'bank' ? 'Bank' : 'Cash'} · ${formatCurrency(a.balance)}`,
+  }))
+
+  const handleCreateAccount = async (name) => {
+    const { data, error: createError } = await addAccount({ name, type: 'cash', openingBalance: 0 })
+    if (createError) {
+      setError(createError.message)
+      return null
+    }
+    return { id: data.id }
+  }
+
   const close = () => {
+    setAccountId('')
     setAmount('')
     setNote('')
     setError(null)
@@ -19,6 +39,10 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (!accountId) {
+      setError('Choose which account this payment is paid from.')
+      return
+    }
     const value = Number(amount)
     if (!value || value <= 0) {
       setError('Enter an amount greater than 0.')
@@ -29,6 +53,7 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
 
     const { error: submitError } = await onSubmit({
       supplierId: supplier.supplier_id,
+      accountId,
       amount: value,
       note: note.trim() || null,
     })
@@ -40,6 +65,7 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
       return
     }
 
+    refetchAccounts()
     close()
   }
 
@@ -49,7 +75,7 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
     <Modal
       open={open}
       onClose={close}
-      title={`Record a payment to ${supplier.name}`}
+      title={`Pay ${supplier.name}`}
       subtitle={`Current balance owed: ${formatCurrency(supplier.balance)}`}
     >
       {error && (
@@ -75,6 +101,20 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
         </label>
 
         <label className="block">
+          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Pay from *</span>
+          <div className="mt-1.5">
+            <SearchSelect
+              value={accountId}
+              onChange={setAccountId}
+              options={accountOptions}
+              placeholder="Choose an account"
+              createLabel="Add new cash account"
+              onCreate={handleCreateAccount}
+            />
+          </div>
+        </label>
+
+        <label className="block">
           <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Note</span>
           <input
             value={note}
@@ -89,7 +129,7 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={loading}>
-            {loading ? 'Saving…' : 'Record payment'}
+            {loading ? 'Saving…' : 'Pay bill'}
           </Button>
         </div>
       </form>

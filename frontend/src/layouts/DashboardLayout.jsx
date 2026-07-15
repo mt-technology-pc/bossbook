@@ -12,12 +12,12 @@ import { useTheme } from '../hooks/useTheme'
 
 const nav = [
   { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, end: true },
+  { label: 'Sales', to: '/dashboard/sales', icon: Receipt },
   { label: 'Inventory', to: '/dashboard/inventory', icon: Package },
   { label: 'Purchases', to: '/dashboard/purchases', icon: ShoppingBag },
   { label: 'Customers', to: '/dashboard/customers', icon: Contact },
   { label: 'Suppliers', to: '/dashboard/suppliers', icon: Truck },
   { label: 'Serial tracking', to: '/dashboard/serial-tracking', icon: ScanLine },
-  { label: 'Invoices', to: '/dashboard/invoices', icon: Receipt },
   { label: 'Reports', to: '/dashboard/reports', icon: BarChart3 },
   { label: 'Settings', to: '/dashboard/settings', icon: Settings },
 ]

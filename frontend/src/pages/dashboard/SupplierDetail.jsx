@@ -116,7 +116,7 @@ export default function SupplierDetail() {
             </p>
           </div>
           <Button onClick={() => setModalOpen(true)} variant="primary" disabled={balance <= 0}>
-            <HandCoins size={16} /> Record payment
+            <HandCoins size={16} /> Pay bill
           </Button>
         </div>
       </div>
