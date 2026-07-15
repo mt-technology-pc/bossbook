@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Landmark, Wallet, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { useAccounts } from '../../hooks/useAccounts'
@@ -8,6 +9,7 @@ import AddAccountModal from './AddAccountModal'
 export default function AccountsPanel() {
   const { accounts, loading, addAccount, deleteAccount, totalBalance } = useAccounts()
   const [modalOpen, setModalOpen] = useState(false)
+  const navigate = useNavigate()
 
   const handleDelete = async (e, id, name) => {
     e.stopPropagation()
@@ -47,7 +49,8 @@ export default function AccountsPanel() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: i * 0.06 }}
-              className="group flex items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-cream-200 dark:hover:bg-dark-700"
+              onClick={() => navigate(`/dashboard/accounts/${a.account_id}`)}
+              className="group flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-cream-200 dark:hover:bg-dark-700"
             >
               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
                 {a.type === 'bank' ? <Landmark size={16} /> : <Wallet size={16} />}
