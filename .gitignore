@@ -1,0 +1,19 @@
+# Env files (never commit secrets)
+.env
+.env.local
+.env.*.local
+*.local
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+dist-ssr
+
+# OS / editor
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.log
