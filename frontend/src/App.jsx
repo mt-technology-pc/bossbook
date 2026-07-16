@@ -20,6 +20,7 @@ import InventoryValuationReport from './pages/dashboard/InventoryValuationReport
 import ProductLedger from './pages/dashboard/ProductLedger'
 import IncomeStatementReport from './pages/dashboard/IncomeStatementReport'
 import SalesDayBookReport from './pages/dashboard/SalesDayBookReport'
+import PurchaseDayBookReport from './pages/dashboard/PurchaseDayBookReport'
 import Expenses from './pages/dashboard/Expenses'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
@@ -89,6 +90,7 @@ function App() {
         <Route path="reports/inventory-valuation/:id" element={<ProductLedger />} />
         <Route path="reports/income-statement" element={<IncomeStatementReport />} />
         <Route path="reports/sales-day-book" element={<SalesDayBookReport />} />
+        <Route path="reports/purchase-day-book" element={<PurchaseDayBookReport />} />
         <Route path="team" element={<ComingSoon title="Team" />} />
         <Route path="settings" element={<ComingSoon title="Settings" />} />
         <Route path="*" element={<ComingSoon />} />

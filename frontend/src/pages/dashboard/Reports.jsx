@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Boxes, ShoppingBag, FileBarChart, BookOpen, ArrowRight } from 'lucide-react'
+import { Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight } from 'lucide-react'
 
 const reports = [
   {
@@ -8,6 +8,12 @@ const reports = [
     title: 'Sales Day Book',
     desc: 'Every sale line item, chronologically, with cash vs. credit position and running totals.',
     to: '/dashboard/reports/sales-day-book',
+  },
+  {
+    icon: ClipboardList,
+    title: 'Purchase Day Book',
+    desc: 'Every bill line item, chronologically, with supplier payments made in the same period.',
+    to: '/dashboard/reports/purchase-day-book',
   },
   {
     icon: Boxes,
@@ -20,12 +26,6 @@ const reports = [
     title: 'Income Statement',
     desc: 'Revenue, cost of goods sold and gross profit by category, over any date range.',
     to: '/dashboard/reports/income-statement',
-  },
-  {
-    icon: ShoppingBag,
-    title: 'Purchase Summary',
-    desc: 'Spend by supplier and by item over a date range.',
-    soon: true,
   },
 ]
 
