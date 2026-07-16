@@ -24,6 +24,8 @@ import ProductLedger from './pages/dashboard/ProductLedger'
 import IncomeStatementReport from './pages/dashboard/IncomeStatementReport'
 import SalesDayBookReport from './pages/dashboard/SalesDayBookReport'
 import PurchaseDayBookReport from './pages/dashboard/PurchaseDayBookReport'
+import AccountsReceivable from './pages/dashboard/AccountsReceivable'
+import AccountsPayable from './pages/dashboard/AccountsPayable'
 import Expenses from './pages/dashboard/Expenses'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
@@ -144,6 +146,8 @@ function App() {
         <Route path="reports/income-statement" element={<IncomeStatementReport />} />
         <Route path="reports/sales-day-book" element={<SalesDayBookReport />} />
         <Route path="reports/purchase-day-book" element={<PurchaseDayBookReport />} />
+        <Route path="reports/receivables" element={<AccountsReceivable />} />
+        <Route path="reports/payables" element={<AccountsPayable />} />
         <Route path="team" element={<ComingSoon title="Team" />} />
         <Route path="settings" element={<ComingSoon title="Settings" />} />
         <Route path="*" element={<ComingSoon />} />

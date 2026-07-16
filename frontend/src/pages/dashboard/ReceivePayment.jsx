@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { X, AlertCircle, HandCoins, Search } from 'lucide-react'
 import { useCustomerPayments } from '../../hooks/useCustomerPayments'
 import { useCustomers } from '../../hooks/useCustomers'
@@ -24,6 +24,7 @@ function formatDate(dateStr) {
 
 export default function ReceivePayment() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
   const isEdit = Boolean(id)
 
@@ -86,6 +87,13 @@ export default function ReceivePayment() {
     setChecked({})
     setAmounts({})
   }, [customerId, isEdit])
+
+  useEffect(() => {
+    if (isEdit || !location.state?.customerId) return
+    setCustomerId(location.state.customerId)
+    navigate(location.pathname, { replace: true, state: {} })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const customerOptions = customers.map((c) => ({
     id: c.id,

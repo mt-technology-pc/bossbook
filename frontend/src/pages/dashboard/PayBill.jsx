@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { X, AlertCircle, HandCoins, Search } from 'lucide-react'
 import { useSupplierPayments } from '../../hooks/useSupplierPayments'
 import { useSuppliers } from '../../hooks/useSuppliers'
@@ -24,6 +24,7 @@ function formatDate(dateStr) {
 
 export default function PayBill() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
   const isEdit = Boolean(id)
 
@@ -86,6 +87,13 @@ export default function PayBill() {
     setChecked({})
     setAmounts({})
   }, [supplierId, isEdit])
+
+  useEffect(() => {
+    if (isEdit || !location.state?.supplierId) return
+    setSupplierId(location.state.supplierId)
+    navigate(location.pathname, { replace: true, state: {} })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const supplierOptions = suppliers.map((s) => ({
     id: s.id,
