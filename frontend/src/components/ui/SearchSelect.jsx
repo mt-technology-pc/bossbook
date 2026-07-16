@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Plus, ChevronDown } from 'lucide-react'
 
@@ -28,15 +29,39 @@ export default function SearchSelect({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
-  const ref = useRef(null)
+  const [menuRect, setMenuRect] = useState(null)
+  const wrapperRef = useRef(null)
+  const menuRef = useRef(null)
   const inputRef = useRef(null)
 
   const selected = options.find((o) => o.id === value)
 
+  // Rendered via a portal (below), so its position is measured rather than
+  // laid out in normal flow — this is what lets the menu escape an
+  // ancestor with overflow-hidden (e.g. an animated line-item row) instead
+  // of being invisibly clipped.
+  useLayoutEffect(() => {
+    if (!open) return
+    const updateRect = () => {
+      if (!wrapperRef.current) return
+      const r = wrapperRef.current.getBoundingClientRect()
+      setMenuRect({ top: r.bottom + 6, left: r.left, width: r.width })
+    }
+    updateRect()
+    window.addEventListener('scroll', updateRect, true)
+    window.addEventListener('resize', updateRect)
+    return () => {
+      window.removeEventListener('scroll', updateRect, true)
+      window.removeEventListener('resize', updateRect)
+    }
+  }, [open])
+
   useEffect(() => {
     if (!open) return
     const onClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
+      const inWrapper = wrapperRef.current && wrapperRef.current.contains(e.target)
+      const inMenu = menuRef.current && menuRef.current.contains(e.target)
+      if (!inWrapper && !inMenu) {
         setOpen(false)
         setQuery('')
       }
@@ -80,7 +105,7 @@ export default function SearchSelect({
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={wrapperRef} className="relative">
       <div
         className={`flex items-center rounded-xl border bg-cream-50 transition-colors dark:bg-dark-800 ${
           open ? 'border-clay-500 ring-2 ring-clay-500/20' : 'border-ink-400/20 dark:border-cream-100/10'
@@ -112,14 +137,16 @@ export default function SearchSelect({
         </button>
       </div>
 
-      <AnimatePresence>
-        {open && (
+      {open && menuRect && createPortal(
+        <AnimatePresence>
           <motion.div
+            ref={menuRef}
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 right-0 top-full z-50 mt-1.5 max-h-72 overflow-y-auto rounded-xl border border-ink-400/15 bg-cream-50 py-1.5 shadow-xl dark:border-cream-100/10 dark:bg-dark-800"
+            style={{ position: 'fixed', top: menuRect.top, left: menuRect.left, width: menuRect.width }}
+            className="z-50 max-h-72 overflow-y-auto rounded-xl border border-ink-400/15 bg-cream-50 py-1.5 shadow-xl dark:border-cream-100/10 dark:bg-dark-800"
           >
             {onCreate && query.trim() && !exactMatch && (
               <button
@@ -153,8 +180,9 @@ export default function SearchSelect({
               ))
             )}
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
   )
 }
