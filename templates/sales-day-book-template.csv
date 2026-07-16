@@ -1,0 +1,19 @@
+Date,Invoice/Bill Number,Customer Name,Product/Service Description,Quantity,Unit Price,Gross Amount,Discount,Net Amount,Deposit To,Amount Received,Outstanding Balance,Salesperson,Remarks
+2026-07-01,INV-1001,Kasun Perera,iPhone 13 128GB,1,185000,=E2*F2,5000,=G2-H2,Cash Drawer,180000,=I2-K2,Nimali,Paid in full
+2026-07-01,INV-1002,Ruwan Silva,Samsung Galaxy A54,2,95000,=E3*F3,0,=G3-H3,HNB Current,190000,=I3-K3,Nimali,
+2026-07-02,INV-1003,Dilani Fernando,Phone Case Clear,3,1200,=E4*F4,0,=G4-H4,Cash Drawer,3600,=I4-K4,Sajith,
+2026-07-02,INV-1004,Tech World Traders,Redmi Note 12 Wholesale x10,10,42000,=E5*F5,20000,=G5-H5,,150000,=I5-K5,Sajith,Credit sale 30 days
+2026-07-03,INV-1005,Chamara Jayasuriya,Screen Protector,5,500,=E6*F6,0,=G6-H6,Cash Drawer,2500,=I6-K6,Nimali,
+2026-07-03,INV-1006,Nadeesha Kumari,iPhone 14 Pro,1,340000,=E7*F7,10000,=G7-H7,HNB Current,100000,=I7-K7,Sajith,Advance paid balance on delivery
+2026-07-04,INV-1007,Priyantha Bandara,Bluetooth Earbuds,4,4500,=E8*F8,1000,=G8-H8,Cash Drawer,17000,=I8-K8,Nimali,
+2026-07-04,INV-1008,Mobile Hub Kandy,OPPO A78 Wholesale x5,5,58000,=E9*F9,15000,=G9-H9,,0,=I9-K9,Sajith,Credit sale awaiting payment
+2026-07-05,INV-1009,Sanduni Rathnayake,Power Bank 20000mAh,2,6500,=E10*F10,500,=G10-H10,Cash Drawer,12500,=I10-K10,Nimali,
+2026-07-05,INV-1010,Isuru Madushanka,Samsung Galaxy S23,1,265000,=E11*F11,5000,=G11-H11,HNB Current,260000,=I11-K11,Sajith,
+
+SUMMARY,,,,,,,,,,,,,
+Total Sales (Gross),=SUM(G2:G11),,,,,,,,,,,,
+Net Sales,=SUM(I2:I11),,,,,,,,,,,,
+Total Cash Sales,=SUMIF(L2:L11,0,I2:I11),,,,,,,,,,,,
+Total Credit Sales,"=SUMIF(L2:L11,"">0"",I2:I11)",,,,,,,,,,,,
+Total Amount Received,=SUM(K2:K11),,,,,,,,,,,,
+Total Outstanding Balance,=SUM(L2:L11),,,,,,,,,,,,

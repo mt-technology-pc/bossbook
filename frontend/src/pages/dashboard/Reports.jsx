@@ -1,8 +1,14 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Boxes, TrendingUp, ShoppingBag, FileBarChart, ArrowRight } from 'lucide-react'
+import { Boxes, ShoppingBag, FileBarChart, BookOpen, ArrowRight } from 'lucide-react'
 
 const reports = [
+  {
+    icon: BookOpen,
+    title: 'Sales Day Book',
+    desc: 'Every sale line item, chronologically, with cash vs. credit position and running totals.',
+    to: '/dashboard/reports/sales-day-book',
+  },
   {
     icon: Boxes,
     title: 'Inventory Valuation Summary',
@@ -14,12 +20,6 @@ const reports = [
     title: 'Income Statement',
     desc: 'Revenue, cost of goods sold and gross profit by category, over any date range.',
     to: '/dashboard/reports/income-statement',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Sales Summary',
-    desc: 'Units sold and top items over a date range.',
-    soon: true,
   },
   {
     icon: ShoppingBag,
