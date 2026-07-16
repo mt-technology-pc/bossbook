@@ -719,6 +719,7 @@ select
   s.type,
   s.reference,
   s.sale_date,
+  s.due_date,
   s.total_amount,
   coalesce(paid.total, 0) as paid_amount,
   s.total_amount - coalesce(paid.total, 0) as outstanding
@@ -741,6 +742,7 @@ select
   p.supplier_id,
   p.reference,
   p.bill_date,
+  p.due_date,
   p.total_amount,
   coalesce(paid.total, 0) as paid_amount,
   p.total_amount - coalesce(paid.total, 0) as outstanding
