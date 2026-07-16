@@ -268,7 +268,7 @@ begin
   end if;
 
   if v_reference is null then
-    v_reference := 'B' || public.next_sequence_number(v_owner_id, 'purchase');
+    v_reference := public.next_sequence_code(v_owner_id, 'purchase', 'B');
   end if;
 
   select coalesce(sum((item->>'quantity')::int * (item->>'unit_cost')::numeric), 0)
@@ -646,6 +646,7 @@ declare
   v_category text := trim(coalesce(p_category, ''));
   v_expense_coa uuid;
   v_cash_coa uuid;
+  v_code text;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -664,8 +665,10 @@ begin
     raise exception 'Invalid account';
   end if;
 
-  insert into public.expenses (owner_id, account_id, category, description, amount, expense_date)
-  values (v_owner_id, p_account_id, v_category, p_description, p_amount, coalesce(p_expense_date, current_date))
+  v_code := public.next_sequence_code(v_owner_id, 'expense', 'EXP');
+
+  insert into public.expenses (owner_id, account_id, category, description, amount, expense_date, code)
+  values (v_owner_id, p_account_id, v_category, p_description, p_amount, coalesce(p_expense_date, current_date), v_code)
   returning id into v_expense_id;
 
   insert into public.account_transactions (owner_id, account_id, type, amount, note, expense_id, created_at)
@@ -850,8 +853,9 @@ begin
   end if;
 
   if v_reference is null then
-    v_reference := (case when p_type = 'invoice' then 'S' else 'R' end)
-      || public.next_sequence_number(v_owner_id, p_type);
+    v_reference := public.next_sequence_code(
+      v_owner_id, p_type, case when p_type = 'invoice' then 'S' else 'R' end
+    );
   end if;
 
   select coalesce(sum((item->>'quantity')::int * (item->>'unit_price')::numeric), 0)
@@ -1475,7 +1479,7 @@ begin
     end if;
   end if;
 
-  v_code := 'RCPT' || public.next_sequence_number(v_owner_id, 'customer_payment');
+  v_code := public.next_sequence_code(v_owner_id, 'customer_payment', 'RCPT');
 
   insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, created_at, code)
   values (v_owner_id, p_customer_id, 'payment', p_amount, coalesce(p_note, 'Payment received'), p_sale_id, v_when, v_code)
@@ -1663,7 +1667,7 @@ begin
     end if;
   end if;
 
-  v_code := 'PAY' || public.next_sequence_number(v_owner_id, 'supplier_payment');
+  v_code := public.next_sequence_code(v_owner_id, 'supplier_payment', 'PAY');
 
   insert into public.supplier_payments (owner_id, supplier_id, amount, note, purchase_id, created_at, code)
   values (v_owner_id, p_supplier_id, p_amount, coalesce(p_note, 'Bill payment'), p_purchase_id, v_when, v_code)
@@ -2574,6 +2578,25 @@ $$;
 
 grant execute on function public.next_sequence_number(uuid, text) to authenticated;
 
+-- Formats a sequence number as a zero-padded code, e.g. next_sequence_code(...,
+-- 'invoice', 'S') -> 'S001', 'S002', ... 'S010', ... 'S1000' (grows past 3
+-- digits naturally once past 999, never truncates).
+create or replace function public.next_sequence_code(p_owner_id uuid, p_key text, p_prefix text default '')
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_n integer;
+begin
+  v_n := public.next_sequence_number(p_owner_id, p_key);
+  return p_prefix || lpad(v_n::text, 3, '0');
+end;
+$$;
+
+grant execute on function public.next_sequence_code(uuid, text, text) to authenticated;
+
 -- Customers and products are created via plain client-side inserts, so a
 -- code/sku is assigned by a trigger when the user leaves it blank (their
 -- own value, if provided, is always respected).
@@ -2589,7 +2612,7 @@ set search_path = public
 as $$
 begin
   if new.code is null or trim(new.code) = '' then
-    new.code := 'C' || public.next_sequence_number(new.owner_id, 'customer');
+    new.code := public.next_sequence_code(new.owner_id, 'customer', 'C');
   end if;
   return new;
 end;
@@ -2608,7 +2631,7 @@ set search_path = public
 as $$
 begin
   if new.sku is null or trim(new.sku) = '' then
-    new.sku := 'P' || public.next_sequence_number(new.owner_id, 'product');
+    new.sku := public.next_sequence_code(new.owner_id, 'product', 'P');
   end if;
   return new;
 end;
@@ -2652,7 +2675,7 @@ begin
     where owner_id = v_owner_id and (code is null or trim(code) = '')
     order by created_at asc
   loop
-    update public.customers set code = 'C' || public.next_sequence_number(v_owner_id, 'customer')
+    update public.customers set code = public.next_sequence_code(v_owner_id, 'customer', 'C')
     where id = v_row.id;
   end loop;
 
@@ -2661,7 +2684,7 @@ begin
     where owner_id = v_owner_id and (sku is null or trim(sku) = '')
     order by created_at asc
   loop
-    update public.products set sku = 'P' || public.next_sequence_number(v_owner_id, 'product')
+    update public.products set sku = public.next_sequence_code(v_owner_id, 'product', 'P')
     where id = v_row.id;
   end loop;
 
@@ -2670,7 +2693,7 @@ begin
     where owner_id = v_owner_id and (reference is null or trim(reference) = '')
     order by created_at asc
   loop
-    update public.purchases set reference = 'B' || public.next_sequence_number(v_owner_id, 'purchase')
+    update public.purchases set reference = public.next_sequence_code(v_owner_id, 'purchase', 'B')
     where id = v_row.id;
   end loop;
 
@@ -2680,8 +2703,9 @@ begin
     order by created_at asc
   loop
     update public.sales
-    set reference = (case when v_row.type = 'invoice' then 'S' else 'R' end)
-      || public.next_sequence_number(v_owner_id, v_row.type)
+    set reference = public.next_sequence_code(
+      v_owner_id, v_row.type, case when v_row.type = 'invoice' then 'S' else 'R' end
+    )
     where id = v_row.id;
   end loop;
 
@@ -2690,7 +2714,7 @@ begin
     where owner_id = v_owner_id and type = 'payment' and (code is null or trim(code) = '')
     order by created_at asc
   loop
-    update public.customer_transactions set code = 'RCPT' || public.next_sequence_number(v_owner_id, 'customer_payment')
+    update public.customer_transactions set code = public.next_sequence_code(v_owner_id, 'customer_payment', 'RCPT')
     where id = v_row.id;
   end loop;
 
@@ -2699,10 +2723,79 @@ begin
     where owner_id = v_owner_id and (code is null or trim(code) = '')
     order by created_at asc
   loop
-    update public.supplier_payments set code = 'PAY' || public.next_sequence_number(v_owner_id, 'supplier_payment')
+    update public.supplier_payments set code = public.next_sequence_code(v_owner_id, 'supplier_payment', 'PAY')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.accounts
+    where owner_id = v_owner_id and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.accounts set code = public.next_sequence_code(v_owner_id, 'account', 'ACC')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.expenses
+    where owner_id = v_owner_id and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.expenses set code = public.next_sequence_code(v_owner_id, 'expense', 'EXP')
     where id = v_row.id;
   end loop;
 end;
 $$;
 
 grant execute on function public.backfill_record_codes() to authenticated;
+
+-- Accounts (cash/bank) get the same auto-code treatment as customers and
+-- products, via a trigger since they're also created by a plain client
+-- insert. Expenses get theirs assigned inside record_expense, same as the
+-- other RPC-created records.
+alter table public.accounts add column if not exists code text;
+create unique index if not exists accounts_owner_code_idx
+  on public.accounts(owner_id, code) where code is not null;
+
+create or replace function public.assign_account_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.code is null or trim(new.code) = '' then
+    new.code := public.next_sequence_code(new.owner_id, 'account', 'ACC');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists assign_account_code_trigger on public.accounts;
+create trigger assign_account_code_trigger
+  before insert on public.accounts
+  for each row execute function public.assign_account_code();
+
+alter table public.expenses add column if not exists code text;
+create unique index if not exists expenses_owner_code_idx
+  on public.expenses(owner_id, code) where code is not null;
+
+-- Re-declare account_balances now that accounts has a code column — the
+-- frontend reads accounts through this view, not the raw table. `code` is
+-- appended at the end since `create or replace view` can't reorder or
+-- insert columns among the existing ones, only add new trailing ones.
+create or replace view public.account_balances
+with (security_invoker = true) as
+select
+  a.id as account_id,
+  a.owner_id,
+  a.name,
+  a.type,
+  a.opening_balance,
+  a.opening_balance + coalesce(sum(
+    case when t.type = 'deposit' then t.amount else -t.amount end
+  ), 0) as balance,
+  a.code
+from public.accounts a
+left join public.account_transactions t on t.account_id = a.id
+group by a.id, a.owner_id, a.name, a.type, a.opening_balance, a.code;

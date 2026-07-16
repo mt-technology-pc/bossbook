@@ -59,7 +59,9 @@ export default function AccountsPanel() {
                 <p className="truncate text-sm font-medium text-ink-900 dark:text-cream-50">
                   {a.name}
                 </p>
-                <p className="text-xs capitalize text-ink-400">{a.type}</p>
+                <p className="text-xs capitalize text-ink-400">
+                  {a.type}{a.code ? ` · ${a.code}` : ''}
+                </p>
               </span>
               <span className="text-sm font-semibold text-ink-700 dark:text-cream-200">
                 {formatCurrency(a.balance)}

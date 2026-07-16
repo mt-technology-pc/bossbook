@@ -137,6 +137,7 @@ export default function Expenses() {
             <table className="w-full min-w-[700px] text-left text-sm">
               <thead>
                 <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                  <th className="pb-3 font-medium">Code</th>
                   <th className="pb-3 font-medium">Date</th>
                   <th className="pb-3 font-medium">Category</th>
                   <th className="pb-3 font-medium">Description</th>
@@ -154,6 +155,7 @@ export default function Expenses() {
                     transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
                     className="border-b border-ink-400/10 last:border-0 dark:border-cream-100/10"
                   >
+                    <td className="py-3.5 pr-3 font-mono text-xs text-ink-400">{e.code || '—'}</td>
                     <td className="py-3.5 pr-3 text-ink-500 dark:text-cream-400">{formatDate(e.expense_date)}</td>
                     <td className="py-3.5 pr-3 font-medium text-ink-900 dark:text-cream-50">{e.category}</td>
                     <td className="py-3.5 pr-3 text-ink-500 dark:text-cream-400">{e.description || '—'}</td>

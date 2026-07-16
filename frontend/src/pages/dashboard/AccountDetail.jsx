@@ -104,7 +104,9 @@ export default function AccountDetail() {
             <h1 className="font-heading text-xl font-semibold text-ink-900 dark:text-cream-50 sm:text-2xl">
               {account.name}
             </h1>
-            <p className="mt-1 text-xs capitalize text-ink-400">{account.type} account</p>
+            <p className="mt-1 text-xs capitalize text-ink-400">
+              {account.type} account{account.code ? ` · ${account.code}` : ''}
+            </p>
           </div>
         </div>
 
