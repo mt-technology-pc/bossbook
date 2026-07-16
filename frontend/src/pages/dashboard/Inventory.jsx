@@ -31,7 +31,6 @@ const columns = [
   { key: 'itemCode', label: 'Item Code', sortable: true },
   { key: 'itemName', label: 'Item Name', sortable: true },
   { key: 'tracking', label: 'Tracking', sortable: false },
-  { key: 'price', label: 'Price', sortable: true, align: 'right' },
   { key: 'quantityOnHand', label: 'Qty on Hand', sortable: true, align: 'right' },
   { key: 'unitCost', label: 'Unit Cost', sortable: true, align: 'right' },
   { key: 'totalValue', label: 'Total Value', sortable: true, align: 'right' },
@@ -74,7 +73,6 @@ export default function Inventory() {
           itemName: p.name,
           category: p.category || 'Uncategorized',
           tracksSerial: p.tracks_serial,
-          price: Number(p.price),
           quantityOnHand: v?.quantityOnHand ?? p.stock_quantity,
           unitCost: v?.unitCost ?? Number(p.cost),
           totalValue: v?.totalValue ?? Number(p.cost) * p.stock_quantity,
@@ -262,7 +260,7 @@ export default function Inventory() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-left text-sm">
+            <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
                 <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
                   {columns.map((c) => (
@@ -308,7 +306,6 @@ export default function Inventory() {
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 pr-3 text-right text-ink-700 dark:text-cream-200">{formatCurrency(r.price)}</td>
                         <td className="py-2.5 pr-3 text-right text-ink-700 dark:text-cream-200">{r.quantityOnHand}</td>
                         <td className="py-2.5 pr-3 text-right text-ink-700 dark:text-cream-200">{formatCurrency(r.unitCost)}</td>
                         <td className="py-2.5 pr-3 text-right font-semibold text-ink-900 dark:text-cream-50">{formatCurrency(r.totalValue)}</td>
@@ -324,7 +321,7 @@ export default function Inventory() {
                       </motion.tr>
                     ))}
                     <tr className="border-b border-ink-400/10 bg-cream-200/50 text-xs font-semibold dark:border-cream-100/10 dark:bg-dark-700/50">
-                      <td className="py-2 pr-3" colSpan={4}>
+                      <td className="py-2 pr-3" colSpan={3}>
                         Subtotal · {group.category}
                       </td>
                       <td className="py-2 pr-3 text-right text-ink-700 dark:text-cream-200">{group.qty}</td>
@@ -337,7 +334,7 @@ export default function Inventory() {
               </tbody>
               <tfoot>
                 <tr className="border-t-2 border-ink-400/20 text-sm font-bold dark:border-cream-100/20">
-                  <td className="pt-3 pr-3" colSpan={4}>Grand total</td>
+                  <td className="pt-3 pr-3" colSpan={3}>Grand total</td>
                   <td className="pt-3 pr-3 text-right text-ink-900 dark:text-cream-50">{grandQty}</td>
                   <td className="pt-3 pr-3" />
                   <td className="pt-3 pr-3 text-right text-ink-900 dark:text-cream-50">{formatCurrency(grandValue)}</td>
