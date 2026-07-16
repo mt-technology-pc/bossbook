@@ -170,7 +170,13 @@ export default function CustomerDetail() {
             </Button>
           </div>
         ) : (
-          <ul className="mt-5 divide-y divide-ink-400/10 dark:divide-cream-100/10">
+          <>
+            <div className="mt-5 flex justify-end gap-2 text-right text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+              <span className="w-[76px]">Debit</span>
+              <span className="w-[76px]">Credit</span>
+              <span className="w-[92px]">Balance</span>
+            </div>
+            <ul className="divide-y divide-ink-400/10 dark:divide-cream-100/10">
             {transactions.map((t, i) => (
               <motion.li
                 key={t.id}
@@ -198,18 +204,21 @@ export default function CustomerDetail() {
                     </p>
                   </div>
                 </div>
-                <span
-                  className={`text-sm font-semibold ${
-                    t.type === 'charge'
-                      ? 'text-clay-600 dark:text-clay-400'
-                      : 'text-ink-700 dark:text-cream-200'
-                  }`}
-                >
-                  {t.type === 'charge' ? '+' : '−'}{formatCurrency(t.amount)}
-                </span>
+                <div className="flex justify-end gap-2 text-right text-xs sm:text-sm">
+                  <span className={`w-[76px] ${t.debit ? 'font-semibold text-clay-600 dark:text-clay-400' : 'text-ink-300 dark:text-cream-100/20'}`}>
+                    {t.debit ? formatCurrency(t.debit) : '—'}
+                  </span>
+                  <span className={`w-[76px] ${t.credit ? 'font-semibold text-ink-700 dark:text-cream-200' : 'text-ink-300 dark:text-cream-100/20'}`}>
+                    {t.credit ? formatCurrency(t.credit) : '—'}
+                  </span>
+                  <span className="w-[92px] font-semibold text-ink-900 dark:text-cream-50">
+                    {formatCurrency(t.balance)}
+                  </span>
+                </div>
               </motion.li>
             ))}
-          </ul>
+            </ul>
+          </>
         )}
       </div>
 

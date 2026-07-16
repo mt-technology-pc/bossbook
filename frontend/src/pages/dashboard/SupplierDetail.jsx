@@ -164,7 +164,14 @@ export default function SupplierDetail() {
             </p>
           </div>
         ) : (
-          <ul className="mt-5 divide-y divide-ink-400/10 dark:divide-cream-100/10">
+          <>
+            <div className="mt-5 flex justify-end gap-2 text-right text-[10px] font-semibold uppercase tracking-wide text-ink-400">
+              <span className="w-[76px]">Debit</span>
+              <span className="w-[76px]">Credit</span>
+              <span className="w-[92px]">Balance</span>
+              <span className="w-[15px]" />
+            </div>
+            <ul className="divide-y divide-ink-400/10 dark:divide-cream-100/10">
             {ledger.map((entry, i) => {
               const isBill = entry.kind === 'bill'
               const isOpen = expanded === entry.id
@@ -200,21 +207,25 @@ export default function SupplierDetail() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`text-sm font-semibold ${
-                          isBill
-                            ? 'text-clay-600 dark:text-clay-400'
-                            : 'text-ink-700 dark:text-cream-200'
-                        }`}
-                      >
-                        {isBill ? '+' : '−'}{formatCurrency(entry.amount)}
+                      <div className="flex justify-end gap-2 text-right text-xs sm:text-sm">
+                        <span className={`w-[76px] ${entry.debit ? 'font-semibold text-clay-600 dark:text-clay-400' : 'text-ink-300 dark:text-cream-100/20'}`}>
+                          {entry.debit ? formatCurrency(entry.debit) : '—'}
+                        </span>
+                        <span className={`w-[76px] ${entry.credit ? 'font-semibold text-ink-700 dark:text-cream-200' : 'text-ink-300 dark:text-cream-100/20'}`}>
+                          {entry.credit ? formatCurrency(entry.credit) : '—'}
+                        </span>
+                        <span className="w-[92px] font-semibold text-ink-900 dark:text-cream-50">
+                          {formatCurrency(entry.balance)}
+                        </span>
+                      </div>
+                      <span className="w-[15px]">
+                        {isBill && (
+                          <ChevronDown
+                            size={15}
+                            className={`text-ink-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+                          />
+                        )}
                       </span>
-                      {isBill && (
-                        <ChevronDown
-                          size={15}
-                          className={`text-ink-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
-                        />
-                      )}
                     </div>
                   </button>
 
@@ -256,7 +267,8 @@ export default function SupplierDetail() {
                 </motion.li>
               )
             })}
-          </ul>
+            </ul>
+          </>
         )}
       </div>
 

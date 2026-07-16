@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { withRunningBalance } from '../lib/ledger'
 
 export function useCustomerTransactions(customerId) {
   const { user } = useAuth()
@@ -19,11 +20,15 @@ export function useCustomerTransactions(customerId) {
       .from('customer_transactions')
       .select('*')
       .eq('customer_id', customerId)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
 
     if (fetchError) setError(fetchError.message)
     else {
-      setTransactions(data ?? [])
+      const withBalance = withRunningBalance(data ?? [], {
+        debit: (t) => (t.type === 'charge' ? t.amount : 0),
+        credit: (t) => (t.type === 'payment' ? t.amount : 0),
+      })
+      setTransactions(withBalance.reverse())
       setError(null)
     }
     setLoading(false)
@@ -46,10 +51,7 @@ export function useCustomerTransactions(customerId) {
     return { data: true }
   }
 
-  const balance = transactions.reduce(
-    (sum, t) => sum + (t.type === 'charge' ? Number(t.amount) : -Number(t.amount)),
-    0,
-  )
+  const balance = transactions[0]?.balance ?? 0
 
   return { transactions, balance, loading, error, addTransaction, refetch: fetchTransactions }
 }

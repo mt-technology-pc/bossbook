@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { withRunningBalance } from '../lib/ledger'
 
 export function useSupplierLedger(supplierId) {
   const { user } = useAuth()
@@ -63,9 +64,8 @@ export function useSupplierLedger(supplierId) {
 
   const totalBilled = purchases.reduce((sum, p) => sum + Number(p.total_amount), 0)
   const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0)
-  const balance = totalBilled - totalPaid
 
-  const ledger = [
+  const ledgerAscending = [
     ...purchases.map((p) => ({
       kind: 'bill',
       id: p.id,
@@ -82,7 +82,16 @@ export function useSupplierLedger(supplierId) {
       amount: Number(p.amount),
       note: p.note,
     })),
-  ].sort((a, b) => new Date(b.date) - new Date(a.date))
+  ].sort((a, b) => new Date(a.date) - new Date(b.date))
+
+  const withBalance = withRunningBalance(ledgerAscending, {
+    // Accounts payable is a liability: a bill increases what we owe (credit),
+    // a payment decreases it (debit).
+    debit: (row) => (row.kind === 'payment' ? row.amount : 0),
+    credit: (row) => (row.kind === 'bill' ? row.amount : 0),
+  })
+  const ledger = withBalance.slice().reverse()
+  const balance = ledger[0]?.balance ?? 0
 
   return {
     ledger, totalBilled, totalPaid, balance, loading, error, addPayment,

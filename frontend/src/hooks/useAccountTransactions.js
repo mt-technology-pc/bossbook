@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { withRunningBalance } from '../lib/ledger'
 
 export function useAccountTransactions(accountId) {
   const { user } = useAuth()
@@ -15,15 +16,23 @@ export function useAccountTransactions(accountId) {
       return
     }
     setLoading(true)
-    const { data, error: fetchError } = await supabase
-      .from('account_transactions')
-      .select('*, sales(type, reference), expenses(category, description)')
-      .eq('account_id', accountId)
-      .order('created_at', { ascending: false })
+    const [txRes, accRes] = await Promise.all([
+      supabase
+        .from('account_transactions')
+        .select('*, sales(type, reference), expenses(category, description)')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: true }),
+      supabase.from('accounts').select('opening_balance').eq('id', accountId).single(),
+    ])
 
-    if (fetchError) setError(fetchError.message)
+    if (txRes.error) setError(txRes.error.message)
     else {
-      setTransactions(data ?? [])
+      const withBalance = withRunningBalance(txRes.data ?? [], {
+        debit: (t) => (t.type === 'deposit' ? t.amount : 0),
+        credit: (t) => (t.type === 'withdrawal' ? t.amount : 0),
+        opening: accRes.data?.opening_balance ?? 0,
+      })
+      setTransactions(withBalance.reverse())
       setError(null)
     }
     setLoading(false)
