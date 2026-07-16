@@ -266,7 +266,7 @@ export default function NewSalesReceipt() {
                   <input
                     value={reference}
                     onChange={(e) => setReference(e.target.value)}
-                    placeholder="Optional"
+                    placeholder={isEdit ? 'Optional' : 'Auto (e.g. R3) — leave blank'}
                     className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
                   />
                 </label>

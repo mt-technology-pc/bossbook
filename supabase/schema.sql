@@ -257,6 +257,7 @@ declare
   v_product_owner uuid;
   v_inventory_coa uuid;
   v_ap_coa uuid;
+  v_reference text := nullif(trim(coalesce(p_reference, '')), '');
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -266,12 +267,16 @@ begin
     raise exception 'A bill needs at least one line item';
   end if;
 
+  if v_reference is null then
+    v_reference := 'B' || public.next_sequence_number(v_owner_id, 'purchase');
+  end if;
+
   select coalesce(sum((item->>'quantity')::int * (item->>'unit_cost')::numeric), 0)
   into v_total
   from jsonb_array_elements(p_items) as item;
 
   insert into public.purchases (owner_id, supplier_id, reference, notes, total_amount, bill_date, due_date)
-  values (v_owner_id, p_supplier_id, p_reference, p_notes, v_total, coalesce(p_bill_date, current_date), p_due_date)
+  values (v_owner_id, p_supplier_id, v_reference, p_notes, v_total, coalesce(p_bill_date, current_date), p_due_date)
   returning id into v_purchase_id;
 
   for v_item in select * from jsonb_array_elements(p_items)
@@ -312,7 +317,7 @@ begin
     v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
     v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
     perform public.post_journal_entry(
-      coalesce(p_bill_date, current_date), coalesce('Bill ' || p_reference, 'Bill'), 'purchases', v_purchase_id,
+      coalesce(p_bill_date, current_date), 'Bill ' || v_reference, 'purchases', v_purchase_id,
       jsonb_build_array(
         jsonb_build_object('account_id', v_inventory_coa, 'debit', v_total, 'credit', 0),
         jsonb_build_object('account_id', v_ap_coa, 'debit', 0, 'credit', v_total)
@@ -823,6 +828,7 @@ declare
   v_inventory_coa uuid;
   v_cash_coa uuid;
   v_lines jsonb;
+  v_reference text := nullif(trim(coalesce(p_reference, '')), '');
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -843,13 +849,18 @@ begin
     end if;
   end if;
 
+  if v_reference is null then
+    v_reference := (case when p_type = 'invoice' then 'S' else 'R' end)
+      || public.next_sequence_number(v_owner_id, p_type);
+  end if;
+
   select coalesce(sum((item->>'quantity')::int * (item->>'unit_price')::numeric), 0)
   into v_total
   from jsonb_array_elements(p_items) as item;
 
   insert into public.sales (owner_id, customer_id, type, reference, notes, sale_date, due_date, deposit_account_id, total_amount)
   values (
-    v_owner_id, p_customer_id, p_type, p_reference, p_notes,
+    v_owner_id, p_customer_id, p_type, v_reference, p_notes,
     coalesce(p_sale_date, current_date), p_due_date, p_deposit_account_id, v_total
   )
   returning id into v_sale_id;
@@ -908,10 +919,10 @@ begin
   if p_customer_id is not null then
     if p_type = 'invoice' then
       insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, auto_generated)
-      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Invoice ' || p_reference, 'Invoice'), v_sale_id, true);
+      values (v_owner_id, p_customer_id, 'charge', v_total, 'Invoice ' || v_reference, v_sale_id, true);
     elsif p_type = 'receipt' then
       insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, auto_generated)
-      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), v_sale_id, true);
+      values (v_owner_id, p_customer_id, 'charge', v_total, 'Sale receipt ' || v_reference, v_sale_id, true);
       insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, auto_generated)
       values (v_owner_id, p_customer_id, 'payment', v_total, 'Paid in full at time of sale', v_sale_id, true);
     end if;
@@ -919,7 +930,7 @@ begin
 
   if p_type = 'receipt' and p_deposit_account_id is not null then
     insert into public.account_transactions (owner_id, account_id, type, amount, note, sale_id)
-    values (v_owner_id, p_deposit_account_id, 'deposit', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), v_sale_id);
+    values (v_owner_id, p_deposit_account_id, 'deposit', v_total, 'Sale receipt ' || v_reference, v_sale_id);
   end if;
 
   -- Journal entry: Dr Accounts Receivable (invoice) or Cash/Undeposited
@@ -960,10 +971,7 @@ begin
 
     perform public.post_journal_entry(
       coalesce(p_sale_date, current_date),
-      case when p_type = 'invoice'
-        then coalesce('Invoice ' || p_reference, 'Invoice')
-        else coalesce('Sale receipt ' || p_reference, 'Sale receipt')
-      end,
+      (case when p_type = 'invoice' then 'Invoice ' else 'Sale receipt ' end) || v_reference,
       'sales', v_sale_id, v_lines
     );
   end if;
@@ -1439,6 +1447,7 @@ declare
   v_when timestamptz := coalesce(p_payment_date, current_date);
   v_cash_coa uuid;
   v_ar_coa uuid;
+  v_code text;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -1466,8 +1475,10 @@ begin
     end if;
   end if;
 
-  insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, created_at)
-  values (v_owner_id, p_customer_id, 'payment', p_amount, coalesce(p_note, 'Payment received'), p_sale_id, v_when)
+  v_code := 'RCPT' || public.next_sequence_number(v_owner_id, 'customer_payment');
+
+  insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, created_at, code)
+  values (v_owner_id, p_customer_id, 'payment', p_amount, coalesce(p_note, 'Payment received'), p_sale_id, v_when, v_code)
   returning id into v_transaction_id;
 
   insert into public.account_transactions (owner_id, account_id, type, amount, note, customer_transaction_id, created_at)
@@ -1624,6 +1635,7 @@ declare
   v_when timestamptz := coalesce(p_payment_date, current_date);
   v_cash_coa uuid;
   v_ap_coa uuid;
+  v_code text;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -1651,8 +1663,10 @@ begin
     end if;
   end if;
 
-  insert into public.supplier_payments (owner_id, supplier_id, amount, note, purchase_id, created_at)
-  values (v_owner_id, p_supplier_id, p_amount, coalesce(p_note, 'Bill payment'), p_purchase_id, v_when)
+  v_code := 'PAY' || public.next_sequence_number(v_owner_id, 'supplier_payment');
+
+  insert into public.supplier_payments (owner_id, supplier_id, amount, note, purchase_id, created_at, code)
+  values (v_owner_id, p_supplier_id, p_amount, coalesce(p_note, 'Bill payment'), p_purchase_id, v_when, v_code)
   returning id into v_payment_id;
 
   insert into public.account_transactions (owner_id, account_id, type, amount, note, supplier_payment_id, created_at)
@@ -2515,3 +2529,180 @@ end;
 $$;
 
 grant execute on function public.backfill_journal_entries() to authenticated;
+
+-- Auto-generated, sequential, per-owner record numbers -------------------
+-- (S1/S2/... for invoices, R1/R2/... for receipts, B1/B2/... for bills,
+-- C1/C2/... for customers, P1/P2/... for products (via sku), RCPT1/RCPT2/...
+-- for payments received, PAY1/PAY2/... for bill payments made). Each prefix
+-- is its own independent counter per owner, assigned atomically so two
+-- concurrent creates can never collide or skip.
+
+create table if not exists public.sequence_counters (
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  key text not null,
+  next_value integer not null default 1,
+  primary key (owner_id, key)
+);
+
+alter table public.sequence_counters enable row level security;
+
+drop policy if exists "Users can view own sequence counters" on public.sequence_counters;
+create policy "Users can view own sequence counters"
+  on public.sequence_counters for select
+  using (auth.uid() = owner_id);
+
+-- Atomically returns the next integer for (owner_id, key), starting at 1.
+-- Safe under concurrent calls: the ON CONFLICT DO UPDATE takes a row lock,
+-- serializing simultaneous requests for the same counter.
+create or replace function public.next_sequence_number(p_owner_id uuid, p_key text)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_next integer;
+begin
+  insert into public.sequence_counters (owner_id, key, next_value)
+  values (p_owner_id, p_key, 2)
+  on conflict (owner_id, key) do update set next_value = public.sequence_counters.next_value + 1
+  returning next_value - 1 into v_next;
+
+  return v_next;
+end;
+$$;
+
+grant execute on function public.next_sequence_number(uuid, text) to authenticated;
+
+-- Customers and products are created via plain client-side inserts, so a
+-- code/sku is assigned by a trigger when the user leaves it blank (their
+-- own value, if provided, is always respected).
+alter table public.customers add column if not exists code text;
+create unique index if not exists customers_owner_code_idx
+  on public.customers(owner_id, code) where code is not null;
+
+create or replace function public.assign_customer_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.code is null or trim(new.code) = '' then
+    new.code := 'C' || public.next_sequence_number(new.owner_id, 'customer');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists assign_customer_code_trigger on public.customers;
+create trigger assign_customer_code_trigger
+  before insert on public.customers
+  for each row execute function public.assign_customer_code();
+
+create or replace function public.assign_product_sku()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.sku is null or trim(new.sku) = '' then
+    new.sku := 'P' || public.next_sequence_number(new.owner_id, 'product');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists assign_product_sku_trigger on public.products;
+create trigger assign_product_sku_trigger
+  before insert on public.products
+  for each row execute function public.assign_product_sku();
+
+-- Customer/supplier payments get their own code column (they never had a
+-- reference field before); bills and sales reuse their existing reference
+-- column, assigned inside create_purchase/create_sale below.
+alter table public.customer_transactions add column if not exists code text;
+create unique index if not exists customer_transactions_owner_code_idx
+  on public.customer_transactions(owner_id, code) where code is not null;
+
+alter table public.supplier_payments add column if not exists code text;
+create unique index if not exists supplier_payments_owner_code_idx
+  on public.supplier_payments(owner_id, code) where code is not null;
+
+-- One-time (safely re-runnable) backfill: assigns a code/reference, in
+-- creation order, to every existing customer/product/purchase/sale/payment
+-- that predates this feature and doesn't have one yet.
+create or replace function public.backfill_record_codes()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_row record;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  for v_row in
+    select id from public.customers
+    where owner_id = v_owner_id and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.customers set code = 'C' || public.next_sequence_number(v_owner_id, 'customer')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.products
+    where owner_id = v_owner_id and (sku is null or trim(sku) = '')
+    order by created_at asc
+  loop
+    update public.products set sku = 'P' || public.next_sequence_number(v_owner_id, 'product')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.purchases
+    where owner_id = v_owner_id and (reference is null or trim(reference) = '')
+    order by created_at asc
+  loop
+    update public.purchases set reference = 'B' || public.next_sequence_number(v_owner_id, 'purchase')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id, type from public.sales
+    where owner_id = v_owner_id and (reference is null or trim(reference) = '')
+    order by created_at asc
+  loop
+    update public.sales
+    set reference = (case when v_row.type = 'invoice' then 'S' else 'R' end)
+      || public.next_sequence_number(v_owner_id, v_row.type)
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.customer_transactions
+    where owner_id = v_owner_id and type = 'payment' and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.customer_transactions set code = 'RCPT' || public.next_sequence_number(v_owner_id, 'customer_payment')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.supplier_payments
+    where owner_id = v_owner_id and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.supplier_payments set code = 'PAY' || public.next_sequence_number(v_owner_id, 'supplier_payment')
+    where id = v_row.id;
+  end loop;
+end;
+$$;
+
+grant execute on function public.backfill_record_codes() to authenticated;

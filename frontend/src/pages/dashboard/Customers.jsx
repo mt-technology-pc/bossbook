@@ -134,6 +134,7 @@ export default function Customers() {
             <table className="w-full min-w-[700px] text-left text-sm">
               <thead>
                 <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                  <th className="pb-3 font-medium">Code</th>
                   <th className="pb-3 font-medium">Customer</th>
                   <th className="pb-3 font-medium">Phone</th>
                   <th className="pb-3 font-medium">Balance</th>
@@ -152,6 +153,9 @@ export default function Customers() {
                       onClick={() => navigate(`/dashboard/customers/${c.id}`)}
                       className="cursor-pointer border-b border-ink-400/10 last:border-0 hover:bg-cream-100 dark:border-cream-100/10 dark:hover:bg-dark-700"
                     >
+                      <td className="py-3.5 pr-3 font-mono text-xs text-ink-400">
+                        {c.code || '—'}
+                      </td>
                       <td className="py-3.5 pr-3">
                         <div className="flex items-center gap-2.5">
                           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-clay-400 to-clay-600 text-xs font-semibold text-cream-50">

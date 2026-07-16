@@ -26,9 +26,17 @@ export default function TrialBalance() {
   const balanced = Math.abs(totalDebits - totalCredits) < 0.01
 
   const runBackfill = async () => {
-    if (!window.confirm('Post journal entries for every existing sale, purchase, payment, and expense that predates double-entry bookkeeping? This is safe to run more than once — it skips anything already posted.')) return
+    if (!window.confirm('Assign codes (C1, P1, B1…) to existing records and post journal entries for every sale, purchase, payment, and expense that predates this feature? This is safe to run more than once — it skips anything already done.')) return
     setBackfilling(true)
     setBackfillMessage(null)
+
+    const { error: codeError } = await supabase.rpc('backfill_record_codes')
+    if (codeError) {
+      setBackfilling(false)
+      setBackfillMessage({ type: 'error', text: codeError.message })
+      return
+    }
+
     const { error: rpcError } = await supabase.rpc('backfill_journal_entries')
     setBackfilling(false)
     if (rpcError) {

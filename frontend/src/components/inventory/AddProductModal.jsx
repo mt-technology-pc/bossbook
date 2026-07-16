@@ -85,7 +85,7 @@ export default function AddProductModal({ open, onClose, onSubmit }) {
             label="SKU"
             value={form.sku}
             onChange={update('sku')}
-            placeholder="Optional"
+            placeholder="Auto (e.g. P3) — leave blank"
           />
           <label className="block">
             <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Category</span>

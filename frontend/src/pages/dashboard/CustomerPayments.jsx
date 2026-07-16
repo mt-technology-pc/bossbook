@@ -125,6 +125,7 @@ export default function CustomerPayments() {
             <table className="w-full min-w-[700px] text-left text-sm">
               <thead>
                 <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                  <th className="pb-3 font-medium">Code</th>
                   <th className="pb-3 font-medium">Date</th>
                   <th className="pb-3 font-medium">Customer</th>
                   <th className="pb-3 font-medium">Applied to</th>
@@ -143,6 +144,7 @@ export default function CustomerPayments() {
                     onClick={() => navigate(`/dashboard/sales/receive-payment/${p.id}`)}
                     className="cursor-pointer border-b border-ink-400/10 last:border-0 hover:bg-cream-100 dark:border-cream-100/10 dark:hover:bg-dark-700"
                   >
+                    <td className="py-3.5 pr-3 font-mono text-xs text-ink-400">{p.code || '—'}</td>
                     <td className="py-3.5 pr-3 text-ink-500 dark:text-cream-400">{formatDate(p.created_at)}</td>
                     <td className="py-3.5 pr-3 font-medium text-ink-900 dark:text-cream-50">
                       {p.customers?.name || '—'}

@@ -22,7 +22,13 @@ export default function SaleLineItemsEditor({
         const next = { ...l, ...patch }
         const product = getProduct(next.productId)
 
-        if ('productId' in patch) next.unitIds = []
+        if ('productId' in patch) {
+          next.unitIds = []
+          if (product) {
+            if (!next.unitPrice) next.unitPrice = String(product.price)
+            if (!next.quantity) next.quantity = '1'
+          }
+        }
         if (product?.tracks_serial) {
           const qty = Math.max(0, Number(next.quantity) || 0)
           if (next.unitIds.length > qty) next.unitIds = next.unitIds.slice(0, qty)
