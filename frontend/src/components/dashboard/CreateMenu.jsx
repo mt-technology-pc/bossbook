@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
-  Plus, ShoppingBag, Receipt, FileText, Package, Contact, Truck, HandCoins,
+  Plus, ShoppingBag, Receipt, FileText, Package, Contact, Truck, HandCoins, Wallet,
 } from 'lucide-react'
 
 const actions = [
@@ -11,6 +11,7 @@ const actions = [
   { label: 'Receive payment', desc: 'Collect against a customer balance', icon: HandCoins, to: '/dashboard/sales/receive-payment', direct: true },
   { label: 'Create purchase', desc: 'Record a supplier bill', icon: ShoppingBag, to: '/dashboard/purchases/new', direct: true },
   { label: 'Pay a bill', desc: 'Pay down a supplier balance', icon: HandCoins, to: '/dashboard/suppliers', plain: true },
+  { label: 'Record expense', desc: 'Rent, utilities, salaries and the like', icon: Wallet, to: '/dashboard/expenses' },
   { label: 'Add product', desc: 'Add to your catalog', icon: Package, to: '/dashboard/inventory' },
   { label: 'Add customer', desc: 'Save a new customer', icon: Contact, to: '/dashboard/customers' },
   { label: 'Add supplier', desc: 'Save a new supplier', icon: Truck, to: '/dashboard/suppliers' },

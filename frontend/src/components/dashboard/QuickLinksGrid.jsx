@@ -2,13 +2,14 @@ import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
   Package, Receipt, ScanLine, BarChart3, Users, Settings, Truck, Contact,
-  ShoppingBag,
+  ShoppingBag, Wallet,
 } from 'lucide-react'
 
 const links = [
   { label: 'Sales', icon: Receipt, to: '/dashboard/sales' },
   { label: 'Inventory', icon: Package, to: '/dashboard/inventory' },
   { label: 'Purchases', icon: ShoppingBag, to: '/dashboard/purchases' },
+  { label: 'Expenses', icon: Wallet, to: '/dashboard/expenses' },
   { label: 'Customers', icon: Contact, to: '/dashboard/customers' },
   { label: 'Suppliers', icon: Truck, to: '/dashboard/suppliers' },
   { label: 'Serial tracking', icon: ScanLine, to: '/dashboard/serial-tracking', soon: true },

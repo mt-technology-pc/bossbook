@@ -186,6 +186,11 @@ export default function AccountDetail() {
                           {t.sales.reference || (t.sales.type === 'invoice' ? 'Invoice' : 'Receipt')}
                         </span>
                       )}
+                      {t.expenses && (
+                        <span className="flex items-center gap-1 rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-500 dark:bg-cream-100/10 dark:text-cream-400">
+                          <Receipt size={10} /> {t.expenses.category}
+                        </span>
+                      )}
                     </p>
                     <p className="text-xs text-ink-400">
                       {formatDate(t.created_at)}{t.note ? ` · ${t.note}` : ''}

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
-  Truck, ShoppingBag, Menu, X, LogOut, Moon, Sun, ChevronDown,
+  Truck, ShoppingBag, Wallet, Menu, X, LogOut, Moon, Sun, ChevronDown,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
@@ -15,6 +15,7 @@ const nav = [
   { label: 'Sales', to: '/dashboard/sales', icon: Receipt },
   { label: 'Inventory', to: '/dashboard/inventory', icon: Package },
   { label: 'Purchases', to: '/dashboard/purchases', icon: ShoppingBag },
+  { label: 'Expenses', to: '/dashboard/expenses', icon: Wallet },
   { label: 'Customers', to: '/dashboard/customers', icon: Contact },
   { label: 'Suppliers', to: '/dashboard/suppliers', icon: Truck },
   { label: 'Serial tracking', to: '/dashboard/serial-tracking', icon: ScanLine },

@@ -55,6 +55,7 @@ function buildEvents(product, purchaseItems, saleItems, asOfDate) {
       type: 'out',
       date: s.sales?.sale_date,
       qty: s.quantity,
+      unitPrice: Number(s.unit_price),
       label: s.sales?.reference
         ? `${isInvoice ? 'Invoice' : 'Sale receipt'} · ${s.sales.reference}`
         : (isInvoice ? 'Invoice' : 'Sale receipt'),
@@ -79,13 +80,16 @@ function computeFIFO(events) {
   const ledger = []
 
   events.forEach((e) => {
+    let cogs
     if (e.type === 'in') {
       layers.push({ qty: e.qty, unitCost: e.unitCost })
     } else {
       let remaining = e.qty
+      cogs = 0
       while (remaining > 0 && layers.length > 0) {
         const layer = layers[0]
         const consumed = Math.min(layer.qty, remaining)
+        cogs += consumed * layer.unitCost
         layer.qty -= consumed
         remaining -= consumed
         if (layer.qty <= 0) layers.shift()
@@ -93,7 +97,7 @@ function computeFIFO(events) {
     }
     const qtyOnHand = layers.reduce((sum, l) => sum + l.qty, 0)
     const value = layers.reduce((sum, l) => sum + l.qty * l.unitCost, 0)
-    ledger.push({ ...e, balanceQty: qtyOnHand, balanceValue: value })
+    ledger.push({ ...e, balanceQty: qtyOnHand, balanceValue: value, cogs })
   })
 
   const qtyOnHand = layers.reduce((sum, l) => sum + l.qty, 0)
@@ -114,18 +118,20 @@ function computeWeightedAverage(events) {
   const ledger = []
 
   events.forEach((e) => {
+    let cogs
     if (e.type === 'in') {
       value += e.qty * e.unitCost
       qty += e.qty
       avgCost = qty > 0 ? value / qty : 0
     } else {
       const consumed = Math.min(qty, e.qty)
-      value -= consumed * avgCost
+      cogs = consumed * avgCost
+      value -= cogs
       qty -= consumed
     }
     qty = Math.max(0, qty)
     value = Math.max(0, value)
-    ledger.push({ ...e, balanceQty: qty, balanceValue: value, unitCostAtPoint: avgCost })
+    ledger.push({ ...e, balanceQty: qty, balanceValue: value, unitCostAtPoint: avgCost, cogs })
   })
 
   return { qtyOnHand: qty, unitCost: avgCost, totalValue: value, ledger }
@@ -136,9 +142,11 @@ function computeStandardCost(events, standardCost) {
   const ledger = []
 
   events.forEach((e) => {
+    let cogs
+    if (e.type === 'out') cogs = Math.min(qty, e.qty) * standardCost
     qty += e.type === 'in' ? e.qty : -e.qty
     qty = Math.max(0, qty)
-    ledger.push({ ...e, balanceQty: qty, balanceValue: qty * standardCost, unitCostAtPoint: standardCost })
+    ledger.push({ ...e, balanceQty: qty, balanceValue: qty * standardCost, unitCostAtPoint: standardCost, cogs })
   })
 
   return { qtyOnHand: qty, unitCost: standardCost, totalValue: qty * standardCost, ledger }

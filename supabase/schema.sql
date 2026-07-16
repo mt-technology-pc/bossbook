@@ -805,3 +805,124 @@ end;
 $$;
 
 grant execute on function public.pay_bill(uuid, uuid, numeric, text, date) to authenticated;
+
+-- Expenses -----------------------------------------------------------------
+-- Recording an expense withdraws money from an account, same as paying a
+-- bill — an expense here always represents money already paid, not an
+-- unpaid liability (there's no accounts-payable concept for expenses).
+
+create table if not exists public.expenses (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  account_id uuid references public.accounts(id) on delete set null,
+  category text not null,
+  description text,
+  amount numeric(12,2) not null check (amount > 0),
+  expense_date date not null default current_date,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists expenses_owner_id_idx on public.expenses(owner_id);
+
+alter table public.expenses enable row level security;
+
+drop policy if exists "Users can view own expenses" on public.expenses;
+create policy "Users can view own expenses"
+  on public.expenses for select
+  using (auth.uid() = owner_id);
+
+drop policy if exists "Users can insert own expenses" on public.expenses;
+create policy "Users can insert own expenses"
+  on public.expenses for insert
+  with check (auth.uid() = owner_id);
+
+drop policy if exists "Users can delete own expenses" on public.expenses;
+create policy "Users can delete own expenses"
+  on public.expenses for delete
+  using (auth.uid() = owner_id);
+
+alter table public.account_transactions add column if not exists expense_id uuid references public.expenses(id) on delete set null;
+create index if not exists account_transactions_expense_id_idx on public.account_transactions(expense_id);
+
+drop function if exists public.record_expense(uuid, text, text, numeric, date);
+
+create or replace function public.record_expense(
+  p_account_id uuid,
+  p_category text,
+  p_description text,
+  p_amount numeric,
+  p_expense_date date default current_date
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_account_owner uuid;
+  v_expense_id uuid;
+  v_when timestamptz := coalesce(p_expense_date, current_date);
+  v_category text := trim(coalesce(p_category, ''));
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  if v_category = '' then
+    raise exception 'Enter a category';
+  end if;
+
+  select owner_id into v_account_owner from public.accounts where id = p_account_id;
+  if v_account_owner is null or v_account_owner <> v_owner_id then
+    raise exception 'Invalid account';
+  end if;
+
+  insert into public.expenses (owner_id, account_id, category, description, amount, expense_date)
+  values (v_owner_id, p_account_id, v_category, p_description, p_amount, coalesce(p_expense_date, current_date))
+  returning id into v_expense_id;
+
+  insert into public.account_transactions (owner_id, account_id, type, amount, note, expense_id, created_at)
+  values (
+    v_owner_id, p_account_id, 'withdrawal', p_amount,
+    v_category || coalesce(': ' || nullif(p_description, ''), ''),
+    v_expense_id, v_when
+  );
+
+  return v_expense_id;
+end;
+$$;
+
+grant execute on function public.record_expense(uuid, text, text, numeric, date) to authenticated;
+
+drop function if exists public.delete_expense(uuid);
+
+create or replace function public.delete_expense(p_expense_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_expense_owner uuid;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select owner_id into v_expense_owner from public.expenses where id = p_expense_id;
+  if v_expense_owner is null or v_expense_owner <> v_owner_id then
+    raise exception 'Invalid expense';
+  end if;
+
+  delete from public.account_transactions where expense_id = p_expense_id and owner_id = v_owner_id;
+  delete from public.expenses where id = p_expense_id and owner_id = v_owner_id;
+end;
+$$;
+
+grant execute on function public.delete_expense(uuid) to authenticated;

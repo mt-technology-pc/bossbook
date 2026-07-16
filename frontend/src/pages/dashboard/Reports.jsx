@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Boxes, TrendingUp, ShoppingBag, ArrowRight } from 'lucide-react'
+import { Boxes, TrendingUp, ShoppingBag, FileBarChart, ArrowRight } from 'lucide-react'
 
 const reports = [
   {
@@ -10,9 +10,15 @@ const reports = [
     to: '/dashboard/reports/inventory-valuation',
   },
   {
+    icon: FileBarChart,
+    title: 'Income Statement',
+    desc: 'Revenue, cost of goods sold and gross profit by category, over any date range.',
+    to: '/dashboard/reports/income-statement',
+  },
+  {
     icon: TrendingUp,
     title: 'Sales Summary',
-    desc: 'Revenue, units sold and top items over a date range.',
+    desc: 'Units sold and top items over a date range.',
     soon: true,
   },
   {
