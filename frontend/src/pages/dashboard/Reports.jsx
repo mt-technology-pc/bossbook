@@ -1,22 +1,8 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import {
-  Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight, Wallet, HandCoins,
-} from 'lucide-react'
+import { Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight } from 'lucide-react'
 
 const reports = [
-  {
-    icon: Wallet,
-    title: 'Accounts Receivable',
-    desc: 'Every customer who currently owes you money, and how much — with a Receive payment shortcut.',
-    to: '/dashboard/reports/receivables',
-  },
-  {
-    icon: HandCoins,
-    title: 'Accounts Payable',
-    desc: 'Every supplier you currently owe money to, and how much — with a Pay a bill shortcut.',
-    to: '/dashboard/reports/payables',
-  },
   {
     icon: BookOpen,
     title: 'Sales Day Book',

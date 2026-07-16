@@ -131,8 +131,10 @@ function App() {
         <Route path="inventory" element={<Inventory />} />
         <Route path="customers" element={<Customers />} />
         <Route path="customers/:id" element={<CustomerDetail />} />
+        <Route path="receivables" element={<AccountsReceivable />} />
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="suppliers/:id" element={<SupplierDetail />} />
+        <Route path="payables" element={<AccountsPayable />} />
         <Route path="purchases" element={<Purchases />} />
         <Route path="purchases/payments-made" element={<SupplierPayments />} />
         <Route path="sales" element={<Sales />} />
@@ -146,8 +148,6 @@ function App() {
         <Route path="reports/income-statement" element={<IncomeStatementReport />} />
         <Route path="reports/sales-day-book" element={<SalesDayBookReport />} />
         <Route path="reports/purchase-day-book" element={<PurchaseDayBookReport />} />
-        <Route path="reports/receivables" element={<AccountsReceivable />} />
-        <Route path="reports/payables" element={<AccountsPayable />} />
         <Route path="team" element={<ComingSoon title="Team" />} />
         <Route path="settings" element={<ComingSoon title="Settings" />} />
         <Route path="*" element={<ComingSoon />} />
