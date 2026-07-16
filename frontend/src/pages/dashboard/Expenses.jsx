@@ -32,7 +32,8 @@ export default function Expenses() {
     const q = query.toLowerCase()
     return (
       e.category.toLowerCase().includes(q) ||
-      e.description?.toLowerCase().includes(q)
+      e.description?.toLowerCase().includes(q) ||
+      e.code?.toLowerCase().includes(q)
     )
   })
 
@@ -97,7 +98,7 @@ export default function Expenses() {
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by category or description…"
+            placeholder="Search by code, category or description…"
             className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
           />
         </div>

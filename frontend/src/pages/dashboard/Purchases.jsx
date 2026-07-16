@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Plus, Receipt, ScanLine, Layers, AlertCircle, ChevronDown, HandCoins, Pencil, Trash2, ListChecks,
+  Search,
 } from 'lucide-react'
 import { usePurchases } from '../../hooks/usePurchases'
 import { formatCurrency } from '../../lib/currency'
@@ -15,7 +16,15 @@ function formatDate(dateStr) {
 export default function Purchases() {
   const { purchases, loading, error, deletePurchase } = usePurchases()
   const [expanded, setExpanded] = useState(null)
+  const [query, setQuery] = useState('')
   const navigate = useNavigate()
+
+  const filtered = purchases.filter((p) => {
+    const q = query.trim().toLowerCase()
+    if (!q) return true
+    const hay = `${p.reference ?? ''} ${p.suppliers?.name ?? ''} ${p.notes ?? ''}`.toLowerCase()
+    return hay.includes(q)
+  })
 
   const handleDelete = async (e, p) => {
     e.stopPropagation()
@@ -82,8 +91,18 @@ export default function Purchases() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+        <div className="relative max-w-xs">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by code, supplier or note…"
+            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+          />
+        </div>
+
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -93,24 +112,28 @@ export default function Purchases() {
           <div className="flex justify-center py-16">
             <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
           </div>
-        ) : purchases.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
               <Receipt size={20} />
             </span>
             <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
-              No bills recorded yet
+              {purchases.length === 0 ? 'No bills recorded yet' : 'No matches'}
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
-              Record your first bill to bring stock into your inventory.
+              {purchases.length === 0
+                ? 'Record your first bill to bring stock into your inventory.'
+                : 'Try a different search term.'}
             </p>
-            <Button onClick={() => navigate('/dashboard/purchases/new')} variant="outline" className="mt-5">
-              <Plus size={15} /> Record a bill
-            </Button>
+            {purchases.length === 0 && (
+              <Button onClick={() => navigate('/dashboard/purchases/new')} variant="outline" className="mt-5">
+                <Plus size={15} /> Record a bill
+              </Button>
+            )}
           </div>
         ) : (
-          <ul className="divide-y divide-ink-400/10 dark:divide-cream-100/10">
-            {purchases.map((p, i) => {
+          <ul className="mt-5 divide-y divide-ink-400/10 dark:divide-cream-100/10">
+            {filtered.map((p, i) => {
               const itemCount = p.purchase_items.reduce((s, it) => s + it.quantity, 0)
               const isOpen = expanded === p.id
               const billDate = p.bill_date || p.created_at
@@ -131,8 +154,11 @@ export default function Purchases() {
                         <Receipt size={16} />
                       </span>
                       <div>
-                        <p className="text-sm font-medium text-ink-900 dark:text-cream-50">
+                        <p className="flex items-center gap-2 text-sm font-medium text-ink-900 dark:text-cream-50">
                           {p.reference || `Bill · ${formatDate(billDate)}`}
+                          <span className="font-mono text-[10px] font-normal text-ink-400">
+                            {p.reference || '—'}
+                          </span>
                         </p>
                         <p className="text-xs text-ink-400">
                           {p.suppliers?.name || 'No supplier'} · {itemCount} unit{itemCount === 1 ? '' : 's'} · {formatDate(billDate)}

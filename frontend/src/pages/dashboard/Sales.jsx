@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Plus, FileText, Receipt, TrendingUp, AlertCircle, ChevronDown, Wallet, Landmark, HandCoins,
-  Pencil, Trash2, ListChecks,
+  Pencil, Trash2, ListChecks, Search,
 } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { formatCurrency } from '../../lib/currency'
@@ -16,7 +16,15 @@ function formatDate(dateStr) {
 export default function Sales() {
   const { sales, loading, error, deleteSale } = useSales()
   const [expanded, setExpanded] = useState(null)
+  const [query, setQuery] = useState('')
   const navigate = useNavigate()
+
+  const filtered = sales.filter((s) => {
+    const q = query.trim().toLowerCase()
+    if (!q) return true
+    const hay = `${s.reference ?? ''} ${s.customers?.name ?? ''} ${s.notes ?? ''}`.toLowerCase()
+    return hay.includes(q)
+  })
 
   const editPathFor = (s) => (s.type === 'invoice' ? `/dashboard/sales/new-invoice/${s.id}` : `/dashboard/sales/new-receipt/${s.id}`)
 
@@ -86,8 +94,18 @@ export default function Sales() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+        <div className="relative max-w-xs">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by code, customer or note…"
+            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+          />
+        </div>
+
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -97,29 +115,33 @@ export default function Sales() {
           <div className="flex justify-center py-16">
             <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
           </div>
-        ) : sales.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
               <TrendingUp size={20} />
             </span>
             <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
-              No sales recorded yet
+              {sales.length === 0 ? 'No sales recorded yet' : 'No matches'}
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
-              Create an invoice for a credit sale, or a sales receipt when you&apos;re paid on the spot.
+              {sales.length === 0
+                ? "Create an invoice for a credit sale, or a sales receipt when you're paid on the spot."
+                : 'Try a different search term.'}
             </p>
-            <div className="mt-5 flex gap-2">
-              <Button onClick={() => navigate('/dashboard/sales/new-receipt')} variant="outline">
-                <Receipt size={15} /> Sales receipt
-              </Button>
-              <Button onClick={() => navigate('/dashboard/sales/new-invoice')} variant="primary">
-                <Plus size={15} /> Invoice
-              </Button>
-            </div>
+            {sales.length === 0 && (
+              <div className="mt-5 flex gap-2">
+                <Button onClick={() => navigate('/dashboard/sales/new-receipt')} variant="outline">
+                  <Receipt size={15} /> Sales receipt
+                </Button>
+                <Button onClick={() => navigate('/dashboard/sales/new-invoice')} variant="primary">
+                  <Plus size={15} /> Invoice
+                </Button>
+              </div>
+            )}
           </div>
         ) : (
-          <ul className="divide-y divide-ink-400/10 dark:divide-cream-100/10">
-            {sales.map((s, i) => {
+          <ul className="mt-5 divide-y divide-ink-400/10 dark:divide-cream-100/10">
+            {filtered.map((s, i) => {
               const itemCount = s.sale_items.reduce((sum, it) => sum + it.quantity, 0)
               const isOpen = expanded === s.id
               const isInvoice = s.type === 'invoice'
@@ -150,6 +172,9 @@ export default function Sales() {
                             }`}
                           >
                             {isInvoice ? 'Invoice' : 'Receipt'}
+                          </span>
+                          <span className="font-mono text-[10px] font-normal text-ink-400">
+                            {s.reference || '—'}
                           </span>
                         </p>
                         <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-400">
