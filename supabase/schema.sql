@@ -255,6 +255,8 @@ declare
   v_total numeric(12,2) := 0;
   v_serial text;
   v_product_owner uuid;
+  v_inventory_coa uuid;
+  v_ap_coa uuid;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -305,6 +307,18 @@ begin
       end loop;
     end if;
   end loop;
+
+  if v_total > 0 then
+    v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+    v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+    perform public.post_journal_entry(
+      coalesce(p_bill_date, current_date), coalesce('Bill ' || p_reference, 'Bill'), 'purchases', v_purchase_id,
+      jsonb_build_array(
+        jsonb_build_object('account_id', v_inventory_coa, 'debit', v_total, 'credit', 0),
+        jsonb_build_object('account_id', v_ap_coa, 'debit', 0, 'credit', v_total)
+      )
+    );
+  end if;
 
   return v_purchase_id;
 end;
@@ -625,6 +639,8 @@ declare
   v_expense_id uuid;
   v_when timestamptz := coalesce(p_expense_date, current_date);
   v_category text := trim(coalesce(p_category, ''));
+  v_expense_coa uuid;
+  v_cash_coa uuid;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -652,6 +668,17 @@ begin
     v_owner_id, p_account_id, 'withdrawal', p_amount,
     v_category || coalesce(': ' || nullif(p_description, ''), ''),
     v_expense_id, v_when
+  );
+
+  v_expense_coa := public.ensure_expense_category_account(v_category);
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  perform public.post_journal_entry(
+    coalesce(p_expense_date, current_date), v_category || coalesce(': ' || nullif(p_description, ''), ''),
+    'expenses', v_expense_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_expense_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', p_amount)
+    )
   );
 
   return v_expense_id;
@@ -683,6 +710,7 @@ begin
 
   delete from public.account_transactions where expense_id = p_expense_id and owner_id = v_owner_id;
   delete from public.expenses where id = p_expense_id and owner_id = v_owner_id;
+  perform public.reverse_journal_entries('expenses', p_expense_id);
 end;
 $$;
 
@@ -787,6 +815,14 @@ declare
   v_stock integer;
   v_tracks_serial boolean;
   v_account_owner uuid;
+  v_product_cost numeric(12,2);
+  v_cogs numeric(12,2) := 0;
+  v_ar_coa uuid;
+  v_revenue_coa uuid;
+  v_cogs_coa uuid;
+  v_inventory_coa uuid;
+  v_cash_coa uuid;
+  v_lines jsonb;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -822,8 +858,8 @@ begin
   loop
     v_product_id := (v_item->>'product_id')::uuid;
 
-    select owner_id, stock_quantity, tracks_serial
-    into v_product_owner, v_stock, v_tracks_serial
+    select owner_id, stock_quantity, tracks_serial, cost
+    into v_product_owner, v_stock, v_tracks_serial, v_product_cost
     from public.products
     where id = v_product_id;
 
@@ -835,15 +871,18 @@ begin
       raise exception 'Not enough stock for one of the products on this sale';
     end if;
 
-    insert into public.sale_items (owner_id, sale_id, product_id, quantity, unit_price, subtotal)
+    insert into public.sale_items (owner_id, sale_id, product_id, quantity, unit_price, subtotal, unit_cost)
     values (
       v_owner_id,
       v_sale_id,
       v_product_id,
       (v_item->>'quantity')::int,
       (v_item->>'unit_price')::numeric,
-      (v_item->>'quantity')::int * (v_item->>'unit_price')::numeric
+      (v_item->>'quantity')::int * (v_item->>'unit_price')::numeric,
+      v_product_cost
     );
+
+    v_cogs := v_cogs + (v_item->>'quantity')::int * coalesce(v_product_cost, 0);
 
     update public.products
     set stock_quantity = stock_quantity - (v_item->>'quantity')::int
@@ -881,6 +920,52 @@ begin
   if p_type = 'receipt' and p_deposit_account_id is not null then
     insert into public.account_transactions (owner_id, account_id, type, amount, note, sale_id)
     values (v_owner_id, p_deposit_account_id, 'deposit', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), v_sale_id);
+  end if;
+
+  -- Journal entry: Dr Accounts Receivable (invoice) or Cash/Undeposited
+  -- Funds (receipt) / Cr Sales Revenue, plus Dr COGS / Cr Inventory using
+  -- each line's cost snapshot above (standard/latest-cost method).
+  if v_total > 0 then
+    v_revenue_coa := public.ensure_system_account('sales_revenue', 'Sales Revenue', 'income', 'credit');
+    v_lines := '[]'::jsonb;
+
+    if p_type = 'invoice' then
+      v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_ar_coa, 'debit', v_total, 'credit', 0)
+      );
+    else
+      if p_deposit_account_id is not null then
+        v_cash_coa := public.ensure_account_coa_row(p_deposit_account_id);
+      else
+        v_cash_coa := public.ensure_system_account('undeposited_funds', 'Undeposited Funds', 'asset', 'debit');
+      end if;
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_cash_coa, 'debit', v_total, 'credit', 0)
+      );
+    end if;
+
+    v_lines := v_lines || jsonb_build_array(
+      jsonb_build_object('account_id', v_revenue_coa, 'debit', 0, 'credit', v_total)
+    );
+
+    if v_cogs > 0 then
+      v_cogs_coa := public.ensure_system_account('cogs', 'Cost of Goods Sold', 'expense', 'debit');
+      v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_cogs_coa, 'debit', v_cogs, 'credit', 0),
+        jsonb_build_object('account_id', v_inventory_coa, 'debit', 0, 'credit', v_cogs)
+      );
+    end if;
+
+    perform public.post_journal_entry(
+      coalesce(p_sale_date, current_date),
+      case when p_type = 'invoice'
+        then coalesce('Invoice ' || p_reference, 'Invoice')
+        else coalesce('Sale receipt ' || p_reference, 'Sale receipt')
+      end,
+      'sales', v_sale_id, v_lines
+    );
   end if;
 
   return v_sale_id;
@@ -921,6 +1006,14 @@ declare
   v_tracks_serial boolean;
   v_account_owner uuid;
   v_total numeric(12,2) := 0;
+  v_product_cost numeric(12,2);
+  v_cogs numeric(12,2) := 0;
+  v_ar_coa uuid;
+  v_revenue_coa uuid;
+  v_cogs_coa uuid;
+  v_inventory_coa uuid;
+  v_cash_coa uuid;
+  v_lines jsonb;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -959,6 +1052,7 @@ begin
   delete from public.account_transactions where sale_id = p_sale_id;
   delete from public.customer_transactions where sale_id = p_sale_id and auto_generated = true;
   delete from public.sale_items where sale_id = p_sale_id;
+  perform public.reverse_journal_entries('sales', p_sale_id);
 
   select coalesce(sum((item->>'quantity')::int * (item->>'unit_price')::numeric), 0)
   into v_total
@@ -980,8 +1074,8 @@ begin
   loop
     v_product_id := (v_new_item->>'product_id')::uuid;
 
-    select owner_id, stock_quantity, tracks_serial
-    into v_product_owner, v_stock, v_tracks_serial
+    select owner_id, stock_quantity, tracks_serial, cost
+    into v_product_owner, v_stock, v_tracks_serial, v_product_cost
     from public.products
     where id = v_product_id;
 
@@ -993,13 +1087,16 @@ begin
       raise exception 'Not enough stock for one of the products on this sale';
     end if;
 
-    insert into public.sale_items (owner_id, sale_id, product_id, quantity, unit_price, subtotal)
+    insert into public.sale_items (owner_id, sale_id, product_id, quantity, unit_price, subtotal, unit_cost)
     values (
       v_owner_id, p_sale_id, v_product_id,
       (v_new_item->>'quantity')::int,
       (v_new_item->>'unit_price')::numeric,
-      (v_new_item->>'quantity')::int * (v_new_item->>'unit_price')::numeric
+      (v_new_item->>'quantity')::int * (v_new_item->>'unit_price')::numeric,
+      v_product_cost
     );
+
+    v_cogs := v_cogs + (v_new_item->>'quantity')::int * coalesce(v_product_cost, 0);
 
     update public.products
     set stock_quantity = stock_quantity - (v_new_item->>'quantity')::int
@@ -1037,6 +1134,49 @@ begin
   if p_type = 'receipt' and p_deposit_account_id is not null then
     insert into public.account_transactions (owner_id, account_id, type, amount, note, sale_id)
     values (v_owner_id, p_deposit_account_id, 'deposit', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), p_sale_id);
+  end if;
+
+  if v_total > 0 then
+    v_revenue_coa := public.ensure_system_account('sales_revenue', 'Sales Revenue', 'income', 'credit');
+    v_lines := '[]'::jsonb;
+
+    if p_type = 'invoice' then
+      v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_ar_coa, 'debit', v_total, 'credit', 0)
+      );
+    else
+      if p_deposit_account_id is not null then
+        v_cash_coa := public.ensure_account_coa_row(p_deposit_account_id);
+      else
+        v_cash_coa := public.ensure_system_account('undeposited_funds', 'Undeposited Funds', 'asset', 'debit');
+      end if;
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_cash_coa, 'debit', v_total, 'credit', 0)
+      );
+    end if;
+
+    v_lines := v_lines || jsonb_build_array(
+      jsonb_build_object('account_id', v_revenue_coa, 'debit', 0, 'credit', v_total)
+    );
+
+    if v_cogs > 0 then
+      v_cogs_coa := public.ensure_system_account('cogs', 'Cost of Goods Sold', 'expense', 'debit');
+      v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_cogs_coa, 'debit', v_cogs, 'credit', 0),
+        jsonb_build_object('account_id', v_inventory_coa, 'debit', 0, 'credit', v_cogs)
+      );
+    end if;
+
+    perform public.post_journal_entry(
+      coalesce(p_sale_date, current_date),
+      case when p_type = 'invoice'
+        then coalesce('Invoice ' || p_reference, 'Invoice')
+        else coalesce('Sale receipt ' || p_reference, 'Sale receipt')
+      end,
+      'sales', p_sale_id, v_lines
+    );
   end if;
 
   return p_sale_id;
@@ -1080,6 +1220,7 @@ begin
   delete from public.customer_transactions where sale_id = p_sale_id and auto_generated = true;
   delete from public.sale_items where sale_id = p_sale_id;
   delete from public.sales where id = p_sale_id;
+  perform public.reverse_journal_entries('sales', p_sale_id);
 end;
 $$;
 
@@ -1114,6 +1255,8 @@ declare
   v_total numeric(12,2) := 0;
   v_current_stock integer;
   v_product_name text;
+  v_inventory_coa uuid;
+  v_ap_coa uuid;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -1152,6 +1295,7 @@ begin
 
   delete from public.product_units where purchase_id = p_purchase_id;
   delete from public.purchase_items where purchase_id = p_purchase_id;
+  perform public.reverse_journal_entries('purchases', p_purchase_id);
 
   select coalesce(sum((item->>'quantity')::int * (item->>'unit_cost')::numeric), 0)
   into v_total
@@ -1196,6 +1340,18 @@ begin
       end loop;
     end if;
   end loop;
+
+  if v_total > 0 then
+    v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+    v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+    perform public.post_journal_entry(
+      coalesce(p_bill_date, current_date), coalesce('Bill ' || p_reference, 'Bill'), 'purchases', p_purchase_id,
+      jsonb_build_array(
+        jsonb_build_object('account_id', v_inventory_coa, 'debit', v_total, 'credit', 0),
+        jsonb_build_object('account_id', v_ap_coa, 'debit', 0, 'credit', v_total)
+      )
+    );
+  end if;
 
   return p_purchase_id;
 end;
@@ -1252,6 +1408,7 @@ begin
   delete from public.product_units where purchase_id = p_purchase_id;
   delete from public.purchase_items where purchase_id = p_purchase_id;
   delete from public.purchases where id = p_purchase_id;
+  perform public.reverse_journal_entries('purchases', p_purchase_id);
 end;
 $$;
 
@@ -1280,6 +1437,8 @@ declare
   v_account_owner uuid;
   v_transaction_id uuid;
   v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ar_coa uuid;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -1314,6 +1473,16 @@ begin
   insert into public.account_transactions (owner_id, account_id, type, amount, note, customer_transaction_id, created_at)
   values (v_owner_id, p_account_id, 'deposit', p_amount, coalesce(p_note, 'Payment received'), v_transaction_id, v_when);
 
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+  perform public.post_journal_entry(
+    coalesce(p_payment_date, current_date), coalesce(p_note, 'Payment received'), 'customer_transactions', v_transaction_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_cash_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_ar_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
+
   return v_transaction_id;
 end;
 $$;
@@ -1340,6 +1509,8 @@ declare
   v_customer_id uuid;
   v_account_owner uuid;
   v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ar_coa uuid;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -1379,6 +1550,17 @@ begin
   update public.account_transactions
   set account_id = p_account_id, amount = p_amount, note = p_note, created_at = v_when
   where customer_transaction_id = p_payment_id;
+
+  perform public.reverse_journal_entries('customer_transactions', p_payment_id);
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+  perform public.post_journal_entry(
+    coalesce(p_payment_date, current_date), coalesce(p_note, 'Payment received'), 'customer_transactions', p_payment_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_cash_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_ar_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
 end;
 $$;
 
@@ -1411,6 +1593,7 @@ begin
 
   delete from public.account_transactions where customer_transaction_id = p_payment_id;
   delete from public.customer_transactions where id = p_payment_id;
+  perform public.reverse_journal_entries('customer_transactions', p_payment_id);
 end;
 $$;
 
@@ -1439,6 +1622,8 @@ declare
   v_account_owner uuid;
   v_payment_id uuid;
   v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ap_coa uuid;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -1473,6 +1658,16 @@ begin
   insert into public.account_transactions (owner_id, account_id, type, amount, note, supplier_payment_id, created_at)
   values (v_owner_id, p_account_id, 'withdrawal', p_amount, coalesce(p_note, 'Bill payment'), v_payment_id, v_when);
 
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+  perform public.post_journal_entry(
+    coalesce(p_payment_date, current_date), coalesce(p_note, 'Bill payment'), 'supplier_payments', v_payment_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_ap_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
+
   return v_payment_id;
 end;
 $$;
@@ -1498,6 +1693,8 @@ declare
   v_supplier_id uuid;
   v_account_owner uuid;
   v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ap_coa uuid;
 begin
   if v_owner_id is null then
     raise exception 'Not authenticated';
@@ -1534,6 +1731,17 @@ begin
   update public.account_transactions
   set account_id = p_account_id, amount = p_amount, note = p_note, created_at = v_when
   where supplier_payment_id = p_payment_id;
+
+  perform public.reverse_journal_entries('supplier_payments', p_payment_id);
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+  perform public.post_journal_entry(
+    coalesce(p_payment_date, current_date), coalesce(p_note, 'Bill payment'), 'supplier_payments', p_payment_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_ap_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
 end;
 $$;
 
@@ -1560,7 +1768,750 @@ begin
 
   delete from public.account_transactions where supplier_payment_id = p_payment_id;
   delete from public.supplier_payments where id = p_payment_id;
+  perform public.reverse_journal_entries('supplier_payments', p_payment_id);
 end;
 $$;
 
 grant execute on function public.delete_supplier_payment(uuid) to authenticated;
+
+-- Double-entry bookkeeping: Chart of Accounts + journal entries ----------
+-- This is additive and does NOT replace any of the tables/views above —
+-- those remain the source of truth for stock, per-customer/supplier
+-- balances, invoice/bill lists, and the FIFO/weighted-average Income
+-- Statement. Every money-moving RPC below now *also* posts a balanced
+-- journal entry as a side effect, so a real General Ledger / Trial
+-- Balance / T-account view can be built on top, matching the standard
+-- pattern of subsidiary ledgers feeding General Ledger control accounts.
+
+create table if not exists public.chart_of_accounts (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  type text not null check (type in ('asset', 'liability', 'equity', 'income', 'expense')),
+  normal_balance text not null check (normal_balance in ('debit', 'credit')),
+  -- system_key identifies a control account (e.g. 'accounts_receivable');
+  -- account_id links a 1:1 row mirroring a real cash/bank account;
+  -- category links a 1:1 row mirroring a distinct expenses.category value.
+  -- Exactly one of the three is set per row.
+  system_key text,
+  account_id uuid references public.accounts(id) on delete cascade,
+  category text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists chart_of_accounts_owner_id_idx on public.chart_of_accounts(owner_id);
+create unique index if not exists chart_of_accounts_owner_system_key_idx
+  on public.chart_of_accounts(owner_id, system_key) where system_key is not null;
+create unique index if not exists chart_of_accounts_owner_account_id_idx
+  on public.chart_of_accounts(owner_id, account_id) where account_id is not null;
+create unique index if not exists chart_of_accounts_owner_category_idx
+  on public.chart_of_accounts(owner_id, category) where category is not null;
+
+alter table public.chart_of_accounts enable row level security;
+
+drop policy if exists "Users can view own chart of accounts" on public.chart_of_accounts;
+create policy "Users can view own chart of accounts"
+  on public.chart_of_accounts for select
+  using (auth.uid() = owner_id);
+
+create table if not exists public.journal_entries (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  entry_date date not null default current_date,
+  memo text,
+  -- Polymorphic pointer back to whatever row generated this entry
+  -- (e.g. source_table='sales', source_id=<sale id>). Not a real FK
+  -- since it can point at several different tables.
+  source_table text,
+  source_id uuid,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists journal_entries_owner_id_idx on public.journal_entries(owner_id);
+create index if not exists journal_entries_source_idx on public.journal_entries(source_table, source_id);
+
+alter table public.journal_entries enable row level security;
+
+drop policy if exists "Users can view own journal entries" on public.journal_entries;
+create policy "Users can view own journal entries"
+  on public.journal_entries for select
+  using (auth.uid() = owner_id);
+
+create table if not exists public.journal_entry_lines (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  entry_id uuid not null references public.journal_entries(id) on delete cascade,
+  account_id uuid not null references public.chart_of_accounts(id) on delete restrict,
+  debit numeric(12,2) not null default 0 check (debit >= 0),
+  credit numeric(12,2) not null default 0 check (credit >= 0),
+  created_at timestamptz not null default now(),
+  check (debit = 0 or credit = 0),
+  check (debit > 0 or credit > 0)
+);
+
+create index if not exists journal_entry_lines_owner_id_idx on public.journal_entry_lines(owner_id);
+create index if not exists journal_entry_lines_entry_id_idx on public.journal_entry_lines(entry_id);
+create index if not exists journal_entry_lines_account_id_idx on public.journal_entry_lines(account_id);
+
+alter table public.journal_entry_lines enable row level security;
+
+drop policy if exists "Users can view own journal entry lines" on public.journal_entry_lines;
+create policy "Users can view own journal entry lines"
+  on public.journal_entry_lines for select
+  using (auth.uid() = owner_id);
+
+-- Sales lock in the product's cost at the moment of sale, so COGS journal
+-- entries (and any future edit/reversal) reflect cost-at-time-of-sale
+-- rather than whatever the product's cost has drifted to since.
+alter table public.sale_items add column if not exists unit_cost numeric(12,2);
+
+-- Lazily get-or-create a named control account (Accounts Receivable,
+-- Accounts Payable, Inventory, Sales Revenue, COGS, Opening Balance
+-- Equity, Undeposited Funds, ...). Idempotent per owner.
+create or replace function public.ensure_system_account(
+  p_system_key text,
+  p_name text,
+  p_type text,
+  p_normal_balance text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_id uuid;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select id into v_id from public.chart_of_accounts
+  where owner_id = v_owner_id and system_key = p_system_key;
+
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  insert into public.chart_of_accounts (owner_id, name, type, normal_balance, system_key)
+  values (v_owner_id, p_name, p_type, p_normal_balance, p_system_key)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function public.ensure_system_account(text, text, text, text) to authenticated;
+
+-- Lazily get-or-create the asset COA row mirroring a real cash/bank account.
+create or replace function public.ensure_account_coa_row(p_account_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_id uuid;
+  v_name text;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select id into v_id from public.chart_of_accounts
+  where owner_id = v_owner_id and account_id = p_account_id;
+
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  select name into v_name from public.accounts where id = p_account_id and owner_id = v_owner_id;
+  if v_name is null then
+    raise exception 'Invalid account';
+  end if;
+
+  insert into public.chart_of_accounts (owner_id, name, type, normal_balance, account_id)
+  values (v_owner_id, v_name, 'asset', 'debit', p_account_id)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function public.ensure_account_coa_row(uuid) to authenticated;
+
+-- Lazily get-or-create an expense COA row per distinct expenses.category
+-- string (categories are free text, not a fixed list).
+create or replace function public.ensure_expense_category_account(p_category text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_id uuid;
+  v_category text := trim(coalesce(p_category, ''));
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+  if v_category = '' then
+    raise exception 'Category required';
+  end if;
+
+  select id into v_id from public.chart_of_accounts
+  where owner_id = v_owner_id and category = v_category;
+
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  insert into public.chart_of_accounts (owner_id, name, type, normal_balance, category)
+  values (v_owner_id, v_category, 'expense', 'debit', v_category)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+grant execute on function public.ensure_expense_category_account(text) to authenticated;
+
+-- The one place double-entry is actually enforced: p_lines must balance
+-- (sum(debit) = sum(credit)) or the whole entry is rejected.
+-- p_lines shape: [{ "account_id": uuid, "debit": numeric, "credit": numeric }, ...]
+create or replace function public.post_journal_entry(
+  p_entry_date date,
+  p_memo text,
+  p_source_table text,
+  p_source_id uuid,
+  p_lines jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_entry_id uuid;
+  v_line jsonb;
+  v_total_debit numeric(12,2) := 0;
+  v_total_credit numeric(12,2) := 0;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_lines is null or jsonb_array_length(p_lines) < 2 then
+    raise exception 'A journal entry needs at least two lines';
+  end if;
+
+  select
+    coalesce(sum((line->>'debit')::numeric), 0),
+    coalesce(sum((line->>'credit')::numeric), 0)
+  into v_total_debit, v_total_credit
+  from jsonb_array_elements(p_lines) as line;
+
+  if round(v_total_debit, 2) <> round(v_total_credit, 2) then
+    raise exception 'Journal entry is not balanced: debits % vs credits %', v_total_debit, v_total_credit;
+  end if;
+
+  insert into public.journal_entries (owner_id, entry_date, memo, source_table, source_id)
+  values (v_owner_id, coalesce(p_entry_date, current_date), p_memo, p_source_table, p_source_id)
+  returning id into v_entry_id;
+
+  for v_line in select * from jsonb_array_elements(p_lines)
+  loop
+    insert into public.journal_entry_lines (owner_id, entry_id, account_id, debit, credit)
+    values (
+      v_owner_id, v_entry_id, (v_line->>'account_id')::uuid,
+      coalesce((v_line->>'debit')::numeric, 0), coalesce((v_line->>'credit')::numeric, 0)
+    );
+  end loop;
+
+  return v_entry_id;
+end;
+$$;
+
+grant execute on function public.post_journal_entry(date, text, text, uuid, jsonb) to authenticated;
+
+-- Deletes every journal entry generated by a given source row (cascades to
+-- its lines). Called by every update/delete RPC before reapplying, mirroring
+-- the reverse-then-reapply pattern already used for sales/purchases above.
+create or replace function public.reverse_journal_entries(p_source_table text, p_source_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  delete from public.journal_entries
+  where owner_id = v_owner_id and source_table = p_source_table and source_id = p_source_id;
+end;
+$$;
+
+grant execute on function public.reverse_journal_entries(text, uuid) to authenticated;
+
+-- Accounts and products are created via plain client-side inserts (not an
+-- RPC), so an opening balance / opening stock quantity needs a trigger to
+-- get its offsetting Opening Balance Equity entry instead of an RPC call.
+
+create or replace function public.post_account_opening_balance()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_cash_coa uuid;
+  v_equity_coa uuid;
+  v_value numeric(12,2);
+begin
+  if new.opening_balance is null or new.opening_balance = 0 then
+    return new;
+  end if;
+
+  v_cash_coa := public.ensure_account_coa_row(new.id);
+  v_equity_coa := public.ensure_system_account(
+    'opening_balance_equity', 'Opening Balance Equity', 'equity', 'credit'
+  );
+  v_value := abs(new.opening_balance);
+
+  if new.opening_balance > 0 then
+    perform public.post_journal_entry(
+      current_date, 'Opening balance: ' || new.name, 'accounts', new.id,
+      jsonb_build_array(
+        jsonb_build_object('account_id', v_cash_coa, 'debit', v_value, 'credit', 0),
+        jsonb_build_object('account_id', v_equity_coa, 'debit', 0, 'credit', v_value)
+      )
+    );
+  else
+    perform public.post_journal_entry(
+      current_date, 'Opening balance: ' || new.name, 'accounts', new.id,
+      jsonb_build_array(
+        jsonb_build_object('account_id', v_equity_coa, 'debit', v_value, 'credit', 0),
+        jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', v_value)
+      )
+    );
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists post_account_opening_balance_trigger on public.accounts;
+create trigger post_account_opening_balance_trigger
+  after insert on public.accounts
+  for each row execute function public.post_account_opening_balance();
+
+create or replace function public.cleanup_account_journal_entries()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.journal_entries where owner_id = old.owner_id and source_table = 'accounts' and source_id = old.id;
+  return old;
+end;
+$$;
+
+drop trigger if exists cleanup_account_journal_entries_trigger on public.accounts;
+create trigger cleanup_account_journal_entries_trigger
+  before delete on public.accounts
+  for each row execute function public.cleanup_account_journal_entries();
+
+create or replace function public.post_product_opening_stock()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_inventory_coa uuid;
+  v_equity_coa uuid;
+  v_value numeric(12,2);
+begin
+  if new.stock_quantity is null or new.stock_quantity <= 0 then
+    return new;
+  end if;
+
+  v_value := new.stock_quantity * coalesce(new.cost, 0);
+  if v_value <= 0 then
+    return new;
+  end if;
+
+  v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+  v_equity_coa := public.ensure_system_account(
+    'opening_balance_equity', 'Opening Balance Equity', 'equity', 'credit'
+  );
+
+  perform public.post_journal_entry(
+    current_date, 'Opening stock: ' || new.name, 'products', new.id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_inventory_coa, 'debit', v_value, 'credit', 0),
+      jsonb_build_object('account_id', v_equity_coa, 'debit', 0, 'credit', v_value)
+    )
+  );
+
+  return new;
+end;
+$$;
+
+drop trigger if exists post_product_opening_stock_trigger on public.products;
+create trigger post_product_opening_stock_trigger
+  after insert on public.products
+  for each row execute function public.post_product_opening_stock();
+
+create or replace function public.cleanup_product_journal_entries()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.journal_entries where owner_id = old.owner_id and source_table = 'products' and source_id = old.id;
+  return old;
+end;
+$$;
+
+drop trigger if exists cleanup_product_journal_entries_trigger on public.products;
+create trigger cleanup_product_journal_entries_trigger
+  before delete on public.products
+  for each row execute function public.cleanup_product_journal_entries();
+
+-- Once an account has real posted journal history, journal_entry_lines'
+-- "on delete restrict" blocks deleting it (protecting ledger integrity,
+-- a deliberate tightening vs. the previous silent cascade). This wraps
+-- that into a friendly error instead of a raw FK violation.
+create or replace function public.delete_account(p_account_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_owner uuid;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select owner_id into v_owner from public.accounts where id = p_account_id;
+  if v_owner is null or v_owner <> v_owner_id then
+    raise exception 'Invalid account';
+  end if;
+
+  begin
+    delete from public.accounts where id = p_account_id;
+  exception
+    when foreign_key_violation then
+      raise exception 'Cannot delete this account: it has real transaction history posted to the ledger. Remove those transactions first.';
+  end;
+end;
+$$;
+
+grant execute on function public.delete_account(uuid) to authenticated;
+
+-- Current balance per chart-of-accounts row, in that account's own normal-
+-- balance direction (so a positive number always means "as expected" for
+-- that account type — an asset/expense account normally sits debit-positive,
+-- a liability/equity/income account normally sits credit-positive).
+drop view if exists public.chart_of_accounts_balances;
+create view public.chart_of_accounts_balances
+with (security_invoker = true) as
+select
+  coa.id as coa_id,
+  coa.owner_id,
+  coa.name,
+  coa.type,
+  coa.normal_balance,
+  coa.system_key,
+  coa.account_id,
+  coa.category,
+  coalesce(sum(jel.debit), 0) as total_debit,
+  coalesce(sum(jel.credit), 0) as total_credit,
+  case when coa.normal_balance = 'debit'
+    then coalesce(sum(jel.debit), 0) - coalesce(sum(jel.credit), 0)
+    else coalesce(sum(jel.credit), 0) - coalesce(sum(jel.debit), 0)
+  end as balance
+from public.chart_of_accounts coa
+left join public.journal_entry_lines jel on jel.account_id = coa.id
+group by coa.id, coa.owner_id, coa.name, coa.type, coa.normal_balance, coa.system_key, coa.account_id, coa.category;
+
+grant select on public.chart_of_accounts_balances to authenticated;
+
+-- One-time (but safely re-runnable) backfill: walks every account, product,
+-- purchase, sale, payment, and expense the current user already has and
+-- posts the equivalent journal entry for anything that predates this
+-- feature, so the General Ledger / Trial Balance are complete from day
+-- one. Idempotent — skips anything that already has a journal entry.
+create or replace function public.backfill_journal_entries()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_acc record;
+  v_prod record;
+  v_purch record;
+  v_sale record;
+  v_item record;
+  v_pay record;
+  v_exp record;
+  v_cash_coa uuid;
+  v_equity_coa uuid;
+  v_inventory_coa uuid;
+  v_ap_coa uuid;
+  v_ar_coa uuid;
+  v_revenue_coa uuid;
+  v_cogs_coa uuid;
+  v_expense_coa uuid;
+  v_value numeric(12,2);
+  v_cogs numeric(12,2);
+  v_lines jsonb;
+  v_account_id uuid;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- 1. Account opening balances
+  for v_acc in select * from public.accounts where owner_id = v_owner_id
+  loop
+    if v_acc.opening_balance is not null and v_acc.opening_balance <> 0
+       and not exists (
+         select 1 from public.journal_entries
+         where owner_id = v_owner_id and source_table = 'accounts' and source_id = v_acc.id
+       )
+    then
+      v_cash_coa := public.ensure_account_coa_row(v_acc.id);
+      v_equity_coa := public.ensure_system_account(
+        'opening_balance_equity', 'Opening Balance Equity', 'equity', 'credit'
+      );
+      v_value := abs(v_acc.opening_balance);
+      if v_acc.opening_balance > 0 then
+        perform public.post_journal_entry(
+          v_acc.created_at::date, 'Opening balance: ' || v_acc.name, 'accounts', v_acc.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_cash_coa, 'debit', v_value, 'credit', 0),
+            jsonb_build_object('account_id', v_equity_coa, 'debit', 0, 'credit', v_value)
+          )
+        );
+      else
+        perform public.post_journal_entry(
+          v_acc.created_at::date, 'Opening balance: ' || v_acc.name, 'accounts', v_acc.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_equity_coa, 'debit', v_value, 'credit', 0),
+            jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', v_value)
+          )
+        );
+      end if;
+    end if;
+  end loop;
+
+  -- 2. Derived product opening stock: the only quantity consistent with
+  -- today's stock_quantity plus everything ever purchased/sold since.
+  for v_prod in
+    select p.id, p.name, p.created_at, p.cost,
+      p.stock_quantity
+        - coalesce((select sum(quantity) from public.purchase_items where product_id = p.id), 0)
+        + coalesce((select sum(quantity) from public.sale_items where product_id = p.id), 0)
+      as opening_qty
+    from public.products p
+    where p.owner_id = v_owner_id
+  loop
+    if v_prod.opening_qty > 0
+       and not exists (
+         select 1 from public.journal_entries
+         where owner_id = v_owner_id and source_table = 'products' and source_id = v_prod.id
+       )
+    then
+      v_value := v_prod.opening_qty * coalesce(v_prod.cost, 0);
+      if v_value > 0 then
+        v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+        v_equity_coa := public.ensure_system_account(
+          'opening_balance_equity', 'Opening Balance Equity', 'equity', 'credit'
+        );
+        perform public.post_journal_entry(
+          v_prod.created_at::date, 'Opening stock: ' || v_prod.name, 'products', v_prod.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_inventory_coa, 'debit', v_value, 'credit', 0),
+            jsonb_build_object('account_id', v_equity_coa, 'debit', 0, 'credit', v_value)
+          )
+        );
+      end if;
+    end if;
+  end loop;
+
+  -- 3. Purchases
+  for v_purch in select * from public.purchases where owner_id = v_owner_id
+  loop
+    if v_purch.total_amount > 0
+       and not exists (
+         select 1 from public.journal_entries
+         where owner_id = v_owner_id and source_table = 'purchases' and source_id = v_purch.id
+       )
+    then
+      v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+      v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+      perform public.post_journal_entry(
+        v_purch.bill_date, coalesce('Bill ' || v_purch.reference, 'Bill'), 'purchases', v_purch.id,
+        jsonb_build_array(
+          jsonb_build_object('account_id', v_inventory_coa, 'debit', v_purch.total_amount, 'credit', 0),
+          jsonb_build_object('account_id', v_ap_coa, 'debit', 0, 'credit', v_purch.total_amount)
+        )
+      );
+    end if;
+  end loop;
+
+  -- 4. Sales (COGS uses sale_items.unit_cost where present, else falls
+  -- back to the product's current cost as a best-effort proxy for sales
+  -- that predate that column — an approximation only for pre-existing data).
+  for v_sale in select * from public.sales where owner_id = v_owner_id
+  loop
+    if v_sale.total_amount > 0
+       and not exists (
+         select 1 from public.journal_entries
+         where owner_id = v_owner_id and source_table = 'sales' and source_id = v_sale.id
+       )
+    then
+      v_cogs := 0;
+      for v_item in
+        select si.quantity, coalesce(si.unit_cost, p.cost, 0) as cost
+        from public.sale_items si
+        join public.products p on p.id = si.product_id
+        where si.sale_id = v_sale.id
+      loop
+        v_cogs := v_cogs + v_item.quantity * v_item.cost;
+      end loop;
+
+      v_revenue_coa := public.ensure_system_account('sales_revenue', 'Sales Revenue', 'income', 'credit');
+      v_lines := '[]'::jsonb;
+
+      if v_sale.type = 'invoice' then
+        v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+        v_lines := v_lines || jsonb_build_array(
+          jsonb_build_object('account_id', v_ar_coa, 'debit', v_sale.total_amount, 'credit', 0)
+        );
+      else
+        if v_sale.deposit_account_id is not null then
+          v_cash_coa := public.ensure_account_coa_row(v_sale.deposit_account_id);
+        else
+          v_cash_coa := public.ensure_system_account('undeposited_funds', 'Undeposited Funds', 'asset', 'debit');
+        end if;
+        v_lines := v_lines || jsonb_build_array(
+          jsonb_build_object('account_id', v_cash_coa, 'debit', v_sale.total_amount, 'credit', 0)
+        );
+      end if;
+
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_revenue_coa, 'debit', 0, 'credit', v_sale.total_amount)
+      );
+
+      if v_cogs > 0 then
+        v_cogs_coa := public.ensure_system_account('cogs', 'Cost of Goods Sold', 'expense', 'debit');
+        v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+        v_lines := v_lines || jsonb_build_array(
+          jsonb_build_object('account_id', v_cogs_coa, 'debit', v_cogs, 'credit', 0),
+          jsonb_build_object('account_id', v_inventory_coa, 'debit', 0, 'credit', v_cogs)
+        );
+      end if;
+
+      perform public.post_journal_entry(
+        v_sale.sale_date,
+        case when v_sale.type = 'invoice'
+          then coalesce('Invoice ' || v_sale.reference, 'Invoice')
+          else coalesce('Sale receipt ' || v_sale.reference, 'Sale receipt')
+        end,
+        'sales', v_sale.id, v_lines
+      );
+    end if;
+  end loop;
+
+  -- 5. Customer payments (account inferred via the existing
+  -- account_transactions.customer_transaction_id link)
+  for v_pay in select * from public.customer_transactions where owner_id = v_owner_id and type = 'payment'
+  loop
+    if not exists (
+      select 1 from public.journal_entries
+      where owner_id = v_owner_id and source_table = 'customer_transactions' and source_id = v_pay.id
+    ) then
+      select account_id into v_account_id from public.account_transactions
+      where customer_transaction_id = v_pay.id limit 1;
+
+      if v_account_id is not null then
+        v_cash_coa := public.ensure_account_coa_row(v_account_id);
+        v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+        perform public.post_journal_entry(
+          v_pay.created_at::date, coalesce(v_pay.note, 'Payment received'), 'customer_transactions', v_pay.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_cash_coa, 'debit', v_pay.amount, 'credit', 0),
+            jsonb_build_object('account_id', v_ar_coa, 'debit', 0, 'credit', v_pay.amount)
+          )
+        );
+      end if;
+    end if;
+  end loop;
+
+  -- 6. Supplier payments (account inferred via account_transactions.supplier_payment_id)
+  for v_pay in select * from public.supplier_payments where owner_id = v_owner_id
+  loop
+    if not exists (
+      select 1 from public.journal_entries
+      where owner_id = v_owner_id and source_table = 'supplier_payments' and source_id = v_pay.id
+    ) then
+      select account_id into v_account_id from public.account_transactions
+      where supplier_payment_id = v_pay.id limit 1;
+
+      if v_account_id is not null then
+        v_cash_coa := public.ensure_account_coa_row(v_account_id);
+        v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+        perform public.post_journal_entry(
+          v_pay.created_at::date, coalesce(v_pay.note, 'Bill payment'), 'supplier_payments', v_pay.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_ap_coa, 'debit', v_pay.amount, 'credit', 0),
+            jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', v_pay.amount)
+          )
+        );
+      end if;
+    end if;
+  end loop;
+
+  -- 7. Expenses (already have a direct account_id column)
+  for v_exp in select * from public.expenses where owner_id = v_owner_id
+  loop
+    if v_exp.account_id is not null
+       and not exists (
+         select 1 from public.journal_entries
+         where owner_id = v_owner_id and source_table = 'expenses' and source_id = v_exp.id
+       )
+    then
+      v_expense_coa := public.ensure_expense_category_account(v_exp.category);
+      v_cash_coa := public.ensure_account_coa_row(v_exp.account_id);
+      perform public.post_journal_entry(
+        v_exp.expense_date, v_exp.category || coalesce(': ' || nullif(v_exp.description, ''), ''),
+        'expenses', v_exp.id,
+        jsonb_build_array(
+          jsonb_build_object('account_id', v_expense_coa, 'debit', v_exp.amount, 'credit', 0),
+          jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', v_exp.amount)
+        )
+      );
+    end if;
+  end loop;
+end;
+$$;
+
+grant execute on function public.backfill_journal_entries() to authenticated;

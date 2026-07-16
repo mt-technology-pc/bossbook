@@ -26,6 +26,9 @@ import SalesDayBookReport from './pages/dashboard/SalesDayBookReport'
 import PurchaseDayBookReport from './pages/dashboard/PurchaseDayBookReport'
 import AccountsReceivable from './pages/dashboard/AccountsReceivable'
 import AccountsPayable from './pages/dashboard/AccountsPayable'
+import ChartOfAccounts from './pages/dashboard/ChartOfAccounts'
+import GeneralLedger from './pages/dashboard/GeneralLedger'
+import TrialBalance from './pages/dashboard/TrialBalance'
 import Expenses from './pages/dashboard/Expenses'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
@@ -148,6 +151,10 @@ function App() {
         <Route path="reports/income-statement" element={<IncomeStatementReport />} />
         <Route path="reports/sales-day-book" element={<SalesDayBookReport />} />
         <Route path="reports/purchase-day-book" element={<PurchaseDayBookReport />} />
+        <Route path="reports/chart-of-accounts" element={<ChartOfAccounts />} />
+        <Route path="reports/general-ledger" element={<GeneralLedger />} />
+        <Route path="reports/general-ledger/:coaId" element={<GeneralLedger />} />
+        <Route path="reports/trial-balance" element={<TrialBalance />} />
         <Route path="team" element={<ComingSoon title="Team" />} />
         <Route path="settings" element={<ComingSoon title="Settings" />} />
         <Route path="*" element={<ComingSoon />} />

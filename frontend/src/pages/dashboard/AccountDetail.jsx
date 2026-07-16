@@ -59,7 +59,11 @@ export default function AccountDetail() {
 
   const handleDelete = async () => {
     if (!window.confirm(`Remove account "${account.name}"? This won't undo any sales or payments already recorded.`)) return
-    await supabase.from('accounts').delete().eq('id', id)
+    const { error: deleteError } = await supabase.rpc('delete_account', { p_account_id: id })
+    if (deleteError) {
+      window.alert(deleteError.message)
+      return
+    }
     navigate('/dashboard')
   }
 

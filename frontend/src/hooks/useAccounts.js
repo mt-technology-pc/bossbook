@@ -53,7 +53,7 @@ export function useAccounts() {
   }
 
   const deleteAccount = async (id) => {
-    const { error: deleteError } = await supabase.from('accounts').delete().eq('id', id)
+    const { error: deleteError } = await supabase.rpc('delete_account', { p_account_id: id })
     if (!deleteError) await fetchAccounts()
     return { error: deleteError }
   }

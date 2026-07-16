@@ -1,6 +1,8 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight } from 'lucide-react'
+import {
+  Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight, Landmark, BookMarked, Scale,
+} from 'lucide-react'
 
 const reports = [
   {
@@ -26,6 +28,24 @@ const reports = [
     title: 'Income Statement',
     desc: 'Revenue, cost of goods sold and gross profit by category, over any date range.',
     to: '/dashboard/reports/income-statement',
+  },
+  {
+    icon: Landmark,
+    title: 'Chart of Accounts',
+    desc: 'Every account your books post to — assets, liabilities, equity, income, and expenses — with current balances.',
+    to: '/dashboard/reports/chart-of-accounts',
+  },
+  {
+    icon: BookMarked,
+    title: 'General Ledger',
+    desc: 'The real T-account for any account: every journal entry line, debit and credit, with a running balance.',
+    to: '/dashboard/reports/general-ledger',
+  },
+  {
+    icon: Scale,
+    title: 'Trial Balance',
+    desc: 'Every account as of a chosen date, proving total debits equal total credits — real double-entry bookkeeping.',
+    to: '/dashboard/reports/trial-balance',
   },
 ]
 
