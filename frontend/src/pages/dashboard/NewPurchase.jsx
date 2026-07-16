@@ -60,6 +60,12 @@ export default function NewPurchase() {
 
   const getProduct = (productId) => products.find((p) => p.id === productId)
 
+  const productOptions = products.map((p) => ({
+    id: p.id,
+    label: p.name,
+    sublabel: `${p.stock_quantity} in stock`,
+  }))
+
   useEffect(() => {
     if (!isEdit || loaded || purchases.length === 0 || products.length === 0) return
     const existing = purchases.find((p) => p.id === id)
@@ -384,16 +390,14 @@ export default function NewPurchase() {
                           className="overflow-hidden border-b border-ink-400/10 px-4 py-3 last:border-0 dark:border-cream-100/10"
                         >
                           <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[2fr_80px_100px_100px_72px] sm:items-center">
-                            <select
-                              value={line.productId}
-                              onChange={(e) => updateLine(line.key, { productId: e.target.value })}
-                              className="col-span-2 rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-2 text-sm text-ink-900 outline-none focus:border-clay-500 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50 sm:col-span-1"
-                            >
-                              <option value="">Select a product…</option>
-                              {products.map((p) => (
-                                <option key={p.id} value={p.id}>{p.name}</option>
-                              ))}
-                            </select>
+                            <div className="col-span-2 sm:col-span-1">
+                              <SearchSelect
+                                value={line.productId}
+                                onChange={(val) => updateLine(line.key, { productId: val })}
+                                options={productOptions}
+                                placeholder="Select a product…"
+                              />
+                            </div>
                             <input
                               type="number"
                               min="1"
