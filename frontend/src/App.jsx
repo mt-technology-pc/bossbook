@@ -15,6 +15,9 @@ import NewInvoice from './pages/dashboard/NewInvoice'
 import NewSalesReceipt from './pages/dashboard/NewSalesReceipt'
 import ReceivePayment from './pages/dashboard/ReceivePayment'
 import AccountDetail from './pages/dashboard/AccountDetail'
+import Reports from './pages/dashboard/Reports'
+import InventoryValuationReport from './pages/dashboard/InventoryValuationReport'
+import ProductLedger from './pages/dashboard/ProductLedger'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import DashboardLayout from './layouts/DashboardLayout'
@@ -77,7 +80,9 @@ function App() {
         <Route path="sales" element={<Sales />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="serial-tracking" element={<ComingSoon title="Serial tracking" />} />
-        <Route path="reports" element={<ComingSoon title="Reports" />} />
+        <Route path="reports" element={<Reports />} />
+        <Route path="reports/inventory-valuation" element={<InventoryValuationReport />} />
+        <Route path="reports/inventory-valuation/:id" element={<ProductLedger />} />
         <Route path="team" element={<ComingSoon title="Team" />} />
         <Route path="settings" element={<ComingSoon title="Settings" />} />
         <Route path="*" element={<ComingSoon />} />

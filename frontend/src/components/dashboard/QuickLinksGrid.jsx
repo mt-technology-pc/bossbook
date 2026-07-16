@@ -12,7 +12,7 @@ const links = [
   { label: 'Customers', icon: Contact, to: '/dashboard/customers' },
   { label: 'Suppliers', icon: Truck, to: '/dashboard/suppliers' },
   { label: 'Serial tracking', icon: ScanLine, to: '/dashboard/serial-tracking', soon: true },
-  { label: 'Reports', icon: BarChart3, to: '/dashboard/reports', soon: true },
+  { label: 'Reports', icon: BarChart3, to: '/dashboard/reports' },
   { label: 'Team', icon: Users, to: '/dashboard/team', soon: true },
   { label: 'Settings', icon: Settings, to: '/dashboard/settings', soon: true },
 ]

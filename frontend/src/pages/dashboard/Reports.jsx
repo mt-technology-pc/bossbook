@@ -1,0 +1,82 @@
+import { motion } from 'framer-motion'
+import { Link } from 'react-router-dom'
+import { Boxes, TrendingUp, ShoppingBag, ArrowRight } from 'lucide-react'
+
+const reports = [
+  {
+    icon: Boxes,
+    title: 'Inventory Valuation Summary',
+    desc: 'Quantity on hand and inventory value by FIFO, weighted average, or standard cost, as of any date.',
+    to: '/dashboard/reports/inventory-valuation',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Sales Summary',
+    desc: 'Revenue, units sold and top items over a date range.',
+    soon: true,
+  },
+  {
+    icon: ShoppingBag,
+    title: 'Purchase Summary',
+    desc: 'Spend by supplier and by item over a date range.',
+    soon: true,
+  },
+]
+
+export default function Reports() {
+  return (
+    <div>
+      <h1 className="font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+        Reports
+      </h1>
+      <p className="mt-1 text-sm text-ink-500 dark:text-cream-400">
+        Real numbers computed from what you&apos;ve actually recorded — no placeholders.
+      </p>
+
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {reports.map((r, i) => {
+          const Card = (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: i * 0.06 }}
+              className={`group h-full rounded-2xl border border-ink-400/15 bg-cream-50 p-6 dark:border-cream-100/10 dark:bg-dark-800 ${
+                r.soon ? 'opacity-60' : 'transition-shadow hover:shadow-lg hover:shadow-clay-500/10'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600 dark:text-clay-400">
+                  <r.icon size={20} />
+                </span>
+                {r.soon && (
+                  <span className="rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-400 dark:bg-cream-100/10">
+                    Soon
+                  </span>
+                )}
+              </div>
+              <h2 className="mt-4 font-heading text-base font-semibold text-ink-900 dark:text-cream-50">
+                {r.title}
+              </h2>
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-500 dark:text-cream-400">
+                {r.desc}
+              </p>
+              {!r.soon && (
+                <span className="mt-4 flex items-center gap-1 text-sm font-medium text-clay-600 dark:text-clay-400">
+                  Open report <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+                </span>
+              )}
+            </motion.div>
+          )
+
+          return r.soon ? (
+            <div key={r.title}>{Card}</div>
+          ) : (
+            <Link key={r.title} to={r.to}>
+              {Card}
+            </Link>
+          )
+        })}
+      </div>
+    </div>
+  )
+}

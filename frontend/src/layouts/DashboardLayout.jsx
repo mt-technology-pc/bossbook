@@ -42,7 +42,7 @@ export default function DashboardLayout() {
 
   return (
     <div className="flex min-h-screen bg-cream-100 dark:bg-dark-900">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-ink-400/10 bg-cream-50 dark:border-cream-100/10 dark:bg-dark-800 lg:flex">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-ink-400/10 bg-cream-50 dark:border-cream-100/10 dark:bg-dark-800 lg:flex print:hidden">
         <div className="flex h-16 items-center px-6">
           <Logo />
         </div>
@@ -140,7 +140,7 @@ export default function DashboardLayout() {
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur dark:border-cream-100/10 dark:bg-dark-800/80 sm:px-6">
+        <header className="flex h-16 items-center justify-between border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur dark:border-cream-100/10 dark:bg-dark-800/80 sm:px-6 print:hidden">
           <button
             className="text-ink-600 dark:text-cream-200 lg:hidden"
             onClick={() => setOpen(true)}
