@@ -12,7 +12,10 @@ export function saleLineTotal(lines) {
   return lines.reduce((sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0)
 }
 
-export function validateSaleLines(lines, getProduct) {
+// originalQuantities: when editing an existing sale, maps product_id -> quantity
+// already committed to stock reduction by this same sale (so it doesn't count
+// against the live stock_quantity, which already reflects that reduction).
+export function validateSaleLines(lines, getProduct, originalQuantities = {}) {
   if (lines.length === 0) return 'Add at least one line item.'
 
   for (const line of lines) {
@@ -24,8 +27,9 @@ export function validateSaleLines(lines, getProduct) {
     if (line.unitPrice === '' || Number(line.unitPrice) < 0) {
       return `Enter a price for ${product.name}.`
     }
-    if (qty > product.stock_quantity) {
-      return `Only ${product.stock_quantity} of ${product.name} in stock.`
+    const available = product.stock_quantity + (originalQuantities[product.id] || 0)
+    if (qty > available) {
+      return `Only ${available} of ${product.name} in stock.`
     }
     if (product.tracks_serial && line.unitIds.length !== qty) {
       return `Select ${qty} serial/IMEI unit(s) for ${product.name}.`

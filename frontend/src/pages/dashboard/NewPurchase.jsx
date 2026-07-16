@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   X, Plus, Trash2, Copy, ScanLine, AlertCircle, Receipt, ShoppingBag,
@@ -7,6 +7,7 @@ import {
 import { usePurchases } from '../../hooks/usePurchases'
 import { useProducts } from '../../hooks/useProducts'
 import { useSuppliers } from '../../hooks/useSuppliers'
+import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
@@ -26,9 +27,12 @@ function todayISO() {
 
 export default function NewPurchase() {
   const navigate = useNavigate()
-  const { createPurchase } = usePurchases()
+  const { id } = useParams()
+  const isEdit = Boolean(id)
+  const { purchases, createPurchase, updatePurchase } = usePurchases()
   const { products, refetch: refetchProducts } = useProducts()
   const { suppliers, addSupplier } = useSuppliers()
+  const [loaded, setLoaded] = useState(!isEdit)
 
   const supplierOptions = suppliers.map((s) => ({
     id: s.id,
@@ -54,7 +58,47 @@ export default function NewPurchase() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const getProduct = (id) => products.find((p) => p.id === id)
+  const getProduct = (productId) => products.find((p) => p.id === productId)
+
+  useEffect(() => {
+    if (!isEdit || loaded || purchases.length === 0 || products.length === 0) return
+    const existing = purchases.find((p) => p.id === id)
+    if (!existing) return
+
+    let cancelled = false
+    supabase.from('product_units').select('id, product_id, serial_number').eq('purchase_id', id)
+      .then(({ data }) => {
+        if (cancelled) return
+        const units = data ?? []
+        const consumed = {}
+        const builtLines = existing.purchase_items.map((item) => {
+          const product = getProduct(item.product_id)
+          const line = newLine()
+          line.productId = item.product_id
+          line.quantity = String(item.quantity)
+          line.unitCost = String(item.unit_cost)
+          if (product?.tracks_serial) {
+            const already = consumed[item.product_id] || 0
+            const productUnits = units.filter((u) => u.product_id === item.product_id)
+            line.serials = productUnits.slice(already, already + item.quantity).map((u) => u.serial_number)
+            consumed[item.product_id] = already + item.quantity
+          }
+          return line
+        })
+
+        setSupplierId(existing.supplier_id || '')
+        setReference(existing.reference || '')
+        setBillDate(existing.bill_date || todayISO())
+        setDueDate(existing.due_date || '')
+        setNotes(existing.notes || '')
+        setLines(builtLines.length > 0 ? builtLines : [newLine()])
+        setLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, loaded, purchases, products, id])
 
   const resetForm = () => {
     setSupplierId('')
@@ -169,14 +213,18 @@ export default function NewPurchase() {
     setError(null)
     setLoading(true)
 
-    const { error: submitError } = await createPurchase({
+    const payload = {
       supplierId: supplierId || null,
       reference: reference.trim() || null,
       notes: notes.trim() || null,
       billDate: billDate || null,
       dueDate: dueDate || null,
       items: buildItems(),
-    })
+    }
+
+    const { error: submitError } = isEdit
+      ? await updatePurchase(id, payload)
+      : await createPurchase(payload)
 
     setLoading(false)
 
@@ -187,7 +235,7 @@ export default function NewPurchase() {
 
     refetchProducts()
 
-    if (andNew) resetForm()
+    if (andNew && !isEdit) resetForm()
     else navigate('/dashboard/purchases')
   }
 
@@ -199,7 +247,7 @@ export default function NewPurchase() {
             <Receipt size={16} />
           </span>
           <h1 className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
-            New bill
+            {isEdit ? 'Edit bill' : 'New bill'}
           </h1>
         </div>
         <button
@@ -213,7 +261,11 @@ export default function NewPurchase() {
 
       <div className="flex-1 overflow-y-auto pb-28">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-          {products.length === 0 ? (
+          {!loaded ? (
+            <div className="flex justify-center py-16">
+              <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
+            </div>
+          ) : products.length === 0 ? (
             <div className="flex flex-col items-center rounded-2xl border border-dashed border-ink-400/25 bg-cream-50 py-16 text-center dark:border-cream-100/15 dark:bg-dark-800">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
                 <ShoppingBag size={20} />
@@ -446,17 +498,19 @@ export default function NewPurchase() {
         </div>
       </div>
 
-      {products.length > 0 && (
+      {loaded && products.length > 0 && (
         <footer className="fixed inset-x-0 bottom-0 flex items-center justify-between border-t border-ink-400/10 bg-cream-50 px-4 py-3.5 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] dark:border-cream-100/10 dark:bg-dark-800 sm:px-6">
           <Button variant="ghost" onClick={() => navigate('/dashboard/purchases')}>
             Cancel
           </Button>
           <div className="flex items-center gap-3">
-            <Button variant="outline" disabled={loading} onClick={() => submit({ andNew: true })}>
-              {loading ? 'Saving…' : 'Save and new'}
-            </Button>
+            {!isEdit && (
+              <Button variant="outline" disabled={loading} onClick={() => submit({ andNew: true })}>
+                {loading ? 'Saving…' : 'Save and new'}
+              </Button>
+            )}
             <Button variant="primary" disabled={loading} onClick={() => submit({ andNew: false })}>
-              {loading ? 'Saving…' : 'Save'}
+              {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Save'}
             </Button>
           </div>
         </footer>

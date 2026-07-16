@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { X, AlertCircle, HandCoins } from 'lucide-react'
-import { useCustomerPayments } from '../../hooks/useCustomerPayments'
-import { useCustomers } from '../../hooks/useCustomers'
-import { useCustomerBalances } from '../../hooks/useCustomerBalances'
+import { useSupplierPayments } from '../../hooks/useSupplierPayments'
+import { useSuppliers } from '../../hooks/useSuppliers'
+import { useSupplierBalances } from '../../hooks/useSupplierBalances'
 import { useAccounts } from '../../hooks/useAccounts'
-import { useOutstandingSales } from '../../hooks/useOutstandingSales'
+import { useOutstandingPurchases } from '../../hooks/useOutstandingPurchases'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
@@ -15,69 +15,69 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function ReceivePayment() {
+export default function PayBill() {
   const navigate = useNavigate()
   const { id } = useParams()
   const isEdit = Boolean(id)
 
-  const { payments, receivePayment, updatePayment } = useCustomerPayments()
-  const { customers, addCustomer } = useCustomers()
-  const { balanceFor, refetch: refetchBalances } = useCustomerBalances()
+  const { payments, payBill, updatePayment } = useSupplierPayments()
+  const { suppliers, addSupplier } = useSuppliers()
+  const { balanceFor, refetch: refetchBalances } = useSupplierBalances()
   const { accounts, addAccount, refetch: refetchAccounts } = useAccounts()
 
-  const [customerId, setCustomerId] = useState('')
+  const [supplierId, setSupplierId] = useState('')
   const [accountId, setAccountId] = useState('')
   const [amount, setAmount] = useState('')
   const [paymentDate, setPaymentDate] = useState(todayISO())
   const [note, setNote] = useState('')
-  const [saleId, setSaleId] = useState('')
+  const [purchaseId, setPurchaseId] = useState('')
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(!isEdit)
 
-  const { sales: outstandingSales } = useOutstandingSales(customerId)
-  const [linkedSale, setLinkedSale] = useState(null)
-  const balance = customerId ? balanceFor(customerId) : 0
+  const { purchases: outstandingPurchases } = useOutstandingPurchases(supplierId)
+  const [linkedPurchase, setLinkedPurchase] = useState(null)
+  const balance = supplierId ? balanceFor(supplierId) : 0
 
   useEffect(() => {
-    if (!saleId || outstandingSales.some((s) => s.sale_id === saleId)) {
-      setLinkedSale(null)
+    if (!purchaseId || outstandingPurchases.some((p) => p.purchase_id === purchaseId)) {
+      setLinkedPurchase(null)
       return
     }
     let cancelled = false
-    supabase.from('sales').select('id, reference, type, sale_date').eq('id', saleId).single()
+    supabase.from('purchases').select('id, reference, bill_date').eq('id', purchaseId).single()
       .then(({ data }) => {
-        if (!cancelled && data) setLinkedSale(data)
+        if (!cancelled && data) setLinkedPurchase(data)
       })
     return () => {
       cancelled = true
     }
-  }, [saleId, outstandingSales])
+  }, [purchaseId, outstandingPurchases])
 
   useEffect(() => {
     if (!isEdit || loaded || payments.length === 0) return
     const existing = payments.find((p) => p.id === id)
     if (existing) {
-      setCustomerId(existing.customer_id)
+      setSupplierId(existing.supplier_id)
       setAmount(String(existing.amount))
       setPaymentDate(existing.created_at.slice(0, 10))
       setNote(existing.note || '')
-      setSaleId(existing.sale_id || '')
+      setPurchaseId(existing.purchase_id || '')
       setLoaded(true)
     }
   }, [isEdit, loaded, payments, id])
 
   useEffect(() => {
     if (isEdit) return
-    if (customerId && balance > 0 && !amount) setAmount(String(balance))
+    if (supplierId && balance > 0 && !amount) setAmount(String(balance))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customerId])
+  }, [supplierId])
 
-  const customerOptions = customers.map((c) => ({
-    id: c.id,
-    label: c.name,
+  const supplierOptions = suppliers.map((s) => ({
+    id: s.id,
+    label: s.name,
     sublabel: (() => {
-      const b = balanceFor(c.id)
+      const b = balanceFor(s.id)
       return b > 0 ? `${formatCurrency(b)} owed` : 'Settled'
     })(),
   }))
@@ -88,22 +88,22 @@ export default function ReceivePayment() {
     sublabel: `${a.type === 'bank' ? 'Bank' : 'Cash'} · ${formatCurrency(a.balance)}`,
   }))
 
-  const invoiceOptions = [
-    { id: '', label: 'General payment (not tied to one invoice)' },
-    ...outstandingSales.map((s) => ({
-      id: s.sale_id,
-      label: s.reference || `${s.type === 'invoice' ? 'Invoice' : 'Receipt'} · ${s.sale_date}`,
-      sublabel: `${formatCurrency(s.outstanding)} outstanding`,
+  const billOptions = [
+    { id: '', label: 'General payment (not tied to one bill)' },
+    ...outstandingPurchases.map((p) => ({
+      id: p.purchase_id,
+      label: p.reference || `Bill · ${p.bill_date}`,
+      sublabel: `${formatCurrency(p.outstanding)} outstanding`,
     })),
-    ...(linkedSale ? [{
-      id: linkedSale.id,
-      label: linkedSale.reference || `${linkedSale.type === 'invoice' ? 'Invoice' : 'Receipt'} · ${linkedSale.sale_date}`,
+    ...(linkedPurchase ? [{
+      id: linkedPurchase.id,
+      label: linkedPurchase.reference || `Bill · ${linkedPurchase.bill_date}`,
       sublabel: 'currently linked',
     }] : []),
   ]
 
-  const handleCreateCustomer = async (name) => {
-    const { data, error: createError } = await addCustomer({ name })
+  const handleCreateSupplier = async (name) => {
+    const { data, error: createError } = await addSupplier({ name })
     if (createError) {
       setError(createError.message)
       return null
@@ -121,12 +121,12 @@ export default function ReceivePayment() {
   }
 
   const submit = async ({ andNew }) => {
-    if (!customerId) {
-      setError('Select a customer.')
+    if (!supplierId) {
+      setError('Select a supplier.')
       return
     }
     if (!accountId) {
-      setError('Choose which account this payment is deposited to.')
+      setError('Choose which account this payment is paid from.')
       return
     }
     const value = Number(amount)
@@ -139,13 +139,13 @@ export default function ReceivePayment() {
     setLoading(true)
 
     const payload = {
-      customerId, accountId, amount: value, note: note.trim() || null,
-      paymentDate: paymentDate || null, saleId: saleId || null,
+      supplierId, accountId, amount: value, note: note.trim() || null,
+      paymentDate: paymentDate || null, purchaseId: purchaseId || null,
     }
 
     const { error: submitError } = isEdit
       ? await updatePayment(id, payload)
-      : await receivePayment(payload)
+      : await payBill(payload)
 
     setLoading(false)
 
@@ -158,14 +158,14 @@ export default function ReceivePayment() {
     refetchAccounts()
 
     if (andNew && !isEdit) {
-      setCustomerId('')
+      setSupplierId('')
       setAccountId('')
       setAmount('')
       setPaymentDate(todayISO())
       setNote('')
-      setSaleId('')
+      setPurchaseId('')
     } else {
-      navigate('/dashboard/sales/payments-received')
+      navigate('/dashboard/purchases/payments-made')
     }
   }
 
@@ -177,11 +177,11 @@ export default function ReceivePayment() {
             <HandCoins size={16} />
           </span>
           <h1 className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
-            {isEdit ? 'Edit payment' : 'Receive payment'}
+            {isEdit ? 'Edit payment' : 'Pay a bill'}
           </h1>
         </div>
         <button
-          onClick={() => navigate('/dashboard/sales/payments-received')}
+          onClick={() => navigate('/dashboard/purchases/payments-made')}
           aria-label="Cancel"
           className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 dark:hover:bg-dark-700 dark:hover:text-cream-200"
         >
@@ -193,23 +193,23 @@ export default function ReceivePayment() {
         <div className="mx-auto max-w-2xl px-4 py-8 sm:px-6">
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div className="w-full max-w-sm">
-              <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Customer *</span>
+              <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Supplier *</span>
               <div className="mt-1.5">
                 <SearchSelect
-                  value={customerId}
-                  onChange={(val) => { setCustomerId(val); setSaleId('') }}
-                  options={customerOptions}
-                  placeholder="Select a customer"
+                  value={supplierId}
+                  onChange={(val) => { setSupplierId(val); setPurchaseId('') }}
+                  options={supplierOptions}
+                  placeholder="Select a supplier"
                   createLabel="Add new"
-                  onCreate={handleCreateCustomer}
+                  onCreate={handleCreateSupplier}
                 />
               </div>
             </div>
 
-            {customerId && (
+            {supplierId && (
               <div className="text-right">
                 <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-                  Current balance
+                  Balance owed
                 </p>
                 <p className="font-heading text-3xl font-semibold text-ink-900 dark:text-cream-50">
                   {formatCurrency(balance)}
@@ -227,7 +227,7 @@ export default function ReceivePayment() {
 
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="block">
-              <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Amount received *</span>
+              <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Amount paid *</span>
               <input
                 type="number"
                 min="0.01"
@@ -250,7 +250,7 @@ export default function ReceivePayment() {
           </div>
 
           <div className="mt-4">
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Deposit to *</span>
+            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Pay from *</span>
             <div className="mt-1.5">
               <SearchSelect
                 value={accountId}
@@ -264,31 +264,31 @@ export default function ReceivePayment() {
           </div>
 
           <label className="mt-4 block">
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Apply to invoice</span>
+            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Apply to bill</span>
             <select
-              value={saleId}
-              onChange={(e) => setSaleId(e.target.value)}
-              disabled={!customerId}
+              value={purchaseId}
+              onChange={(e) => setPurchaseId(e.target.value)}
+              disabled={!supplierId}
               className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 disabled:opacity-50 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
             >
-              {invoiceOptions.map((o) => (
+              {billOptions.map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.label}{o.sublabel ? ` — ${o.sublabel}` : ''}
                 </option>
               ))}
             </select>
             <span className="mt-1 block text-xs text-ink-400">
-              Optional — links this payment to a specific outstanding invoice so its balance reflects it.
+              Optional — links this payment to a specific outstanding bill so its balance reflects it.
             </span>
           </label>
 
           <label className="mt-6 block">
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Memo</span>
+            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Note</span>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
-              placeholder="Optional"
+              placeholder="Optional — e.g. bank transfer, cash"
               className="mt-1.5 w-full resize-none rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
             />
           </label>
@@ -296,7 +296,7 @@ export default function ReceivePayment() {
       </div>
 
       <footer className="fixed inset-x-0 bottom-0 flex items-center justify-between border-t border-ink-400/10 bg-cream-50 px-4 py-3.5 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] dark:border-cream-100/10 dark:bg-dark-800 sm:px-6">
-        <Button variant="ghost" onClick={() => navigate('/dashboard/sales/payments-received')}>
+        <Button variant="ghost" onClick={() => navigate('/dashboard/purchases/payments-made')}>
           Cancel
         </Button>
         <div className="flex items-center gap-3">

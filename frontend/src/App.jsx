@@ -14,6 +14,9 @@ import Sales from './pages/dashboard/Sales'
 import NewInvoice from './pages/dashboard/NewInvoice'
 import NewSalesReceipt from './pages/dashboard/NewSalesReceipt'
 import ReceivePayment from './pages/dashboard/ReceivePayment'
+import CustomerPayments from './pages/dashboard/CustomerPayments'
+import PayBill from './pages/dashboard/PayBill'
+import SupplierPayments from './pages/dashboard/SupplierPayments'
 import AccountDetail from './pages/dashboard/AccountDetail'
 import Reports from './pages/dashboard/Reports'
 import InventoryValuationReport from './pages/dashboard/InventoryValuationReport'
@@ -42,7 +45,23 @@ function App() {
         }
       />
       <Route
+        path="/dashboard/purchases/new/:id"
+        element={
+          <ProtectedRoute>
+            <NewPurchase />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/dashboard/sales/new-invoice"
+        element={
+          <ProtectedRoute>
+            <NewInvoice />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/sales/new-invoice/:id"
         element={
           <ProtectedRoute>
             <NewInvoice />
@@ -58,10 +77,42 @@ function App() {
         }
       />
       <Route
+        path="/dashboard/sales/new-receipt/:id"
+        element={
+          <ProtectedRoute>
+            <NewSalesReceipt />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/dashboard/sales/receive-payment"
         element={
           <ProtectedRoute>
             <ReceivePayment />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/sales/receive-payment/:id"
+        element={
+          <ProtectedRoute>
+            <ReceivePayment />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/purchases/pay-bill"
+        element={
+          <ProtectedRoute>
+            <PayBill />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/dashboard/purchases/pay-bill/:id"
+        element={
+          <ProtectedRoute>
+            <PayBill />
           </ProtectedRoute>
         }
       />
@@ -81,7 +132,9 @@ function App() {
         <Route path="suppliers" element={<Suppliers />} />
         <Route path="suppliers/:id" element={<SupplierDetail />} />
         <Route path="purchases" element={<Purchases />} />
+        <Route path="purchases/payments-made" element={<SupplierPayments />} />
         <Route path="sales" element={<Sales />} />
+        <Route path="sales/payments-received" element={<CustomerPayments />} />
         <Route path="expenses" element={<Expenses />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="serial-tracking" element={<ComingSoon title="Serial tracking" />} />

@@ -1,10 +1,11 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { X, Plus, AlertCircle, FileText, ShoppingBag } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useAvailableUnits } from '../../hooks/useAvailableUnits'
+import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import { newSaleLine, saleLineTotal, validateSaleLines, buildSaleItems } from '../../lib/saleLines'
 import Button from '../../components/ui/Button'
@@ -23,7 +24,9 @@ function addDaysISO(days) {
 
 export default function NewInvoice() {
   const navigate = useNavigate()
-  const { createSale } = useSales()
+  const { id } = useParams()
+  const isEdit = Boolean(id)
+  const { sales, createSale, updateSale } = useSales()
   const { products, refetch: refetchProducts } = useProducts()
   const { customers, addCustomer } = useCustomers()
   const availableUnits = useAvailableUnits()
@@ -36,8 +39,63 @@ export default function NewInvoice() {
   const [lines, setLines] = useState([newSaleLine()])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(!isEdit)
+  const [ownUnits, setOwnUnits] = useState([])
+  const [originalQuantities, setOriginalQuantities] = useState({})
 
   const getProduct = (id) => products.find((p) => p.id === id)
+
+  useEffect(() => {
+    if (!isEdit || loaded || sales.length === 0 || products.length === 0) return
+    const existing = sales.find((s) => s.id === id)
+    if (!existing) return
+
+    let cancelled = false
+    supabase.from('product_units').select('id, product_id, serial_number').eq('sale_id', id)
+      .then(({ data }) => {
+        if (cancelled) return
+        const units = data ?? []
+        const consumed = {}
+        const quantities = {}
+        const builtLines = existing.sale_items.map((item) => {
+          const product = getProduct(item.product_id)
+          quantities[item.product_id] = (quantities[item.product_id] || 0) + item.quantity
+          const line = newSaleLine()
+          line.productId = item.product_id
+          line.quantity = String(item.quantity)
+          line.unitPrice = String(item.unit_price)
+          if (product?.tracks_serial) {
+            const already = consumed[item.product_id] || 0
+            const productUnits = units.filter((u) => u.product_id === item.product_id)
+            line.unitIds = productUnits.slice(already, already + item.quantity).map((u) => u.id)
+            consumed[item.product_id] = already + item.quantity
+          }
+          return line
+        })
+
+        setCustomerId(existing.customer_id || '')
+        setReference(existing.reference || '')
+        setInvoiceDate(existing.sale_date)
+        setDueDate(existing.due_date || '')
+        setNotes(existing.notes || '')
+        setLines(builtLines.length > 0 ? builtLines : [newSaleLine()])
+        setOwnUnits(units)
+        setOriginalQuantities(quantities)
+        setLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, loaded, sales, products, id])
+
+  const mergedAvailableUnits = {
+    ...availableUnits,
+    forProduct: (productId) => [
+      ...availableUnits.forProduct(productId),
+      ...ownUnits.filter((u) => u.product_id === productId),
+    ],
+  }
 
   const customerOptions = customers.map((c) => ({
     id: c.id,
@@ -71,7 +129,7 @@ export default function NewInvoice() {
       setError('Select a customer for this invoice.')
       return
     }
-    const validationError = validateSaleLines(lines, getProduct)
+    const validationError = validateSaleLines(lines, getProduct, originalQuantities)
     if (validationError) {
       setError(validationError)
       return
@@ -79,7 +137,7 @@ export default function NewInvoice() {
     setError(null)
     setLoading(true)
 
-    const { error: submitError } = await createSale({
+    const payload = {
       customerId,
       type: 'invoice',
       reference: reference.trim() || null,
@@ -87,7 +145,11 @@ export default function NewInvoice() {
       saleDate: invoiceDate || null,
       dueDate: dueDate || null,
       items: buildSaleItems(lines, getProduct),
-    })
+    }
+
+    const { error: submitError } = isEdit
+      ? await updateSale(id, payload)
+      : await createSale(payload)
 
     setLoading(false)
 
@@ -99,7 +161,7 @@ export default function NewInvoice() {
     refetchProducts()
     availableUnits.refetch()
 
-    if (andNew) resetForm()
+    if (andNew && !isEdit) resetForm()
     else navigate('/dashboard/sales')
   }
 
@@ -111,7 +173,7 @@ export default function NewInvoice() {
             <FileText size={16} />
           </span>
           <h1 className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
-            New invoice
+            {isEdit ? 'Edit invoice' : 'New invoice'}
           </h1>
         </div>
         <button
@@ -125,7 +187,11 @@ export default function NewInvoice() {
 
       <div className="flex-1 overflow-y-auto pb-28">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-          {products.length === 0 ? (
+          {!loaded ? (
+            <div className="flex justify-center py-16">
+              <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
+            </div>
+          ) : products.length === 0 ? (
             <div className="flex flex-col items-center rounded-2xl border border-dashed border-ink-400/25 bg-cream-50 py-16 text-center dark:border-cream-100/15 dark:bg-dark-800">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
                 <ShoppingBag size={20} />
@@ -213,8 +279,9 @@ export default function NewInvoice() {
                   lines={lines}
                   setLines={setLines}
                   products={products}
-                  availableUnits={availableUnits}
+                  availableUnits={mergedAvailableUnits}
                   priceLabel="Rate"
+                  stockAdjustments={originalQuantities}
                 />
                 <div className="mt-3 flex justify-end">
                   <p className="text-sm text-ink-500 dark:text-cream-400">
@@ -241,17 +308,19 @@ export default function NewInvoice() {
         </div>
       </div>
 
-      {products.length > 0 && (
+      {loaded && products.length > 0 && (
         <footer className="fixed inset-x-0 bottom-0 flex items-center justify-between border-t border-ink-400/10 bg-cream-50 px-4 py-3.5 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] dark:border-cream-100/10 dark:bg-dark-800 sm:px-6">
           <Button variant="ghost" onClick={() => navigate('/dashboard/sales')}>
             Cancel
           </Button>
           <div className="flex items-center gap-3">
-            <Button variant="outline" disabled={loading} onClick={() => submit({ andNew: true })}>
-              {loading ? 'Saving…' : 'Save and new'}
-            </Button>
+            {!isEdit && (
+              <Button variant="outline" disabled={loading} onClick={() => submit({ andNew: true })}>
+                {loading ? 'Saving…' : 'Save and new'}
+              </Button>
+            )}
             <Button variant="primary" disabled={loading} onClick={() => submit({ andNew: false })}>
-              {loading ? 'Saving…' : 'Save'}
+              {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Save'}
             </Button>
           </div>
         </footer>

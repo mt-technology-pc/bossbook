@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Plus, Receipt, ScanLine, Layers, AlertCircle, ChevronDown } from 'lucide-react'
+import {
+  Plus, Receipt, ScanLine, Layers, AlertCircle, ChevronDown, HandCoins, Pencil, Trash2, ListChecks,
+} from 'lucide-react'
 import { usePurchases } from '../../hooks/usePurchases'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
@@ -11,9 +13,17 @@ function formatDate(dateStr) {
 }
 
 export default function Purchases() {
-  const { purchases, loading, error } = usePurchases()
+  const { purchases, loading, error, deletePurchase } = usePurchases()
   const [expanded, setExpanded] = useState(null)
   const navigate = useNavigate()
+
+  const handleDelete = async (e, p) => {
+    e.stopPropagation()
+    const label = p.reference || 'this bill'
+    if (!window.confirm(`Delete ${label}? This reverses its effect on stock and account balances.`)) return
+    const { error: deleteError } = await deletePurchase(p.id)
+    if (deleteError) window.alert(deleteError.message)
+  }
 
   const totalSpent = purchases.reduce((sum, p) => sum + Number(p.total_amount), 0)
   const unitsReceived = purchases.reduce(
@@ -38,9 +48,17 @@ export default function Purchases() {
             Record supplier bills to bring stock into your inventory.
           </p>
         </div>
-        <Button onClick={() => navigate('/dashboard/purchases/new')} variant="primary">
-          <Plus size={16} /> Record a bill
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => navigate('/dashboard/purchases/payments-made')} variant="ghost">
+            <ListChecks size={16} /> Payments made
+          </Button>
+          <Button onClick={() => navigate('/dashboard/purchases/pay-bill')} variant="outline">
+            <HandCoins size={16} /> Pay a bill
+          </Button>
+          <Button onClick={() => navigate('/dashboard/purchases/new')} variant="primary">
+            <Plus size={16} /> Record a bill
+          </Button>
+        </div>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -122,10 +140,24 @@ export default function Purchases() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-semibold text-ink-700 dark:text-cream-200">
+                    <div className="flex items-center gap-1.5">
+                      <span className="mr-1.5 text-sm font-semibold text-ink-700 dark:text-cream-200">
                         {formatCurrency(p.total_amount)}
                       </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/purchases/new/${p.id}`) }}
+                        aria-label="Edit bill"
+                        className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-clay-500/10 hover:text-clay-600"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(e, p)}
+                        aria-label="Delete bill"
+                        className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-red-500/10 hover:text-red-500"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                       <ChevronDown
                         size={16}
                         className={`text-ink-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}

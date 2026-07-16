@@ -17,7 +17,7 @@ export function useSales() {
     setLoading(true)
     const { data, error: fetchError } = await supabase
       .from('sales')
-      .select('*, customers(name), accounts(name, type), sale_items(id, quantity, unit_price, subtotal)')
+      .select('*, customers(name), accounts(name, type), sale_items(id, product_id, quantity, unit_price, subtotal)')
       .order('created_at', { ascending: false })
 
     if (fetchError) setError(fetchError.message)
@@ -32,20 +32,34 @@ export function useSales() {
     fetchSales()
   }, [fetchSales])
 
-  const createSale = async ({
-    customerId, type, reference, notes, saleDate, dueDate, depositAccountId, items,
-  }) => {
+  const buildPayload = ({ customerId, type, reference, notes, saleDate, dueDate, depositAccountId, items }) => ({
+    p_customer_id: customerId || null,
+    p_type: type,
+    p_reference: reference || null,
+    p_notes: notes || null,
+    p_sale_date: saleDate || null,
+    p_due_date: dueDate || null,
+    p_deposit_account_id: depositAccountId || null,
+    p_items: items,
+  })
+
+  const createSale = async (payload) => {
     if (!user) return { error: new Error('Not signed in') }
 
-    const { data, error: rpcError } = await supabase.rpc('create_sale', {
-      p_customer_id: customerId || null,
-      p_type: type,
-      p_reference: reference || null,
-      p_notes: notes || null,
-      p_sale_date: saleDate || null,
-      p_due_date: dueDate || null,
-      p_deposit_account_id: depositAccountId || null,
-      p_items: items,
+    const { data, error: rpcError } = await supabase.rpc('create_sale', buildPayload(payload))
+
+    if (rpcError) return { error: rpcError }
+
+    await fetchSales()
+    return { data }
+  }
+
+  const updateSale = async (saleId, payload) => {
+    if (!user) return { error: new Error('Not signed in') }
+
+    const { data, error: rpcError } = await supabase.rpc('update_sale', {
+      p_sale_id: saleId,
+      ...buildPayload(payload),
     })
 
     if (rpcError) return { error: rpcError }
@@ -54,5 +68,13 @@ export function useSales() {
     return { data }
   }
 
-  return { sales, loading, error, createSale, refetch: fetchSales }
+  const deleteSale = async (saleId) => {
+    if (!user) return { error: new Error('Not signed in') }
+
+    const { error: rpcError } = await supabase.rpc('delete_sale', { p_sale_id: saleId })
+    if (!rpcError) await fetchSales()
+    return { error: rpcError }
+  }
+
+  return { sales, loading, error, createSale, updateSale, deleteSale, refetch: fetchSales }
 }

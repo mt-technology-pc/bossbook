@@ -4,7 +4,7 @@ import { formatCurrency } from '../../lib/currency'
 import { newSaleLine } from '../../lib/saleLines'
 
 export default function SaleLineItemsEditor({
-  lines, setLines, products, availableUnits, priceLabel = 'Rate',
+  lines, setLines, products, availableUnits, priceLabel = 'Rate', stockAdjustments = {},
 }) {
   const getProduct = (id) => products.find((p) => p.id === id)
 
@@ -99,7 +99,7 @@ export default function SaleLineItemsEditor({
                     <option value="">Select a product…</option>
                     {products.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.name} ({p.stock_quantity} in stock)
+                        {p.name} ({p.stock_quantity + (stockAdjustments[p.id] || 0)} in stock)
                       </option>
                     ))}
                   </select>

@@ -10,7 +10,7 @@ const actions = [
   { label: 'Create sales receipt', desc: 'Record a cash or bank sale', icon: Receipt, to: '/dashboard/sales/new-receipt', direct: true },
   { label: 'Receive payment', desc: 'Collect against a customer balance', icon: HandCoins, to: '/dashboard/sales/receive-payment', direct: true },
   { label: 'Create purchase', desc: 'Record a supplier bill', icon: ShoppingBag, to: '/dashboard/purchases/new', direct: true },
-  { label: 'Pay a bill', desc: 'Pay down a supplier balance', icon: HandCoins, to: '/dashboard/suppliers', plain: true },
+  { label: 'Pay a bill', desc: 'Pay down a supplier balance', icon: HandCoins, to: '/dashboard/purchases/pay-bill', direct: true },
   { label: 'Record expense', desc: 'Rent, utilities, salaries and the like', icon: Wallet, to: '/dashboard/expenses' },
   { label: 'Add product', desc: 'Add to your catalog', icon: Package, to: '/dashboard/inventory' },
   { label: 'Add customer', desc: 'Save a new customer', icon: Contact, to: '/dashboard/customers' },

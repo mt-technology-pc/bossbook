@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Plus, FileText, Receipt, TrendingUp, AlertCircle, ChevronDown, Wallet, Landmark, HandCoins,
+  Pencil, Trash2, ListChecks,
 } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { formatCurrency } from '../../lib/currency'
@@ -13,9 +14,19 @@ function formatDate(dateStr) {
 }
 
 export default function Sales() {
-  const { sales, loading, error } = useSales()
+  const { sales, loading, error, deleteSale } = useSales()
   const [expanded, setExpanded] = useState(null)
   const navigate = useNavigate()
+
+  const editPathFor = (s) => (s.type === 'invoice' ? `/dashboard/sales/new-invoice/${s.id}` : `/dashboard/sales/new-receipt/${s.id}`)
+
+  const handleDelete = async (e, s) => {
+    e.stopPropagation()
+    const label = s.reference || (s.type === 'invoice' ? 'this invoice' : 'this receipt')
+    if (!window.confirm(`Delete ${label}? This reverses its effect on stock and account balances.`)) return
+    const { error: deleteError } = await deleteSale(s.id)
+    if (deleteError) window.alert(deleteError.message)
+  }
 
   const totalSales = sales.reduce((sum, s) => sum + Number(s.total_amount), 0)
   const invoiceCount = sales.filter((s) => s.type === 'invoice').length
@@ -39,6 +50,9 @@ export default function Sales() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button onClick={() => navigate('/dashboard/sales/payments-received')} variant="ghost">
+            <ListChecks size={16} /> Payments received
+          </Button>
           <Button onClick={() => navigate('/dashboard/sales/receive-payment')} variant="outline">
             <HandCoins size={16} /> Receive payment
           </Button>
@@ -150,10 +164,24 @@ export default function Sales() {
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-semibold text-ink-700 dark:text-cream-200">
+                    <div className="flex items-center gap-1.5">
+                      <span className="mr-1.5 text-sm font-semibold text-ink-700 dark:text-cream-200">
                         {formatCurrency(s.total_amount)}
                       </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate(editPathFor(s)) }}
+                        aria-label="Edit sale"
+                        className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-clay-500/10 hover:text-clay-600"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => handleDelete(e, s)}
+                        aria-label="Delete sale"
+                        className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-red-500/10 hover:text-red-500"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                       <ChevronDown
                         size={16}
                         className={`text-ink-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}

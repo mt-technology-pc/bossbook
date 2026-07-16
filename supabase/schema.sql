@@ -559,252 +559,13 @@ group by a.id, a.owner_id, a.name, a.type, a.opening_balance;
 
 grant select on public.account_balances to authenticated;
 
--- Atomically records a sale: inserts the sale, its line items, reduces
--- product stock, marks any selected serial/IMEI units as sold, and — for
--- invoices — charges the customer's balance (receipts settle instantly
--- so they charge and immediately pay off the same amount, net zero, purely
--- so it still shows up in the customer's transaction history). Sales
--- receipts deposit into a real account rather than a free-text label.
--- p_items shape: [{ "product_id": uuid, "quantity": int, "unit_price": numeric, "unit_ids": [uuid, ...]? }]
+-- Sales receipts deposit into a real account rather than a free-text label.
+-- (create_sale itself is defined once, further below, alongside update_sale
+-- and delete_sale so the three stay next to each other.)
 alter table public.sales add column if not exists deposit_account_id uuid references public.accounts(id) on delete set null;
 
-drop function if exists public.create_sale(uuid, text, text, text, date, date, text, jsonb);
-
-create or replace function public.create_sale(
-  p_customer_id uuid,
-  p_type text,
-  p_reference text,
-  p_notes text,
-  p_sale_date date,
-  p_due_date date,
-  p_deposit_account_id uuid,
-  p_items jsonb
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_owner_id uuid := auth.uid();
-  v_sale_id uuid;
-  v_item jsonb;
-  v_total numeric(12,2) := 0;
-  v_unit_id uuid;
-  v_product_id uuid;
-  v_product_owner uuid;
-  v_stock integer;
-  v_tracks_serial boolean;
-  v_account_owner uuid;
-begin
-  if v_owner_id is null then
-    raise exception 'Not authenticated';
-  end if;
-
-  if p_type not in ('invoice', 'receipt') then
-    raise exception 'Invalid sale type';
-  end if;
-
-  if p_items is null or jsonb_array_length(p_items) = 0 then
-    raise exception 'A sale needs at least one line item';
-  end if;
-
-  if p_type = 'receipt' and p_deposit_account_id is not null then
-    select owner_id into v_account_owner from public.accounts where id = p_deposit_account_id;
-    if v_account_owner is null or v_account_owner <> v_owner_id then
-      raise exception 'Invalid deposit account';
-    end if;
-  end if;
-
-  select coalesce(sum((item->>'quantity')::int * (item->>'unit_price')::numeric), 0)
-  into v_total
-  from jsonb_array_elements(p_items) as item;
-
-  insert into public.sales (owner_id, customer_id, type, reference, notes, sale_date, due_date, deposit_account_id, total_amount)
-  values (
-    v_owner_id, p_customer_id, p_type, p_reference, p_notes,
-    coalesce(p_sale_date, current_date), p_due_date, p_deposit_account_id, v_total
-  )
-  returning id into v_sale_id;
-
-  for v_item in select * from jsonb_array_elements(p_items)
-  loop
-    v_product_id := (v_item->>'product_id')::uuid;
-
-    select owner_id, stock_quantity, tracks_serial
-    into v_product_owner, v_stock, v_tracks_serial
-    from public.products
-    where id = v_product_id;
-
-    if v_product_owner is null or v_product_owner <> v_owner_id then
-      raise exception 'Invalid product on this sale';
-    end if;
-
-    if v_stock < (v_item->>'quantity')::int then
-      raise exception 'Not enough stock for one of the products on this sale';
-    end if;
-
-    insert into public.sale_items (owner_id, sale_id, product_id, quantity, unit_price, subtotal)
-    values (
-      v_owner_id,
-      v_sale_id,
-      v_product_id,
-      (v_item->>'quantity')::int,
-      (v_item->>'unit_price')::numeric,
-      (v_item->>'quantity')::int * (v_item->>'unit_price')::numeric
-    );
-
-    update public.products
-    set stock_quantity = stock_quantity - (v_item->>'quantity')::int
-    where id = v_product_id;
-
-    if v_tracks_serial and (v_item ? 'unit_ids') then
-      for v_unit_id in select (jsonb_array_elements_text(v_item->'unit_ids'))::uuid
-      loop
-        update public.product_units
-        set status = 'sold', sale_id = v_sale_id
-        where id = v_unit_id
-          and owner_id = v_owner_id
-          and product_id = v_product_id
-          and status = 'in_stock';
-
-        if not found then
-          raise exception 'One of the selected serial/IMEI units is no longer in stock';
-        end if;
-      end loop;
-    end if;
-  end loop;
-
-  if p_customer_id is not null then
-    if p_type = 'invoice' then
-      insert into public.customer_transactions (owner_id, customer_id, type, amount, note)
-      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Invoice ' || p_reference, 'Invoice'));
-    elsif p_type = 'receipt' then
-      insert into public.customer_transactions (owner_id, customer_id, type, amount, note)
-      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'));
-      insert into public.customer_transactions (owner_id, customer_id, type, amount, note)
-      values (v_owner_id, p_customer_id, 'payment', v_total, 'Paid in full at time of sale');
-    end if;
-  end if;
-
-  if p_type = 'receipt' and p_deposit_account_id is not null then
-    insert into public.account_transactions (owner_id, account_id, type, amount, note, sale_id)
-    values (v_owner_id, p_deposit_account_id, 'deposit', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), v_sale_id);
-  end if;
-
-  return v_sale_id;
-end;
-$$;
-
-grant execute on function public.create_sale(uuid, text, text, text, date, date, uuid, jsonb) to authenticated;
-
--- Receive payment: a customer pays down their balance, money lands in an account.
-drop function if exists public.receive_payment(uuid, uuid, numeric, text);
-drop function if exists public.receive_payment(uuid, uuid, numeric, text, date);
-
-create or replace function public.receive_payment(
-  p_customer_id uuid,
-  p_account_id uuid,
-  p_amount numeric,
-  p_note text,
-  p_payment_date date default current_date
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_owner_id uuid := auth.uid();
-  v_customer_owner uuid;
-  v_account_owner uuid;
-  v_transaction_id uuid;
-  v_when timestamptz := coalesce(p_payment_date, current_date);
-begin
-  if v_owner_id is null then
-    raise exception 'Not authenticated';
-  end if;
-
-  if p_amount is null or p_amount <= 0 then
-    raise exception 'Enter an amount greater than 0';
-  end if;
-
-  select owner_id into v_customer_owner from public.customers where id = p_customer_id;
-  if v_customer_owner is null or v_customer_owner <> v_owner_id then
-    raise exception 'Invalid customer';
-  end if;
-
-  select owner_id into v_account_owner from public.accounts where id = p_account_id;
-  if v_account_owner is null or v_account_owner <> v_owner_id then
-    raise exception 'Invalid account';
-  end if;
-
-  insert into public.customer_transactions (owner_id, customer_id, type, amount, note, created_at)
-  values (v_owner_id, p_customer_id, 'payment', p_amount, coalesce(p_note, 'Payment received'), v_when)
-  returning id into v_transaction_id;
-
-  insert into public.account_transactions (owner_id, account_id, type, amount, note, created_at)
-  values (v_owner_id, p_account_id, 'deposit', p_amount, coalesce(p_note, 'Payment received'), v_when);
-
-  return v_transaction_id;
-end;
-$$;
-
-grant execute on function public.receive_payment(uuid, uuid, numeric, text, date) to authenticated;
-
--- Pay bill: pay down a supplier balance, money leaves an account.
-drop function if exists public.pay_bill(uuid, uuid, numeric, text);
-drop function if exists public.pay_bill(uuid, uuid, numeric, text, date);
-
-create or replace function public.pay_bill(
-  p_supplier_id uuid,
-  p_account_id uuid,
-  p_amount numeric,
-  p_note text,
-  p_payment_date date default current_date
-)
-returns uuid
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_owner_id uuid := auth.uid();
-  v_supplier_owner uuid;
-  v_account_owner uuid;
-  v_payment_id uuid;
-  v_when timestamptz := coalesce(p_payment_date, current_date);
-begin
-  if v_owner_id is null then
-    raise exception 'Not authenticated';
-  end if;
-
-  if p_amount is null or p_amount <= 0 then
-    raise exception 'Enter an amount greater than 0';
-  end if;
-
-  select owner_id into v_supplier_owner from public.suppliers where id = p_supplier_id;
-  if v_supplier_owner is null or v_supplier_owner <> v_owner_id then
-    raise exception 'Invalid supplier';
-  end if;
-
-  select owner_id into v_account_owner from public.accounts where id = p_account_id;
-  if v_account_owner is null or v_account_owner <> v_owner_id then
-    raise exception 'Invalid account';
-  end if;
-
-  insert into public.supplier_payments (owner_id, supplier_id, amount, note, created_at)
-  values (v_owner_id, p_supplier_id, p_amount, coalesce(p_note, 'Bill payment'), v_when)
-  returning id into v_payment_id;
-
-  insert into public.account_transactions (owner_id, account_id, type, amount, note, created_at)
-  values (v_owner_id, p_account_id, 'withdrawal', p_amount, coalesce(p_note, 'Bill payment'), v_when);
-
-  return v_payment_id;
-end;
-$$;
-
-grant execute on function public.pay_bill(uuid, uuid, numeric, text, date) to authenticated;
+-- receive_payment and pay_bill are defined once, further below, alongside
+-- their update/delete counterparts, so all four stay together.
 
 -- Expenses -----------------------------------------------------------------
 -- Recording an expense withdraws money from an account, same as paying a
@@ -926,3 +687,878 @@ end;
 $$;
 
 grant execute on function public.delete_expense(uuid) to authenticated;
+
+-- Payment linking + full CRUD for Sales, Purchases, Receive Payment, Pay Bill
+-- ----------------------------------------------------------------------
+-- Lets a payment optionally point at the specific invoice/bill it settles,
+-- and lets each payment's ledger deposit/withdrawal point back at the
+-- payment itself — so editing or deleting a payment correctly reverses
+-- money movement instead of leaving the account ledger out of sync.
+
+alter table public.customer_transactions add column if not exists sale_id uuid references public.sales(id) on delete set null;
+alter table public.customer_transactions add column if not exists auto_generated boolean not null default false;
+create index if not exists customer_transactions_sale_id_idx on public.customer_transactions(sale_id);
+
+alter table public.supplier_payments add column if not exists purchase_id uuid references public.purchases(id) on delete set null;
+create index if not exists supplier_payments_purchase_id_idx on public.supplier_payments(purchase_id);
+
+alter table public.account_transactions add column if not exists customer_transaction_id uuid references public.customer_transactions(id) on delete set null;
+alter table public.account_transactions add column if not exists supplier_payment_id uuid references public.supplier_payments(id) on delete set null;
+create index if not exists account_transactions_customer_transaction_id_idx on public.account_transactions(customer_transaction_id);
+create index if not exists account_transactions_supplier_payment_id_idx on public.account_transactions(supplier_payment_id);
+
+-- Real per-invoice / per-bill outstanding balance, now that payments can
+-- be linked to a specific sale or purchase.
+drop view if exists public.sale_balances;
+create view public.sale_balances
+with (security_invoker = true) as
+select
+  s.id as sale_id,
+  s.owner_id,
+  s.customer_id,
+  s.type,
+  s.reference,
+  s.sale_date,
+  s.total_amount,
+  coalesce(paid.total, 0) as paid_amount,
+  s.total_amount - coalesce(paid.total, 0) as outstanding
+from public.sales s
+left join (
+  select sale_id, sum(amount) as total
+  from public.customer_transactions
+  where type = 'payment' and sale_id is not null
+  group by sale_id
+) paid on paid.sale_id = s.id;
+
+grant select on public.sale_balances to authenticated;
+
+drop view if exists public.purchase_balances;
+create view public.purchase_balances
+with (security_invoker = true) as
+select
+  p.id as purchase_id,
+  p.owner_id,
+  p.supplier_id,
+  p.reference,
+  p.bill_date,
+  p.total_amount,
+  coalesce(paid.total, 0) as paid_amount,
+  p.total_amount - coalesce(paid.total, 0) as outstanding
+from public.purchases p
+left join (
+  select purchase_id, sum(amount) as total
+  from public.supplier_payments
+  where purchase_id is not null
+  group by purchase_id
+) paid on paid.purchase_id = p.id;
+
+grant select on public.purchase_balances to authenticated;
+
+-- create_sale now tags the charge/payment entries it generates itself as
+-- auto_generated, so update_sale can safely wipe and recreate only those
+-- without touching a real, manually-linked Receive Payment.
+drop function if exists public.create_sale(uuid, text, text, text, date, date, uuid, jsonb);
+
+create or replace function public.create_sale(
+  p_customer_id uuid,
+  p_type text,
+  p_reference text,
+  p_notes text,
+  p_sale_date date,
+  p_due_date date,
+  p_deposit_account_id uuid,
+  p_items jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_sale_id uuid;
+  v_item jsonb;
+  v_total numeric(12,2) := 0;
+  v_unit_id uuid;
+  v_product_id uuid;
+  v_product_owner uuid;
+  v_stock integer;
+  v_tracks_serial boolean;
+  v_account_owner uuid;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_type not in ('invoice', 'receipt') then
+    raise exception 'Invalid sale type';
+  end if;
+
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'A sale needs at least one line item';
+  end if;
+
+  if p_type = 'receipt' and p_deposit_account_id is not null then
+    select owner_id into v_account_owner from public.accounts where id = p_deposit_account_id;
+    if v_account_owner is null or v_account_owner <> v_owner_id then
+      raise exception 'Invalid deposit account';
+    end if;
+  end if;
+
+  select coalesce(sum((item->>'quantity')::int * (item->>'unit_price')::numeric), 0)
+  into v_total
+  from jsonb_array_elements(p_items) as item;
+
+  insert into public.sales (owner_id, customer_id, type, reference, notes, sale_date, due_date, deposit_account_id, total_amount)
+  values (
+    v_owner_id, p_customer_id, p_type, p_reference, p_notes,
+    coalesce(p_sale_date, current_date), p_due_date, p_deposit_account_id, v_total
+  )
+  returning id into v_sale_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_product_id := (v_item->>'product_id')::uuid;
+
+    select owner_id, stock_quantity, tracks_serial
+    into v_product_owner, v_stock, v_tracks_serial
+    from public.products
+    where id = v_product_id;
+
+    if v_product_owner is null or v_product_owner <> v_owner_id then
+      raise exception 'Invalid product on this sale';
+    end if;
+
+    if v_stock < (v_item->>'quantity')::int then
+      raise exception 'Not enough stock for one of the products on this sale';
+    end if;
+
+    insert into public.sale_items (owner_id, sale_id, product_id, quantity, unit_price, subtotal)
+    values (
+      v_owner_id,
+      v_sale_id,
+      v_product_id,
+      (v_item->>'quantity')::int,
+      (v_item->>'unit_price')::numeric,
+      (v_item->>'quantity')::int * (v_item->>'unit_price')::numeric
+    );
+
+    update public.products
+    set stock_quantity = stock_quantity - (v_item->>'quantity')::int
+    where id = v_product_id;
+
+    if v_tracks_serial and (v_item ? 'unit_ids') then
+      for v_unit_id in select (jsonb_array_elements_text(v_item->'unit_ids'))::uuid
+      loop
+        update public.product_units
+        set status = 'sold', sale_id = v_sale_id
+        where id = v_unit_id
+          and owner_id = v_owner_id
+          and product_id = v_product_id
+          and status = 'in_stock';
+
+        if not found then
+          raise exception 'One of the selected serial/IMEI units is no longer in stock';
+        end if;
+      end loop;
+    end if;
+  end loop;
+
+  if p_customer_id is not null then
+    if p_type = 'invoice' then
+      insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Invoice ' || p_reference, 'Invoice'), v_sale_id, true);
+    elsif p_type = 'receipt' then
+      insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), v_sale_id, true);
+      insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, p_customer_id, 'payment', v_total, 'Paid in full at time of sale', v_sale_id, true);
+    end if;
+  end if;
+
+  if p_type = 'receipt' and p_deposit_account_id is not null then
+    insert into public.account_transactions (owner_id, account_id, type, amount, note, sale_id)
+    values (v_owner_id, p_deposit_account_id, 'deposit', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), v_sale_id);
+  end if;
+
+  return v_sale_id;
+end;
+$$;
+
+grant execute on function public.create_sale(uuid, text, text, text, date, date, uuid, jsonb) to authenticated;
+
+-- Edits a posted sale by fully reversing its stock/serial/ledger effects
+-- and reapplying fresh ones from the new line items, atomically. A real,
+-- manually-linked Receive Payment against this sale is preserved (only
+-- the sale's own auto-generated charge/payment entries are replaced).
+create or replace function public.update_sale(
+  p_sale_id uuid,
+  p_customer_id uuid,
+  p_type text,
+  p_reference text,
+  p_notes text,
+  p_sale_date date,
+  p_due_date date,
+  p_deposit_account_id uuid,
+  p_items jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_old_owner uuid;
+  v_old_item record;
+  v_new_item jsonb;
+  v_unit_id uuid;
+  v_product_id uuid;
+  v_product_owner uuid;
+  v_stock integer;
+  v_tracks_serial boolean;
+  v_account_owner uuid;
+  v_total numeric(12,2) := 0;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select owner_id into v_old_owner from public.sales where id = p_sale_id;
+  if v_old_owner is null or v_old_owner <> v_owner_id then
+    raise exception 'Invalid sale';
+  end if;
+
+  if p_type not in ('invoice', 'receipt') then
+    raise exception 'Invalid sale type';
+  end if;
+
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'A sale needs at least one line item';
+  end if;
+
+  if p_type = 'receipt' and p_deposit_account_id is not null then
+    select owner_id into v_account_owner from public.accounts where id = p_deposit_account_id;
+    if v_account_owner is null or v_account_owner <> v_owner_id then
+      raise exception 'Invalid deposit account';
+    end if;
+  end if;
+
+  -- Reverse old effects
+  for v_old_item in select product_id, quantity from public.sale_items where sale_id = p_sale_id
+  loop
+    update public.products
+    set stock_quantity = stock_quantity + v_old_item.quantity
+    where id = v_old_item.product_id;
+  end loop;
+
+  update public.product_units set status = 'in_stock', sale_id = null where sale_id = p_sale_id;
+
+  delete from public.account_transactions where sale_id = p_sale_id;
+  delete from public.customer_transactions where sale_id = p_sale_id and auto_generated = true;
+  delete from public.sale_items where sale_id = p_sale_id;
+
+  select coalesce(sum((item->>'quantity')::int * (item->>'unit_price')::numeric), 0)
+  into v_total
+  from jsonb_array_elements(p_items) as item;
+
+  update public.sales
+  set customer_id = p_customer_id,
+      type = p_type,
+      reference = p_reference,
+      notes = p_notes,
+      sale_date = coalesce(p_sale_date, sale_date),
+      due_date = p_due_date,
+      deposit_account_id = p_deposit_account_id,
+      total_amount = v_total
+  where id = p_sale_id;
+
+  -- Reapply new effects
+  for v_new_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_product_id := (v_new_item->>'product_id')::uuid;
+
+    select owner_id, stock_quantity, tracks_serial
+    into v_product_owner, v_stock, v_tracks_serial
+    from public.products
+    where id = v_product_id;
+
+    if v_product_owner is null or v_product_owner <> v_owner_id then
+      raise exception 'Invalid product on this sale';
+    end if;
+
+    if v_stock < (v_new_item->>'quantity')::int then
+      raise exception 'Not enough stock for one of the products on this sale';
+    end if;
+
+    insert into public.sale_items (owner_id, sale_id, product_id, quantity, unit_price, subtotal)
+    values (
+      v_owner_id, p_sale_id, v_product_id,
+      (v_new_item->>'quantity')::int,
+      (v_new_item->>'unit_price')::numeric,
+      (v_new_item->>'quantity')::int * (v_new_item->>'unit_price')::numeric
+    );
+
+    update public.products
+    set stock_quantity = stock_quantity - (v_new_item->>'quantity')::int
+    where id = v_product_id;
+
+    if v_tracks_serial and (v_new_item ? 'unit_ids') then
+      for v_unit_id in select (jsonb_array_elements_text(v_new_item->'unit_ids'))::uuid
+      loop
+        update public.product_units
+        set status = 'sold', sale_id = p_sale_id
+        where id = v_unit_id
+          and owner_id = v_owner_id
+          and product_id = v_product_id
+          and status = 'in_stock';
+
+        if not found then
+          raise exception 'One of the selected serial/IMEI units is no longer in stock';
+        end if;
+      end loop;
+    end if;
+  end loop;
+
+  if p_customer_id is not null then
+    if p_type = 'invoice' then
+      insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Invoice ' || p_reference, 'Invoice'), p_sale_id, true);
+    elsif p_type = 'receipt' then
+      insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, p_customer_id, 'charge', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), p_sale_id, true);
+      insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, p_customer_id, 'payment', v_total, 'Paid in full at time of sale', p_sale_id, true);
+    end if;
+  end if;
+
+  if p_type = 'receipt' and p_deposit_account_id is not null then
+    insert into public.account_transactions (owner_id, account_id, type, amount, note, sale_id)
+    values (v_owner_id, p_deposit_account_id, 'deposit', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), p_sale_id);
+  end if;
+
+  return p_sale_id;
+end;
+$$;
+
+grant execute on function public.update_sale(uuid, uuid, text, text, text, date, date, uuid, jsonb) to authenticated;
+
+-- Deletes a sale, reversing stock/serial effects. A real, manually-linked
+-- Receive Payment survives, just unlinked (sale_id set to null via FK).
+create or replace function public.delete_sale(p_sale_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_old_owner uuid;
+  v_old_item record;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select owner_id into v_old_owner from public.sales where id = p_sale_id;
+  if v_old_owner is null or v_old_owner <> v_owner_id then
+    raise exception 'Invalid sale';
+  end if;
+
+  for v_old_item in select product_id, quantity from public.sale_items where sale_id = p_sale_id
+  loop
+    update public.products
+    set stock_quantity = stock_quantity + v_old_item.quantity
+    where id = v_old_item.product_id;
+  end loop;
+
+  update public.product_units set status = 'in_stock', sale_id = null where sale_id = p_sale_id;
+
+  delete from public.account_transactions where sale_id = p_sale_id;
+  delete from public.customer_transactions where sale_id = p_sale_id and auto_generated = true;
+  delete from public.sale_items where sale_id = p_sale_id;
+  delete from public.sales where id = p_sale_id;
+end;
+$$;
+
+grant execute on function public.delete_sale(uuid) to authenticated;
+
+-- Edits a posted purchase the same way — reverse then reapply, atomically.
+-- Blocked if any unit from this bill has already been sold, or if stock
+-- has dropped below what this bill originally added (can't safely
+-- un-receive stock that's already gone).
+create or replace function public.update_purchase(
+  p_purchase_id uuid,
+  p_supplier_id uuid,
+  p_reference text,
+  p_notes text,
+  p_bill_date date,
+  p_due_date date,
+  p_items jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_old_owner uuid;
+  v_old_item record;
+  v_new_item jsonb;
+  v_serial text;
+  v_product_id uuid;
+  v_product_owner uuid;
+  v_total numeric(12,2) := 0;
+  v_current_stock integer;
+  v_product_name text;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select owner_id into v_old_owner from public.purchases where id = p_purchase_id;
+  if v_old_owner is null or v_old_owner <> v_owner_id then
+    raise exception 'Invalid purchase';
+  end if;
+
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'A bill needs at least one line item';
+  end if;
+
+  if exists (select 1 from public.product_units where purchase_id = p_purchase_id and status <> 'in_stock') then
+    raise exception 'Cannot edit this bill: one or more of its serial/IMEI units have already been sold';
+  end if;
+
+  for v_old_item in select product_id, quantity from public.purchase_items where purchase_id = p_purchase_id
+  loop
+    select stock_quantity, name into v_current_stock, v_product_name
+    from public.products where id = v_old_item.product_id;
+
+    if v_current_stock < v_old_item.quantity then
+      raise exception 'Cannot edit this bill: % has less stock remaining than this bill added — some has already been sold or removed', v_product_name;
+    end if;
+  end loop;
+
+  -- Reverse old effects
+  for v_old_item in select product_id, quantity from public.purchase_items where purchase_id = p_purchase_id
+  loop
+    update public.products
+    set stock_quantity = stock_quantity - v_old_item.quantity
+    where id = v_old_item.product_id;
+  end loop;
+
+  delete from public.product_units where purchase_id = p_purchase_id;
+  delete from public.purchase_items where purchase_id = p_purchase_id;
+
+  select coalesce(sum((item->>'quantity')::int * (item->>'unit_cost')::numeric), 0)
+  into v_total
+  from jsonb_array_elements(p_items) as item;
+
+  update public.purchases
+  set supplier_id = p_supplier_id,
+      reference = p_reference,
+      notes = p_notes,
+      bill_date = coalesce(p_bill_date, bill_date),
+      due_date = p_due_date,
+      total_amount = v_total
+  where id = p_purchase_id;
+
+  for v_new_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_product_id := (v_new_item->>'product_id')::uuid;
+
+    select owner_id into v_product_owner from public.products where id = v_product_id;
+    if v_product_owner is null or v_product_owner <> v_owner_id then
+      raise exception 'Invalid product on this bill';
+    end if;
+
+    insert into public.purchase_items (owner_id, purchase_id, product_id, quantity, unit_cost, subtotal)
+    values (
+      v_owner_id, p_purchase_id, v_product_id,
+      (v_new_item->>'quantity')::int,
+      (v_new_item->>'unit_cost')::numeric,
+      (v_new_item->>'quantity')::int * (v_new_item->>'unit_cost')::numeric
+    );
+
+    update public.products
+    set stock_quantity = stock_quantity + (v_new_item->>'quantity')::int,
+        cost = (v_new_item->>'unit_cost')::numeric
+    where id = v_product_id;
+
+    if (v_new_item ? 'serials') then
+      for v_serial in select jsonb_array_elements_text(v_new_item->'serials')
+      loop
+        insert into public.product_units (owner_id, product_id, purchase_id, serial_number, status)
+        values (v_owner_id, v_product_id, p_purchase_id, v_serial, 'in_stock');
+      end loop;
+    end if;
+  end loop;
+
+  return p_purchase_id;
+end;
+$$;
+
+grant execute on function public.update_purchase(uuid, uuid, text, text, date, date, jsonb) to authenticated;
+
+-- Deletes a purchase, reversing stock effects. Blocked under the same
+-- conditions as update_purchase. A real, manually-linked Pay Bill payment
+-- survives, just unlinked (purchase_id set to null via FK).
+create or replace function public.delete_purchase(p_purchase_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_old_owner uuid;
+  v_old_item record;
+  v_current_stock integer;
+  v_product_name text;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select owner_id into v_old_owner from public.purchases where id = p_purchase_id;
+  if v_old_owner is null or v_old_owner <> v_owner_id then
+    raise exception 'Invalid purchase';
+  end if;
+
+  if exists (select 1 from public.product_units where purchase_id = p_purchase_id and status <> 'in_stock') then
+    raise exception 'Cannot delete this bill: one or more of its serial/IMEI units have already been sold';
+  end if;
+
+  for v_old_item in select product_id, quantity from public.purchase_items where purchase_id = p_purchase_id
+  loop
+    select stock_quantity, name into v_current_stock, v_product_name
+    from public.products where id = v_old_item.product_id;
+
+    if v_current_stock < v_old_item.quantity then
+      raise exception 'Cannot delete this bill: % has less stock remaining than this bill added — some has already been sold or removed', v_product_name;
+    end if;
+  end loop;
+
+  for v_old_item in select product_id, quantity from public.purchase_items where purchase_id = p_purchase_id
+  loop
+    update public.products
+    set stock_quantity = stock_quantity - v_old_item.quantity
+    where id = v_old_item.product_id;
+  end loop;
+
+  delete from public.product_units where purchase_id = p_purchase_id;
+  delete from public.purchase_items where purchase_id = p_purchase_id;
+  delete from public.purchases where id = p_purchase_id;
+end;
+$$;
+
+grant execute on function public.delete_purchase(uuid) to authenticated;
+
+-- Receive payment now optionally links to a specific invoice.
+drop function if exists public.receive_payment(uuid, uuid, numeric, text);
+drop function if exists public.receive_payment(uuid, uuid, numeric, text, date);
+
+create or replace function public.receive_payment(
+  p_customer_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date default current_date,
+  p_sale_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_customer_owner uuid;
+  v_account_owner uuid;
+  v_transaction_id uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select owner_id into v_customer_owner from public.customers where id = p_customer_id;
+  if v_customer_owner is null or v_customer_owner <> v_owner_id then
+    raise exception 'Invalid customer';
+  end if;
+
+  select owner_id into v_account_owner from public.accounts where id = p_account_id;
+  if v_account_owner is null or v_account_owner <> v_owner_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_sale_id is not null then
+    if not exists (
+      select 1 from public.sales where id = p_sale_id and owner_id = v_owner_id and customer_id = p_customer_id
+    ) then
+      raise exception 'Invalid invoice for this customer';
+    end if;
+  end if;
+
+  insert into public.customer_transactions (owner_id, customer_id, type, amount, note, sale_id, created_at)
+  values (v_owner_id, p_customer_id, 'payment', p_amount, coalesce(p_note, 'Payment received'), p_sale_id, v_when)
+  returning id into v_transaction_id;
+
+  insert into public.account_transactions (owner_id, account_id, type, amount, note, customer_transaction_id, created_at)
+  values (v_owner_id, p_account_id, 'deposit', p_amount, coalesce(p_note, 'Payment received'), v_transaction_id, v_when);
+
+  return v_transaction_id;
+end;
+$$;
+
+grant execute on function public.receive_payment(uuid, uuid, numeric, text, date, uuid) to authenticated;
+
+create or replace function public.update_customer_payment(
+  p_payment_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date,
+  p_sale_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_payment_owner uuid;
+  v_payment_type text;
+  v_customer_id uuid;
+  v_account_owner uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select owner_id, type, customer_id into v_payment_owner, v_payment_type, v_customer_id
+  from public.customer_transactions where id = p_payment_id;
+
+  if v_payment_owner is null or v_payment_owner <> v_owner_id then
+    raise exception 'Invalid payment';
+  end if;
+  if v_payment_type <> 'payment' then
+    raise exception 'Only payments can be edited here';
+  end if;
+
+  select owner_id into v_account_owner from public.accounts where id = p_account_id;
+  if v_account_owner is null or v_account_owner <> v_owner_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_sale_id is not null then
+    if not exists (
+      select 1 from public.sales where id = p_sale_id and owner_id = v_owner_id and customer_id = v_customer_id
+    ) then
+      raise exception 'Invalid invoice for this customer';
+    end if;
+  end if;
+
+  update public.customer_transactions
+  set amount = p_amount, note = p_note, created_at = v_when, sale_id = p_sale_id
+  where id = p_payment_id;
+
+  update public.account_transactions
+  set account_id = p_account_id, amount = p_amount, note = p_note, created_at = v_when
+  where customer_transaction_id = p_payment_id;
+end;
+$$;
+
+grant execute on function public.update_customer_payment(uuid, uuid, numeric, text, date, uuid) to authenticated;
+
+create or replace function public.delete_customer_payment(p_payment_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_payment_owner uuid;
+  v_payment_type text;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select owner_id, type into v_payment_owner, v_payment_type
+  from public.customer_transactions where id = p_payment_id;
+
+  if v_payment_owner is null or v_payment_owner <> v_owner_id then
+    raise exception 'Invalid payment';
+  end if;
+  if v_payment_type <> 'payment' then
+    raise exception 'Only payments can be deleted here';
+  end if;
+
+  delete from public.account_transactions where customer_transaction_id = p_payment_id;
+  delete from public.customer_transactions where id = p_payment_id;
+end;
+$$;
+
+grant execute on function public.delete_customer_payment(uuid) to authenticated;
+
+-- Pay bill now optionally links to a specific bill.
+drop function if exists public.pay_bill(uuid, uuid, numeric, text);
+drop function if exists public.pay_bill(uuid, uuid, numeric, text, date);
+
+create or replace function public.pay_bill(
+  p_supplier_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date default current_date,
+  p_purchase_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_supplier_owner uuid;
+  v_account_owner uuid;
+  v_payment_id uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select owner_id into v_supplier_owner from public.suppliers where id = p_supplier_id;
+  if v_supplier_owner is null or v_supplier_owner <> v_owner_id then
+    raise exception 'Invalid supplier';
+  end if;
+
+  select owner_id into v_account_owner from public.accounts where id = p_account_id;
+  if v_account_owner is null or v_account_owner <> v_owner_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_purchase_id is not null then
+    if not exists (
+      select 1 from public.purchases where id = p_purchase_id and owner_id = v_owner_id and supplier_id = p_supplier_id
+    ) then
+      raise exception 'Invalid bill for this supplier';
+    end if;
+  end if;
+
+  insert into public.supplier_payments (owner_id, supplier_id, amount, note, purchase_id, created_at)
+  values (v_owner_id, p_supplier_id, p_amount, coalesce(p_note, 'Bill payment'), p_purchase_id, v_when)
+  returning id into v_payment_id;
+
+  insert into public.account_transactions (owner_id, account_id, type, amount, note, supplier_payment_id, created_at)
+  values (v_owner_id, p_account_id, 'withdrawal', p_amount, coalesce(p_note, 'Bill payment'), v_payment_id, v_when);
+
+  return v_payment_id;
+end;
+$$;
+
+grant execute on function public.pay_bill(uuid, uuid, numeric, text, date, uuid) to authenticated;
+
+create or replace function public.update_supplier_payment(
+  p_payment_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date,
+  p_purchase_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_payment_owner uuid;
+  v_supplier_id uuid;
+  v_account_owner uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select owner_id, supplier_id into v_payment_owner, v_supplier_id
+  from public.supplier_payments where id = p_payment_id;
+
+  if v_payment_owner is null or v_payment_owner <> v_owner_id then
+    raise exception 'Invalid payment';
+  end if;
+
+  select owner_id into v_account_owner from public.accounts where id = p_account_id;
+  if v_account_owner is null or v_account_owner <> v_owner_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_purchase_id is not null then
+    if not exists (
+      select 1 from public.purchases where id = p_purchase_id and owner_id = v_owner_id and supplier_id = v_supplier_id
+    ) then
+      raise exception 'Invalid bill for this supplier';
+    end if;
+  end if;
+
+  update public.supplier_payments
+  set amount = p_amount, note = p_note, created_at = v_when, purchase_id = p_purchase_id
+  where id = p_payment_id;
+
+  update public.account_transactions
+  set account_id = p_account_id, amount = p_amount, note = p_note, created_at = v_when
+  where supplier_payment_id = p_payment_id;
+end;
+$$;
+
+grant execute on function public.update_supplier_payment(uuid, uuid, numeric, text, date, uuid) to authenticated;
+
+create or replace function public.delete_supplier_payment(p_payment_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_payment_owner uuid;
+begin
+  if v_owner_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select owner_id into v_payment_owner from public.supplier_payments where id = p_payment_id;
+  if v_payment_owner is null or v_payment_owner <> v_owner_id then
+    raise exception 'Invalid payment';
+  end if;
+
+  delete from public.account_transactions where supplier_payment_id = p_payment_id;
+  delete from public.supplier_payments where id = p_payment_id;
+end;
+$$;
+
+grant execute on function public.delete_supplier_payment(uuid) to authenticated;
