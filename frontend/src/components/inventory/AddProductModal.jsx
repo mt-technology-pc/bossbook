@@ -65,7 +65,7 @@ export default function AddProductModal({ open, onClose, onSubmit }) {
       subtitle="Add an item to your catalog. You can edit details anytime."
     >
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           {error}
         </div>
@@ -88,11 +88,11 @@ export default function AddProductModal({ open, onClose, onSubmit }) {
             placeholder="Auto (e.g. P3) — leave blank"
           />
           <label className="block">
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Category</span>
+            <span className="text-xs font-medium text-ink-500">Category</span>
             <select
               value={form.category}
               onChange={update('category')}
-              className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+              className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
             >
               <option value="">Select…</option>
               {categories.map((c) => (
@@ -134,16 +134,16 @@ export default function AddProductModal({ open, onClose, onSubmit }) {
           />
         </div>
 
-        <div className="rounded-xl border border-ink-400/15 bg-cream-100 p-4 dark:border-cream-100/10 dark:bg-dark-700">
+        <div className="rounded-xl border border-ink-400/15 bg-cream-100 p-4">
           <div className="flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
               <ScanLine size={17} />
             </span>
             <div>
-              <p className="text-sm font-semibold text-ink-900 dark:text-cream-50">
+              <p className="text-sm font-semibold text-ink-900">
                 Does this product need IMEI / serial number tracking?
               </p>
-              <p className="mt-0.5 text-xs leading-relaxed text-ink-500 dark:text-cream-400">
+              <p className="mt-0.5 text-xs leading-relaxed text-ink-500">
                 Turn this on for phones, laptops or anything you need to
                 trace unit by unit. You can register individual serial
                 numbers after adding it.
@@ -185,18 +185,18 @@ export default function AddProductModal({ open, onClose, onSubmit }) {
 function optionClass(active) {
   return `rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
     active
-      ? 'border-clay-500 bg-clay-500/10 text-clay-600 dark:text-clay-400'
-      : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40 dark:border-cream-100/15 dark:text-cream-400'
+      ? 'border-clay-500 bg-clay-500/10 text-clay-600'
+      : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40'
   }`
 }
 
 function Field({ label, ...props }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-ink-500 dark:text-cream-400">{label}</span>
+      <span className="text-xs font-medium text-ink-500">{label}</span>
       <input
         {...props}
-        className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+        className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
       />
     </label>
   )

@@ -14,7 +14,7 @@ export default function Logo({ className }) {
           />
         </svg>
       </span>
-      <span className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-100">
+      <span className="font-heading text-lg font-semibold text-ink-900">
         Ledgerly
       </span>
     </Link>

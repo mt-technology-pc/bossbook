@@ -52,10 +52,10 @@ const reports = [
 export default function Reports() {
   return (
     <div>
-      <h1 className="font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+      <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
         Reports
       </h1>
-      <p className="mt-1 text-sm text-ink-500 dark:text-cream-400">
+      <p className="mt-1 text-sm text-ink-500">
         Real numbers computed from what you&apos;ve actually recorded — no placeholders.
       </p>
 
@@ -66,28 +66,28 @@ export default function Reports() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: i * 0.06 }}
-              className={`group h-full rounded-2xl border border-ink-400/15 bg-cream-50 p-6 dark:border-cream-100/10 dark:bg-dark-800 ${
+              className={`group h-full rounded-2xl border border-ink-400/15 bg-cream-50 p-6 ${
                 r.soon ? 'opacity-60' : 'transition-shadow hover:shadow-lg hover:shadow-clay-500/10'
               }`}
             >
               <div className="flex items-start justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600 dark:text-clay-400">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600">
                   <r.icon size={20} />
                 </span>
                 {r.soon && (
-                  <span className="rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-400 dark:bg-cream-100/10">
+                  <span className="rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-400">
                     Soon
                   </span>
                 )}
               </div>
-              <h2 className="mt-4 font-heading text-base font-semibold text-ink-900 dark:text-cream-50">
+              <h2 className="mt-4 font-heading text-base font-semibold text-ink-900">
                 {r.title}
               </h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-ink-500 dark:text-cream-400">
+              <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
                 {r.desc}
               </p>
               {!r.soon && (
-                <span className="mt-4 flex items-center gap-1 text-sm font-medium text-clay-600 dark:text-clay-400">
+                <span className="mt-4 flex items-center gap-1 text-sm font-medium text-clay-600">
                   Open report <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
                 </span>
               )}

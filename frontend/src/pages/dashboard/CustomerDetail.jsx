@@ -61,7 +61,7 @@ export default function CustomerDetail() {
   if (notFound) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-sm font-medium text-ink-600 dark:text-cream-300">Customer not found</p>
+        <p className="text-sm font-medium text-ink-600">Customer not found</p>
         <Link to="/dashboard/customers" className="mt-4 text-sm font-medium text-clay-600 hover:text-clay-700">
           Back to customers
         </Link>
@@ -73,18 +73,18 @@ export default function CustomerDetail() {
     <div>
       <Link
         to="/dashboard/customers"
-        className="flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600 dark:text-cream-400"
+        className="flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600"
       >
         <ArrowLeft size={15} /> Customers
       </Link>
 
-      <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-ink-400/15 bg-cream-50 p-6 dark:border-cream-100/10 dark:bg-dark-800 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-ink-400/15 bg-cream-50 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-clay-400 to-clay-600 font-heading text-xl font-semibold text-cream-50">
             {customer.name.charAt(0).toUpperCase()}
           </span>
           <div>
-            <h1 className="font-heading text-xl font-semibold text-ink-900 dark:text-cream-50 sm:text-2xl">
+            <h1 className="font-heading text-xl font-semibold text-ink-900 sm:text-2xl">
               {customer.name}
             </h1>
             <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-400">
@@ -107,8 +107,8 @@ export default function CustomerDetail() {
             <p
               className={`font-heading text-xl font-semibold ${
                 balance > 0
-                  ? 'text-clay-600 dark:text-clay-400'
-                  : 'text-ink-700 dark:text-cream-200'
+                  ? 'text-clay-600'
+                  : 'text-ink-700'
               }`}
             >
               {balance > 0
@@ -125,14 +125,14 @@ export default function CustomerDetail() {
       </div>
 
       {customer.notes && (
-        <p className="mt-3 rounded-xl bg-cream-200/60 px-4 py-3 text-sm text-ink-500 dark:bg-dark-800/60 dark:text-cream-400">
+        <p className="mt-3 rounded-xl bg-cream-200/60 px-4 py-3 text-sm text-ink-500">
           {customer.notes}
         </p>
       )}
 
-      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
+          <h2 className="font-heading text-lg font-semibold text-ink-900">
             Transaction history
           </h2>
           <button
@@ -144,7 +144,7 @@ export default function CustomerDetail() {
         </div>
 
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -156,10 +156,10 @@ export default function CustomerDetail() {
           </div>
         ) : transactions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
               <HandCoins size={20} />
             </span>
-            <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
+            <p className="mt-4 text-sm font-medium text-ink-600">
               No transactions yet
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
@@ -176,7 +176,7 @@ export default function CustomerDetail() {
               <span className="w-[76px]">Credit</span>
               <span className="w-[92px]">Balance</span>
             </div>
-            <ul className="divide-y divide-ink-400/10 dark:divide-cream-100/10">
+            <ul className="divide-y divide-ink-400/10">
             {transactions.map((t, i) => (
               <motion.li
                 key={t.id}
@@ -189,14 +189,14 @@ export default function CustomerDetail() {
                   <span
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                       t.type === 'charge'
-                        ? 'bg-clay-500/10 text-clay-600 dark:text-clay-400'
-                        : 'bg-ink-400/10 text-ink-500 dark:bg-cream-100/10 dark:text-cream-300'
+                        ? 'bg-clay-500/10 text-clay-600'
+                        : 'bg-ink-400/10 text-ink-500'
                     }`}
                   >
                     {t.type === 'charge' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
                   </span>
                   <div>
-                    <p className="text-sm font-medium text-ink-900 dark:text-cream-50">
+                    <p className="text-sm font-medium text-ink-900">
                       {t.type === 'charge' ? 'Charge' : 'Payment received'}
                     </p>
                     <p className="text-xs text-ink-400">
@@ -205,13 +205,13 @@ export default function CustomerDetail() {
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 text-right text-xs sm:text-sm">
-                  <span className={`w-[76px] ${t.debit ? 'font-semibold text-clay-600 dark:text-clay-400' : 'text-ink-300 dark:text-cream-100/20'}`}>
+                  <span className={`w-[76px] ${t.debit ? 'font-semibold text-clay-600' : 'text-ink-300'}`}>
                     {t.debit ? formatCurrency(t.debit) : '—'}
                   </span>
-                  <span className={`w-[76px] ${t.credit ? 'font-semibold text-ink-700 dark:text-cream-200' : 'text-ink-300 dark:text-cream-100/20'}`}>
+                  <span className={`w-[76px] ${t.credit ? 'font-semibold text-ink-700' : 'text-ink-300'}`}>
                     {t.credit ? formatCurrency(t.credit) : '—'}
                   </span>
-                  <span className="w-[92px] font-semibold text-ink-900 dark:text-cream-50">
+                  <span className="w-[92px] font-semibold text-ink-900">
                     {formatCurrency(t.balance)}
                   </span>
                 </div>

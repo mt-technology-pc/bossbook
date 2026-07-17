@@ -10,7 +10,7 @@ function highlight(label, query) {
   return (
     <>
       {label.slice(0, idx)}
-      <span className="font-semibold text-ink-900 dark:text-cream-50">
+      <span className="font-semibold text-ink-900">
         {label.slice(idx, idx + query.length)}
       </span>
       {label.slice(idx + query.length)}
@@ -107,8 +107,8 @@ export default function SearchSelect({
   return (
     <div ref={wrapperRef} className="relative">
       <div
-        className={`flex items-center rounded-xl border bg-cream-50 transition-colors dark:bg-dark-800 ${
-          open ? 'border-clay-500 ring-2 ring-clay-500/20' : 'border-ink-400/20 dark:border-cream-100/10'
+        className={`flex items-center rounded-xl border bg-cream-50 transition-colors ${
+          open ? 'border-clay-500 ring-2 ring-clay-500/20' : 'border-ink-400/20'
         }`}
       >
         <input
@@ -121,7 +121,7 @@ export default function SearchSelect({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          className="w-full rounded-xl bg-transparent px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none dark:text-cream-50"
+          className="w-full rounded-xl bg-transparent px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none"
         />
         <button
           type="button"
@@ -146,14 +146,14 @@ export default function SearchSelect({
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.15 }}
             style={{ position: 'fixed', top: menuRect.top, left: menuRect.left, width: menuRect.width }}
-            className="z-50 max-h-72 overflow-y-auto rounded-xl border border-ink-400/15 bg-cream-50 py-1.5 shadow-xl dark:border-cream-100/10 dark:bg-dark-800"
+            className="z-50 max-h-72 overflow-y-auto rounded-xl border border-ink-400/15 bg-cream-50 py-1.5 shadow-xl"
           >
             {onCreate && query.trim() && !exactMatch && (
               <button
                 type="button"
                 onClick={handleCreate}
                 disabled={creating}
-                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm font-medium text-clay-600 hover:bg-cream-200 disabled:opacity-50 dark:text-clay-400 dark:hover:bg-dark-700"
+                className="flex w-full items-center gap-2 px-3.5 py-2.5 text-left text-sm font-medium text-clay-600 hover:bg-cream-200 disabled:opacity-50"
               >
                 <Plus size={15} />
                 {creating ? 'Adding…' : createLabel} &ldquo;{query.trim()}&rdquo;
@@ -170,11 +170,11 @@ export default function SearchSelect({
                   key={o.id}
                   type="button"
                   onClick={() => select(o)}
-                  className={`flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-cream-200 dark:hover:bg-dark-700 ${
+                  className={`flex w-full items-center justify-between gap-3 px-3.5 py-2.5 text-left text-sm transition-colors hover:bg-cream-200 ${
                     o.id === value ? 'bg-clay-500/5' : ''
                   }`}
                 >
-                  <span className="text-ink-700 dark:text-cream-200">{highlight(o.label, query)}</span>
+                  <span className="text-ink-700">{highlight(o.label, query)}</span>
                   {o.sublabel && <span className="text-xs text-ink-400">{o.sublabel}</span>}
                 </button>
               ))

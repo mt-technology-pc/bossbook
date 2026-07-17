@@ -62,10 +62,10 @@ export default function About() {
             <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
               About Ledgerly
             </p>
-            <h1 className="mx-auto mt-3 max-w-2xl font-heading text-4xl font-semibold tracking-tight text-ink-900 dark:text-cream-50 sm:text-5xl">
+            <h1 className="mx-auto mt-3 max-w-2xl font-heading text-4xl font-semibold tracking-tight text-ink-900 sm:text-5xl">
               We&apos;re just getting started
             </h1>
-            <p className="mx-auto mt-5 max-w-xl text-ink-500 dark:text-cream-400">
+            <p className="mx-auto mt-5 max-w-xl text-ink-500">
               Ledgerly is a new accounting and inventory tool for small
               businesses — built to handle everyday stock, not just
               spreadsheets pretending to be one.
@@ -77,7 +77,7 @@ export default function About() {
       <section className="py-16 lg:py-24">
         <Container className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
           <Reveal y={30}>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-cream-200 dark:bg-dark-700">
+            <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-cream-200">
               <div className="absolute inset-0 bg-grain opacity-30" />
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="grid grid-cols-2 gap-4 p-8">
@@ -100,10 +100,10 @@ export default function About() {
             <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
               Why Ledgerly
             </p>
-            <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 dark:text-cream-50 sm:text-4xl">
+            <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
               Accounting tools weren&apos;t built for stock-heavy businesses
             </h2>
-            <p className="mt-4 text-ink-500 dark:text-cream-400">
+            <p className="mt-4 text-ink-500">
               Most accounting software treats inventory as an afterthought,
               and most inventory tools ignore the books entirely. We&apos;re
               building Ledgerly to close that gap — starting with the
@@ -121,7 +121,7 @@ export default function About() {
             <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
               What we believe
             </p>
-            <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 dark:text-cream-50 sm:text-4xl">
+            <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
               Our values
             </h2>
           </Reveal>
@@ -130,15 +130,15 @@ export default function About() {
               <Reveal key={v.title} delay={i * 0.08}>
                 <motion.div
                   whileHover={{ y: -6 }}
-                  className="h-full rounded-2xl border border-ink-400/15 bg-cream-50 p-6 dark:border-cream-100/10 dark:bg-dark-800"
+                  className="h-full rounded-2xl border border-ink-400/15 bg-cream-50 p-6"
                 >
-                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600 dark:text-clay-400">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600">
                     <v.icon size={20} />
                   </span>
-                  <h3 className="mt-5 font-heading text-base font-semibold text-ink-900 dark:text-cream-50">
+                  <h3 className="mt-5 font-heading text-base font-semibold text-ink-900">
                     {v.title}
                   </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-ink-500 dark:text-cream-400">
+                  <p className="mt-2 text-sm leading-relaxed text-ink-500">
                     {v.desc}
                   </p>
                 </motion.div>
@@ -148,16 +148,16 @@ export default function About() {
         </Container>
       </section>
 
-      <section className="bg-cream-200/60 py-20 dark:bg-dark-800/40 lg:py-28">
+      <section className="bg-cream-200/60 py-20 lg:py-28">
         <Container>
           <Reveal className="mx-auto max-w-2xl text-center">
             <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
               Where we&apos;re headed
             </p>
-            <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 dark:text-cream-50 sm:text-4xl">
+            <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
               Our roadmap
             </h2>
-            <p className="mt-4 text-ink-500 dark:text-cream-400">
+            <p className="mt-4 text-ink-500">
               We&apos;re building in the open and shipping fast. Here&apos;s
               what we&apos;re focused on right now and what&apos;s coming next.
             </p>
@@ -169,19 +169,19 @@ export default function About() {
               whileInView={{ scaleY: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 1.2, ease: 'easeInOut' }}
-              className="absolute left-[27px] top-0 h-full w-px origin-top bg-ink-400/20 dark:bg-cream-100/15"
+              className="absolute left-[27px] top-0 h-full w-px origin-top bg-ink-400/20"
             />
             <div className="space-y-10">
               {roadmap.map((item, i) => (
                 <Reveal key={item.stage} delay={i * 0.1} className="relative flex gap-5">
-                  <span className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-cream-100 bg-clay-500 font-heading text-xs font-semibold text-cream-50 dark:border-dark-800">
+                  <span className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-full border-4 border-cream-100 bg-clay-500 font-heading text-xs font-semibold text-cream-50">
                     {item.stage}
                   </span>
-                  <div className="flex-1 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800">
-                    <h3 className="font-heading text-base font-semibold text-ink-900 dark:text-cream-50">
+                  <div className="flex-1 rounded-2xl border border-ink-400/15 bg-cream-50 p-5">
+                    <h3 className="font-heading text-base font-semibold text-ink-900">
                       {item.title}
                     </h3>
-                    <p className="mt-1 text-sm leading-relaxed text-ink-500 dark:text-cream-400">
+                    <p className="mt-1 text-sm leading-relaxed text-ink-500">
                       {item.desc}
                     </p>
                   </div>
@@ -198,10 +198,10 @@ export default function About() {
             <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
               Get involved
             </p>
-            <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 dark:text-cream-50 sm:text-4xl">
+            <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
               Help shape Ledgerly from day one
             </h2>
-            <p className="mt-4 text-ink-500 dark:text-cream-400">
+            <p className="mt-4 text-ink-500">
               We&apos;re a small team and we read every message. If you run
               a business and want a say in what we build next, we&apos;d
               love to hear from you.

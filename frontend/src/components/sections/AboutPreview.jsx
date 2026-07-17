@@ -8,7 +8,7 @@ export default function AboutPreview() {
     <section className="py-24 lg:py-32">
       <Container className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
         <Reveal y={30}>
-          <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-cream-200 dark:bg-dark-700">
+          <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-cream-200">
             <div className="absolute inset-0 bg-grain opacity-30" />
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="grid grid-cols-2 gap-4 p-8">
@@ -31,10 +31,10 @@ export default function AboutPreview() {
           <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
             Why we&apos;re building this
           </p>
-          <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 dark:text-cream-50 sm:text-4xl">
+          <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
             Accounting software that understands stock
           </h2>
-          <p className="mt-4 text-ink-500 dark:text-cream-400">
+          <p className="mt-4 text-ink-500">
             We&apos;re a small team building Ledgerly because too many
             businesses are stuck between spreadsheets and bloated
             accounting suites that were never designed around inventory.

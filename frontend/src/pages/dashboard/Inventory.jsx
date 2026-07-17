@@ -140,10 +140,10 @@ export default function Inventory() {
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+          <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
             Inventory
           </h1>
-          <p className="mt-1 text-sm text-ink-500 dark:text-cream-400">
+          <p className="mt-1 text-sm text-ink-500">
             Manage your product catalog — value computed the same way as the Inventory Valuation Summary.
           </p>
         </div>
@@ -159,12 +159,12 @@ export default function Inventory() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: i * 0.05 }}
-            className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800"
+            className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
               <s.icon size={17} />
             </span>
-            <p className="mt-3 font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50">
+            <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">
               {s.value}
             </p>
             <p className="mt-0.5 text-xs text-ink-400">{s.label}</p>
@@ -175,23 +175,23 @@ export default function Inventory() {
       <div className="mt-6 flex flex-wrap items-end justify-between gap-3">
         <div className="flex flex-wrap items-end gap-3">
           <label className="block">
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Search</span>
+            <span className="text-xs font-medium text-ink-500">Search</span>
             <div className="relative mt-1.5">
               <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Name or SKU…"
-                className="w-full rounded-xl border border-ink-400/20 bg-cream-50 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+                className="w-full rounded-xl border border-ink-400/20 bg-cream-50 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
               />
             </div>
           </label>
           <label className="block">
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Category</span>
+            <span className="text-xs font-medium text-ink-500">Category</span>
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+              className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
             >
               <option value="">All categories</option>
               {categories.map((c) => (
@@ -200,7 +200,7 @@ export default function Inventory() {
             </select>
           </label>
           <div>
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Valuation method</span>
+            <span className="text-xs font-medium text-ink-500">Valuation method</span>
             <div className="mt-1.5 flex gap-1.5">
               {VALUATION_METHODS.map((m) => (
                 <button
@@ -208,8 +208,8 @@ export default function Inventory() {
                   onClick={() => setMethod(m.value)}
                   className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
                     method === m.value
-                      ? 'border-clay-500 bg-clay-500/10 text-clay-600 dark:text-clay-400'
-                      : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40 dark:border-cream-100/15 dark:text-cream-400'
+                      ? 'border-clay-500 bg-clay-500/10 text-clay-600'
+                      : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40'
                   }`}
                 >
                   {m.label}
@@ -221,15 +221,15 @@ export default function Inventory() {
 
         <button
           onClick={() => navigate('/dashboard/reports/inventory-valuation')}
-          className="flex items-center gap-1.5 text-sm font-medium text-clay-600 hover:text-clay-700 dark:text-clay-400"
+          className="flex items-center gap-1.5 text-sm font-medium text-clay-600 hover:text-clay-700"
         >
           Full valuation report <ArrowRight size={14} />
         </button>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+      <div className="mt-4 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -241,10 +241,10 @@ export default function Inventory() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
               <Package size={20} />
             </span>
-            <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
+            <p className="mt-4 text-sm font-medium text-ink-600">
               {products.length === 0 ? 'No products yet' : 'No matches'}
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
@@ -262,13 +262,13 @@ export default function Inventory() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead>
-                <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                <tr className="border-b border-ink-400/10 text-xs text-ink-400">
                   {columns.map((c) => (
                     <th key={c.key} className={`pb-3 font-medium ${c.align === 'right' ? 'text-right' : ''}`}>
                       {c.sortable ? (
                         <button
                           onClick={() => toggleSort(c.key)}
-                          className={`flex items-center gap-1 hover:text-ink-700 dark:hover:text-cream-200 ${c.align === 'right' ? 'ml-auto' : ''}`}
+                          className={`flex items-center gap-1 hover:text-ink-700 ${c.align === 'right' ? 'ml-auto' : ''}`}
                         >
                           {c.label}
                           <ArrowUpDown size={11} className={sort.field === c.key ? 'text-clay-500' : 'opacity-40'} />
@@ -291,24 +291,24 @@ export default function Inventory() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.25, delay: Math.min(i * 0.02, 0.3) }}
                         onClick={() => navigate(`/dashboard/reports/inventory-valuation/${r.productId}?method=${method}`)}
-                        className="cursor-pointer border-b border-ink-400/5 last:border-0 hover:bg-cream-100 dark:border-cream-100/5 dark:hover:bg-dark-700"
+                        className="cursor-pointer border-b border-ink-400/5 last:border-0 hover:bg-cream-100"
                       >
-                        <td className="py-2.5 pr-3 font-mono text-xs text-ink-600 dark:text-cream-300">{r.itemCode}</td>
-                        <td className="py-2.5 pr-3 font-medium text-ink-900 dark:text-cream-50">{r.itemName}</td>
+                        <td className="py-2.5 pr-3 font-mono text-xs text-ink-600">{r.itemCode}</td>
+                        <td className="py-2.5 pr-3 font-medium text-ink-900">{r.itemName}</td>
                         <td className="py-2.5 pr-3">
                           {r.tracksSerial ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-clay-500/10 px-2.5 py-1 text-xs font-medium text-clay-600 dark:text-clay-400">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-clay-500/10 px-2.5 py-1 text-xs font-medium text-clay-600">
                               <ScanLine size={12} /> Serial/IMEI
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-ink-400/10 px-2.5 py-1 text-xs font-medium text-ink-500 dark:bg-cream-100/10 dark:text-cream-400">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-ink-400/10 px-2.5 py-1 text-xs font-medium text-ink-500">
                               Quantity
                             </span>
                           )}
                         </td>
-                        <td className="py-2.5 pr-3 text-right text-ink-700 dark:text-cream-200">{r.quantityOnHand}</td>
-                        <td className="py-2.5 pr-3 text-right text-ink-700 dark:text-cream-200">{formatCurrency(r.unitCost)}</td>
-                        <td className="py-2.5 pr-3 text-right font-semibold text-ink-900 dark:text-cream-50">{formatCurrency(r.totalValue)}</td>
+                        <td className="py-2.5 pr-3 text-right text-ink-700">{r.quantityOnHand}</td>
+                        <td className="py-2.5 pr-3 text-right text-ink-700">{formatCurrency(r.unitCost)}</td>
+                        <td className="py-2.5 pr-3 text-right font-semibold text-ink-900">{formatCurrency(r.totalValue)}</td>
                         <td className="py-2.5 text-right">
                           <button
                             onClick={(e) => handleDelete(e, r.productId, r.itemName)}
@@ -320,24 +320,24 @@ export default function Inventory() {
                         </td>
                       </motion.tr>
                     ))}
-                    <tr className="border-b border-ink-400/10 bg-cream-200/50 text-xs font-semibold dark:border-cream-100/10 dark:bg-dark-700/50">
+                    <tr className="border-b border-ink-400/10 bg-cream-200/50 text-xs font-semibold">
                       <td className="py-2 pr-3" colSpan={3}>
                         Subtotal · {group.category}
                       </td>
-                      <td className="py-2 pr-3 text-right text-ink-700 dark:text-cream-200">{group.qty}</td>
+                      <td className="py-2 pr-3 text-right text-ink-700">{group.qty}</td>
                       <td className="py-2 pr-3" />
-                      <td className="py-2 pr-3 text-right text-ink-900 dark:text-cream-50">{formatCurrency(group.value)}</td>
+                      <td className="py-2 pr-3 text-right text-ink-900">{formatCurrency(group.value)}</td>
                       <td className="py-2" />
                     </tr>
                   </Fragment>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-ink-400/20 text-sm font-bold dark:border-cream-100/20">
+                <tr className="border-t-2 border-ink-400/20 text-sm font-bold">
                   <td className="pt-3 pr-3" colSpan={3}>Grand total</td>
-                  <td className="pt-3 pr-3 text-right text-ink-900 dark:text-cream-50">{grandQty}</td>
+                  <td className="pt-3 pr-3 text-right text-ink-900">{grandQty}</td>
                   <td className="pt-3 pr-3" />
-                  <td className="pt-3 pr-3 text-right text-ink-900 dark:text-cream-50">{formatCurrency(grandValue)}</td>
+                  <td className="pt-3 pr-3 text-right text-ink-900">{formatCurrency(grandValue)}</td>
                   <td className="pt-3" />
                 </tr>
               </tfoot>

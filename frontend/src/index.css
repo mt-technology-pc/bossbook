@@ -1,7 +1,5 @@
 @import "tailwindcss";
 
-@custom-variant dark (&:where(.dark, .dark *));
-
 @theme {
   --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-serif: "Fraunces", Georgia, serif;
@@ -18,16 +16,10 @@
   --color-ink-500: #6b6558;
   --color-ink-400: #8a8478;
 
-  --color-clay-400: #e0785a;
-  --color-clay-500: #c96442;
-  --color-clay-600: #b1502f;
-  --color-clay-700: #8f3f25;
-
-  --color-dark-900: #191817;
-  --color-dark-800: #22211f;
-  --color-dark-700: #2b2a27;
-  --color-dark-600: #363532;
-  --color-dark-500: #4a4844;
+  --color-clay-400: #3d6fc7;
+  --color-clay-500: #0047ab;
+  --color-clay-600: #003d91;
+  --color-clay-700: #002f73;
 
   --animate-float: float 6s ease-in-out infinite;
   --animate-marquee: marquee 28s linear infinite;
@@ -57,10 +49,6 @@
     @apply bg-cream-100 text-ink-700 font-sans antialiased;
   }
 
-  .dark body {
-    @apply bg-dark-900 text-cream-200;
-  }
-
   ::selection {
     background: var(--color-clay-500);
     color: white;
@@ -76,9 +64,5 @@
   .bg-grain {
     background-image: radial-gradient(rgba(31, 27, 22, 0.06) 1px, transparent 1px);
     background-size: 18px 18px;
-  }
-
-  .dark .bg-grain {
-    background-image: radial-gradient(rgba(250, 249, 245, 0.06) 1px, transparent 1px);
   }
 }

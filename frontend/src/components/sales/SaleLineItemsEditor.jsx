@@ -67,7 +67,7 @@ export default function SaleLineItemsEditor({
   return (
     <div>
       <div className="flex items-center justify-between">
-        <h2 className="font-heading text-base font-semibold text-ink-900 dark:text-cream-50">
+        <h2 className="font-heading text-base font-semibold text-ink-900">
           Items
         </h2>
         <button
@@ -79,8 +79,8 @@ export default function SaleLineItemsEditor({
         </button>
       </div>
 
-      <div className="mt-3 overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 dark:border-cream-100/10 dark:bg-dark-800">
-        <div className="hidden grid-cols-[2fr_80px_100px_100px_72px] gap-2 border-b border-ink-400/10 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-ink-400 dark:border-cream-100/10 sm:grid">
+      <div className="mt-3 overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50">
+        <div className="hidden grid-cols-[2fr_80px_100px_100px_72px] gap-2 border-b border-ink-400/10 px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-ink-400 sm:grid">
           <span>Product</span>
           <span>Qty</span>
           <span>{priceLabel}</span>
@@ -101,7 +101,7 @@ export default function SaleLineItemsEditor({
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2 }}
-                className="overflow-hidden border-b border-ink-400/10 px-4 py-3 last:border-0 dark:border-cream-100/10"
+                className="overflow-hidden border-b border-ink-400/10 px-4 py-3 last:border-0"
               >
                 <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-[2fr_80px_100px_100px_72px] sm:items-center">
                   <div className="col-span-2 sm:col-span-1">
@@ -119,7 +119,7 @@ export default function SaleLineItemsEditor({
                     value={line.quantity}
                     onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
                     placeholder="Qty"
-                    className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-2 text-sm text-ink-900 outline-none focus:border-clay-500 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+                    className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-2 text-sm text-ink-900 outline-none focus:border-clay-500"
                   />
                   <input
                     type="number"
@@ -128,10 +128,10 @@ export default function SaleLineItemsEditor({
                     value={line.unitPrice}
                     onChange={(e) => updateLine(line.key, { unitPrice: e.target.value })}
                     placeholder="0.00"
-                    className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-2 text-sm text-ink-900 outline-none focus:border-clay-500 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+                    className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-2 text-sm text-ink-900 outline-none focus:border-clay-500"
                   />
                   <div className="flex items-center justify-between gap-1 sm:justify-end">
-                    <span className="text-sm font-semibold text-ink-900 dark:text-cream-50">
+                    <span className="text-sm font-semibold text-ink-900">
                       {formatCurrency((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0))}
                     </span>
                     <div className="flex items-center">
@@ -139,7 +139,7 @@ export default function SaleLineItemsEditor({
                         type="button"
                         onClick={() => duplicateLine(line.key)}
                         aria-label="Duplicate line"
-                        className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 dark:hover:bg-dark-700 dark:hover:text-cream-200"
+                        className="rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600"
                       >
                         <Copy size={14} />
                       </button>
@@ -158,7 +158,7 @@ export default function SaleLineItemsEditor({
 
                 {product?.tracks_serial && qty > 0 && (
                   <div className="mt-3 rounded-lg border border-clay-500/20 bg-clay-500/5 p-3">
-                    <p className="flex items-center gap-1.5 text-[11px] font-medium text-clay-600 dark:text-clay-400">
+                    <p className="flex items-center gap-1.5 text-[11px] font-medium text-clay-600">
                       <ScanLine size={12} /> Select {qty} unit{qty === 1 ? '' : 's'} to sell
                       <span className="ml-auto font-semibold">{line.unitIds.length}/{qty} selected</span>
                     </p>
@@ -173,8 +173,8 @@ export default function SaleLineItemsEditor({
                               key={u.id}
                               className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
                                 checked
-                                  ? 'border-clay-500 bg-clay-500/10 text-clay-700 dark:text-clay-300'
-                                  : 'border-ink-400/20 text-ink-600 hover:border-ink-400/40 dark:border-cream-100/15 dark:text-cream-300'
+                                  ? 'border-clay-500 bg-clay-500/10 text-clay-700'
+                                  : 'border-ink-400/20 text-ink-600 hover:border-ink-400/40'
                               }`}
                             >
                               <input
@@ -199,7 +199,7 @@ export default function SaleLineItemsEditor({
         <button
           type="button"
           onClick={addLine}
-          className="flex w-full items-center gap-1.5 border-t border-ink-400/10 px-4 py-3 text-sm font-medium text-clay-600 hover:bg-cream-100 dark:border-cream-100/10 dark:text-clay-400 dark:hover:bg-dark-700"
+          className="flex w-full items-center gap-1.5 border-t border-ink-400/10 px-4 py-3 text-sm font-medium text-clay-600 hover:bg-cream-100"
         >
           <Plus size={15} /> Add lines
         </button>

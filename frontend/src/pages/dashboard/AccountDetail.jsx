@@ -78,7 +78,7 @@ export default function AccountDetail() {
   if (notFound) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
-        <p className="text-sm font-medium text-ink-600 dark:text-cream-300">Account not found</p>
+        <p className="text-sm font-medium text-ink-600">Account not found</p>
         <Link to="/dashboard" className="mt-4 text-sm font-medium text-clay-600 hover:text-clay-700">
           Back to overview
         </Link>
@@ -90,18 +90,18 @@ export default function AccountDetail() {
     <div>
       <Link
         to="/dashboard"
-        className="flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600 dark:text-cream-400"
+        className="flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600"
       >
         <ArrowLeft size={15} /> Overview
       </Link>
 
-      <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-ink-400/15 bg-cream-50 p-6 dark:border-cream-100/10 dark:bg-dark-800 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-ink-400/15 bg-cream-50 p-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-4">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-clay-400 to-clay-600 text-cream-50">
             {account.type === 'bank' ? <Landmark size={22} /> : <Wallet size={22} />}
           </span>
           <div>
-            <h1 className="font-heading text-xl font-semibold text-ink-900 dark:text-cream-50 sm:text-2xl">
+            <h1 className="font-heading text-xl font-semibold text-ink-900 sm:text-2xl">
               {account.name}
             </h1>
             <p className="mt-1 text-xs capitalize text-ink-400">
@@ -113,7 +113,7 @@ export default function AccountDetail() {
         <div className="flex items-center gap-3">
           <div className="text-right">
             <p className="text-xs text-ink-400">Balance</p>
-            <p className="font-heading text-xl font-semibold text-ink-900 dark:text-cream-50">
+            <p className="font-heading text-xl font-semibold text-ink-900">
               {formatCurrency(account.balance)}
             </p>
           </div>
@@ -123,9 +123,9 @@ export default function AccountDetail() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
         <div className="flex items-center justify-between">
-          <h2 className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
+          <h2 className="font-heading text-lg font-semibold text-ink-900">
             Transaction history
           </h2>
           <button
@@ -137,7 +137,7 @@ export default function AccountDetail() {
         </div>
 
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -149,10 +149,10 @@ export default function AccountDetail() {
           </div>
         ) : transactions.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
               {account.type === 'bank' ? <Landmark size={20} /> : <Wallet size={20} />}
             </span>
-            <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
+            <p className="mt-4 text-sm font-medium text-ink-600">
               No transactions yet
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
@@ -170,7 +170,7 @@ export default function AccountDetail() {
               <span className="w-[76px]">Credit</span>
               <span className="w-[92px]">Balance</span>
             </div>
-            <ul className="divide-y divide-ink-400/10 dark:divide-cream-100/10">
+            <ul className="divide-y divide-ink-400/10">
             {transactions.map((t, i) => (
               <motion.li
                 key={t.id}
@@ -183,23 +183,23 @@ export default function AccountDetail() {
                   <span
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                       t.type === 'deposit'
-                        ? 'bg-clay-500/10 text-clay-600 dark:text-clay-400'
-                        : 'bg-ink-400/10 text-ink-500 dark:bg-cream-100/10 dark:text-cream-300'
+                        ? 'bg-clay-500/10 text-clay-600'
+                        : 'bg-ink-400/10 text-ink-500'
                     }`}
                   >
                     {t.type === 'deposit' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
                   </span>
                   <div>
-                    <p className="flex items-center gap-1.5 text-sm font-medium text-ink-900 dark:text-cream-50">
+                    <p className="flex items-center gap-1.5 text-sm font-medium text-ink-900">
                       {t.type === 'deposit' ? 'Deposit' : 'Withdrawal'}
                       {t.sales && (
-                        <span className="flex items-center gap-1 rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-500 dark:bg-cream-100/10 dark:text-cream-400">
+                        <span className="flex items-center gap-1 rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-500">
                           {t.sales.type === 'invoice' ? <FileText size={10} /> : <Receipt size={10} />}
                           {t.sales.reference || (t.sales.type === 'invoice' ? 'Invoice' : 'Receipt')}
                         </span>
                       )}
                       {t.expenses && (
-                        <span className="flex items-center gap-1 rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-500 dark:bg-cream-100/10 dark:text-cream-400">
+                        <span className="flex items-center gap-1 rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-500">
                           <Receipt size={10} /> {t.expenses.category}
                         </span>
                       )}
@@ -210,13 +210,13 @@ export default function AccountDetail() {
                   </div>
                 </div>
                 <div className="flex justify-end gap-2 text-right text-xs sm:text-sm">
-                  <span className={`w-[76px] ${t.debit ? 'font-semibold text-clay-600 dark:text-clay-400' : 'text-ink-300 dark:text-cream-100/20'}`}>
+                  <span className={`w-[76px] ${t.debit ? 'font-semibold text-clay-600' : 'text-ink-300'}`}>
                     {t.debit ? formatCurrency(t.debit) : '—'}
                   </span>
-                  <span className={`w-[76px] ${t.credit ? 'font-semibold text-ink-700 dark:text-cream-200' : 'text-ink-300 dark:text-cream-100/20'}`}>
+                  <span className={`w-[76px] ${t.credit ? 'font-semibold text-ink-700' : 'text-ink-300'}`}>
                     {t.credit ? formatCurrency(t.credit) : '—'}
                   </span>
-                  <span className="w-[92px] font-semibold text-ink-900 dark:text-cream-50">
+                  <span className="w-[92px] font-semibold text-ink-900">
                     {formatCurrency(t.balance)}
                   </span>
                 </div>

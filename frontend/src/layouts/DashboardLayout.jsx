@@ -3,13 +3,12 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
-  Truck, ShoppingBag, Wallet, Menu, X, LogOut, Moon, Sun, ChevronDown,
+  Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
   ArrowDownToLine, ArrowUpFromLine,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../hooks/useTheme'
 
 const nav = [
   { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, end: true },
@@ -30,7 +29,6 @@ export default function DashboardLayout() {
   const [open, setOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const { user, fullName, signOut } = useAuth()
-  const [dark, setDark] = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -45,8 +43,8 @@ export default function DashboardLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-cream-100 dark:bg-dark-900">
-      <aside className="hidden w-64 shrink-0 flex-col border-r border-ink-400/10 bg-cream-50 dark:border-cream-100/10 dark:bg-dark-800 lg:flex print:hidden">
+    <div className="flex min-h-screen bg-cream-100">
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-ink-400/10 bg-cream-50 lg:flex print:hidden">
         <div className="flex h-16 items-center px-6">
           <Logo />
         </div>
@@ -62,8 +60,8 @@ export default function DashboardLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-clay-500/10 text-clay-600 dark:text-clay-400'
-                    : 'text-ink-500 hover:bg-cream-200 dark:text-cream-400 dark:hover:bg-dark-700'
+                    ? 'bg-clay-500/10 text-clay-600'
+                    : 'text-ink-500 hover:bg-cream-200'
                 }`
               }
             >
@@ -72,10 +70,10 @@ export default function DashboardLayout() {
             </NavLink>
           ))}
         </nav>
-        <div className="border-t border-ink-400/10 p-3 dark:border-cream-100/10">
+        <div className="border-t border-ink-400/10 p-3">
           <button
             onClick={handleSignOut}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-500 transition-colors hover:bg-cream-200 dark:text-cream-400 dark:hover:bg-dark-700"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-500 transition-colors hover:bg-cream-200"
           >
             <LogOut size={17} />
             Log out
@@ -98,11 +96,11 @@ export default function DashboardLayout() {
               exit={{ x: -280 }}
               transition={{ type: 'spring', stiffness: 320, damping: 34 }}
               onClick={(e) => e.stopPropagation()}
-              className="flex h-full w-64 flex-col bg-cream-50 dark:bg-dark-800"
+              className="flex h-full w-64 flex-col bg-cream-50"
             >
               <div className="flex h-16 items-center justify-between px-6">
                 <Logo />
-                <button onClick={() => setOpen(false)} className="text-ink-500 dark:text-cream-300">
+                <button onClick={() => setOpen(false)} className="text-ink-500">
                   <X size={20} />
                 </button>
               </div>
@@ -119,8 +117,8 @@ export default function DashboardLayout() {
                     className={({ isActive }) =>
                       `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
                         isActive
-                          ? 'bg-clay-500/10 text-clay-600 dark:text-clay-400'
-                          : 'text-ink-500 hover:bg-cream-200 dark:text-cream-400 dark:hover:bg-dark-700'
+                          ? 'bg-clay-500/10 text-clay-600'
+                          : 'text-ink-500 hover:bg-cream-200'
                       }`
                     }
                   >
@@ -129,10 +127,10 @@ export default function DashboardLayout() {
                   </NavLink>
                 ))}
               </nav>
-              <div className="border-t border-ink-400/10 p-3 dark:border-cream-100/10">
+              <div className="border-t border-ink-400/10 p-3">
                 <button
                   onClick={handleSignOut}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-500 dark:text-cream-400"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-500"
                 >
                   <LogOut size={17} />
                   Log out
@@ -144,9 +142,9 @@ export default function DashboardLayout() {
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur dark:border-cream-100/10 dark:bg-dark-800/80 sm:px-6 print:hidden">
+        <header className="flex h-16 items-center justify-between border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
           <button
-            className="text-ink-600 dark:text-cream-200 lg:hidden"
+            className="text-ink-600 lg:hidden"
             onClick={() => setOpen(true)}
           >
             <Menu size={22} />
@@ -155,23 +153,15 @@ export default function DashboardLayout() {
           <div className="hidden lg:block" />
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setDark((d) => !d)}
-              aria-label="Toggle dark mode"
-              className="flex h-9 w-9 items-center justify-center rounded-full text-ink-500 transition-colors hover:bg-cream-200 dark:text-cream-300 dark:hover:bg-dark-700"
-            >
-              {dark ? <Sun size={16} /> : <Moon size={16} />}
-            </button>
-
             <div className="relative">
               <button
                 onClick={() => setMenuOpen((m) => !m)}
-                className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-cream-200 dark:hover:bg-dark-700"
+                className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-cream-200"
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-clay-400 to-clay-600 text-sm font-semibold text-cream-50">
                   {initial}
                 </span>
-                <span className="hidden text-sm font-medium text-ink-700 dark:text-cream-200 sm:block">
+                <span className="hidden text-sm font-medium text-ink-700 sm:block">
                   {displayName}
                 </span>
                 <ChevronDown size={14} className="hidden text-ink-400 sm:block" />
@@ -184,15 +174,15 @@ export default function DashboardLayout() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-ink-400/15 bg-cream-50 py-1 shadow-xl dark:border-cream-100/10 dark:bg-dark-800"
+                    className="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-ink-400/15 bg-cream-50 py-1 shadow-xl"
                   >
-                    <div className="border-b border-ink-400/10 px-3.5 py-2.5 dark:border-cream-100/10">
-                      <p className="truncate text-sm font-medium text-ink-900 dark:text-cream-50">{displayName}</p>
+                    <div className="border-b border-ink-400/10 px-3.5 py-2.5">
+                      <p className="truncate text-sm font-medium text-ink-900">{displayName}</p>
                       <p className="truncate text-xs text-ink-400">{user?.email}</p>
                     </div>
                     <button
                       onClick={handleSignOut}
-                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink-600 hover:bg-cream-200 dark:text-cream-300 dark:hover:bg-dark-700"
+                      className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink-600 hover:bg-cream-200"
                     >
                       <LogOut size={15} />
                       Log out

@@ -79,7 +79,7 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
       subtitle={`Current balance owed: ${formatCurrency(supplier.balance)}`}
     >
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           {error}
         </div>
@@ -87,7 +87,7 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Amount paid *</span>
+          <span className="text-xs font-medium text-ink-500">Amount paid *</span>
           <input
             type="number"
             min="0.01"
@@ -96,12 +96,12 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0.00"
-            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Pay from *</span>
+          <span className="text-xs font-medium text-ink-500">Pay from *</span>
           <div className="mt-1.5">
             <SearchSelect
               value={accountId}
@@ -115,12 +115,12 @@ export default function RecordPaymentModal({ open, onClose, onSubmit, supplier }
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Note</span>
+          <span className="text-xs font-medium text-ink-500">Note</span>
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder="Optional — e.g. bank transfer, cash"
-            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </label>
 

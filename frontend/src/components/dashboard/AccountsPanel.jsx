@@ -18,7 +18,7 @@ export default function AccountsPanel() {
   }
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-ink-400/15 bg-cream-50 p-6 dark:border-cream-100/10 dark:bg-dark-800">
+    <div className="flex h-full flex-col rounded-2xl border border-ink-400/15 bg-cream-50 p-6">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
@@ -32,7 +32,7 @@ export default function AccountsPanel() {
 
       <div className="mt-4">
         <p className="text-xs text-ink-400">Total balance</p>
-        <p className="font-heading text-3xl font-semibold text-ink-900 dark:text-cream-50">
+        <p className="font-heading text-3xl font-semibold text-ink-900">
           {formatCurrency(totalBalance)}
         </p>
       </div>
@@ -50,20 +50,20 @@ export default function AccountsPanel() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: i * 0.06 }}
               onClick={() => navigate(`/dashboard/accounts/${a.account_id}`)}
-              className="group flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-cream-200 dark:hover:bg-dark-700"
+              className="group flex cursor-pointer items-center gap-3 rounded-xl px-2 py-2.5 hover:bg-cream-200"
             >
-              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
+              <span className="flex h-9 w-9 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
                 {a.type === 'bank' ? <Landmark size={16} /> : <Wallet size={16} />}
               </span>
               <span className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-ink-900 dark:text-cream-50">
+                <p className="truncate text-sm font-medium text-ink-900">
                   {a.name}
                 </p>
                 <p className="text-xs capitalize text-ink-400">
                   {a.type}{a.code ? ` · ${a.code}` : ''}
                 </p>
               </span>
-              <span className="text-sm font-semibold text-ink-700 dark:text-cream-200">
+              <span className="text-sm font-semibold text-ink-700">
                 {formatCurrency(a.balance)}
               </span>
               <button
@@ -77,9 +77,9 @@ export default function AccountsPanel() {
           ))}
         </ul>
       ) : (
-        <div className="mt-5 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-ink-400/25 py-10 text-center dark:border-cream-100/15">
+        <div className="mt-5 flex flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-ink-400/25 py-10 text-center">
           <Landmark size={20} className="text-ink-400" />
-          <p className="mt-3 text-sm font-medium text-ink-600 dark:text-cream-300">
+          <p className="mt-3 text-sm font-medium text-ink-600">
             No accounts connected
           </p>
           <p className="mt-1 max-w-[220px] text-xs text-ink-400">
@@ -90,7 +90,7 @@ export default function AccountsPanel() {
 
       <button
         onClick={() => setModalOpen(true)}
-        className="mt-5 flex items-center justify-center gap-1.5 rounded-xl border border-ink-400/20 py-2.5 text-sm font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600 dark:border-cream-100/15 dark:text-cream-300"
+        className="mt-5 flex items-center justify-center gap-1.5 rounded-xl border border-ink-400/20 py-2.5 text-sm font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600"
       >
         <Plus size={15} /> Add account
       </button>

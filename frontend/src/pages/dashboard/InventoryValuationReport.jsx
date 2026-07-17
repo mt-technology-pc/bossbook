@@ -111,40 +111,40 @@ export default function InventoryValuationReport() {
       <div className="flex items-center justify-between gap-3 print:hidden">
         <button
           onClick={() => navigate('/dashboard/reports')}
-          className="flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600 dark:text-cream-400"
+          className="flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600"
         >
           <ArrowLeft size={15} /> Reports
         </button>
         <div className="flex items-center gap-2">
           <button
             onClick={() => handleExportCsv('inventory-valuation.csv')}
-            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600 dark:border-cream-100/15 dark:text-cream-300"
+            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600"
           >
             <Download size={13} /> CSV
           </button>
           <button
             onClick={() => handleExportCsv('inventory-valuation.xls')}
-            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600 dark:border-cream-100/15 dark:text-cream-300"
+            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600"
           >
             <Download size={13} /> Excel
           </button>
           <button
             onClick={() => window.print()}
-            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600 dark:border-cream-100/15 dark:text-cream-300"
+            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600"
           >
             <Printer size={13} /> Print / PDF
           </button>
         </div>
       </div>
 
-      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
         Inventory Valuation Summary
       </h1>
-      <p className="mt-1 text-sm text-ink-500 dark:text-cream-400">
+      <p className="mt-1 text-sm text-ink-500">
         As of {new Date(asOfDate).toLocaleDateString('en-LK', { dateStyle: 'long' })} · {methodLabel}
       </p>
 
-      <div className="mt-4 flex items-start gap-2 rounded-xl border border-ink-400/15 bg-cream-200/60 px-4 py-3 text-xs leading-relaxed text-ink-500 dark:border-cream-100/10 dark:bg-dark-800/60 dark:text-cream-400 print:hidden">
+      <div className="mt-4 flex items-start gap-2 rounded-xl border border-ink-400/15 bg-cream-200/60 px-4 py-3 text-xs leading-relaxed text-ink-500 print:hidden">
         <Info size={14} className="mt-0.5 shrink-0" />
         <p>
           Quantities and costs are computed from purchases and sales actually
@@ -159,21 +159,21 @@ export default function InventoryValuationReport() {
 
       <div className="mt-6 flex flex-wrap items-end gap-3 print:hidden">
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">As of date</span>
+          <span className="text-xs font-medium text-ink-500">As of date</span>
           <input
             type="date"
             value={asOfDate}
             onChange={(e) => setAsOfDate(e.target.value)}
-            className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+            className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Category</span>
+          <span className="text-xs font-medium text-ink-500">Category</span>
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+            className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           >
             <option value="">All categories</option>
             {categories.map((c) => (
@@ -183,11 +183,11 @@ export default function InventoryValuationReport() {
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Supplier</span>
+          <span className="text-xs font-medium text-ink-500">Supplier</span>
           <select
             value={supplierFilter}
             onChange={(e) => setSupplierFilter(e.target.value)}
-            className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+            className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           >
             <option value="">All suppliers</option>
             {suppliers.map((s) => (
@@ -197,17 +197,17 @@ export default function InventoryValuationReport() {
         </label>
 
         <label className="block flex-1 min-w-[160px]">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Search item</span>
+          <span className="text-xs font-medium text-ink-500">Search item</span>
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Name or code…"
-            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </label>
 
         <div>
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Valuation method</span>
+          <span className="text-xs font-medium text-ink-500">Valuation method</span>
           <div className="mt-1.5 flex gap-1.5">
             {VALUATION_METHODS.map((m) => (
               <button
@@ -215,8 +215,8 @@ export default function InventoryValuationReport() {
                 onClick={() => setMethod(m.value)}
                 className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
                   method === m.value
-                    ? 'border-clay-500 bg-clay-500/10 text-clay-600 dark:text-clay-400'
-                    : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40 dark:border-cream-100/15 dark:text-cream-400'
+                    ? 'border-clay-500 bg-clay-500/10 text-clay-600'
+                    : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40'
                 }`}
               >
                 {m.label}
@@ -226,9 +226,9 @@ export default function InventoryValuationReport() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6 print:border-0 print:p-0">
+      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6 print:border-0 print:p-0">
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -240,10 +240,10 @@ export default function InventoryValuationReport() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
               <Boxes size={20} />
             </span>
-            <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
+            <p className="mt-4 text-sm font-medium text-ink-600">
               No inventory to value
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
@@ -254,13 +254,13 @@ export default function InventoryValuationReport() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] text-left text-sm">
               <thead>
-                <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                <tr className="border-b border-ink-400/10 text-xs text-ink-400">
                   {columns.map((c) => (
                     <th key={c.key} className={`pb-3 font-medium ${c.align === 'right' ? 'text-right' : ''}`}>
                       {c.sortable ? (
                         <button
                           onClick={() => toggleSort(c.key)}
-                          className={`flex items-center gap-1 hover:text-ink-700 dark:hover:text-cream-200 ${c.align === 'right' ? 'ml-auto' : ''}`}
+                          className={`flex items-center gap-1 hover:text-ink-700 ${c.align === 'right' ? 'ml-auto' : ''}`}
                         >
                           {c.label}
                           <ArrowUpDown size={11} className={sort.field === c.key ? 'text-clay-500' : 'opacity-40'} />
@@ -284,35 +284,35 @@ export default function InventoryValuationReport() {
                         onClick={() =>
                           navigate(`/dashboard/reports/inventory-valuation/${r.productId}?asOf=${asOfDate}&method=${method}`)
                         }
-                        className="cursor-pointer border-b border-ink-400/5 last:border-0 hover:bg-cream-100 dark:border-cream-100/5 dark:hover:bg-dark-700"
+                        className="cursor-pointer border-b border-ink-400/5 last:border-0 hover:bg-cream-100"
                       >
-                        <td className="py-2.5 pr-3 font-mono text-xs text-ink-600 dark:text-cream-300">{r.itemCode}</td>
-                        <td className="py-2.5 pr-3 font-medium text-ink-900 dark:text-cream-50">{r.itemName}</td>
-                        <td className="py-2.5 pr-3 text-ink-500 dark:text-cream-400">{r.category}</td>
-                        <td className="py-2.5 pr-3 text-right text-ink-700 dark:text-cream-200">{r.quantityOnHand}</td>
-                        <td className="py-2.5 pr-3 text-right text-ink-700 dark:text-cream-200">{formatCurrency(r.unitCost)}</td>
-                        <td className="py-2.5 pr-3 text-right font-semibold text-ink-900 dark:text-cream-50">{formatCurrency(r.totalValue)}</td>
+                        <td className="py-2.5 pr-3 font-mono text-xs text-ink-600">{r.itemCode}</td>
+                        <td className="py-2.5 pr-3 font-medium text-ink-900">{r.itemName}</td>
+                        <td className="py-2.5 pr-3 text-ink-500">{r.category}</td>
+                        <td className="py-2.5 pr-3 text-right text-ink-700">{r.quantityOnHand}</td>
+                        <td className="py-2.5 pr-3 text-right text-ink-700">{formatCurrency(r.unitCost)}</td>
+                        <td className="py-2.5 pr-3 text-right font-semibold text-ink-900">{formatCurrency(r.totalValue)}</td>
                         <td className="py-2.5 text-xs text-ink-400">{methodLabel}</td>
                       </motion.tr>
                     ))}
-                    <tr key={`${group.category}-subtotal`} className="border-b border-ink-400/10 bg-cream-200/50 text-xs font-semibold dark:border-cream-100/10 dark:bg-dark-700/50">
+                    <tr key={`${group.category}-subtotal`} className="border-b border-ink-400/10 bg-cream-200/50 text-xs font-semibold">
                       <td className="py-2 pr-3" colSpan={3}>
                         Subtotal · {group.category}
                       </td>
-                      <td className="py-2 pr-3 text-right text-ink-700 dark:text-cream-200">{group.qty}</td>
+                      <td className="py-2 pr-3 text-right text-ink-700">{group.qty}</td>
                       <td className="py-2 pr-3" />
-                      <td className="py-2 pr-3 text-right text-ink-900 dark:text-cream-50">{formatCurrency(group.value)}</td>
+                      <td className="py-2 pr-3 text-right text-ink-900">{formatCurrency(group.value)}</td>
                       <td className="py-2" />
                     </tr>
                   </Fragment>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-ink-400/20 text-sm font-bold dark:border-cream-100/20">
+                <tr className="border-t-2 border-ink-400/20 text-sm font-bold">
                   <td className="pt-3 pr-3" colSpan={3}>Grand total</td>
-                  <td className="pt-3 pr-3 text-right text-ink-900 dark:text-cream-50">{grandQty}</td>
+                  <td className="pt-3 pr-3 text-right text-ink-900">{grandQty}</td>
                   <td className="pt-3 pr-3" />
-                  <td className="pt-3 pr-3 text-right text-ink-900 dark:text-cream-50">{formatCurrency(grandValue)}</td>
+                  <td className="pt-3 pr-3 text-right text-ink-900">{formatCurrency(grandValue)}</td>
                   <td className="pt-3" />
                 </tr>
               </tfoot>

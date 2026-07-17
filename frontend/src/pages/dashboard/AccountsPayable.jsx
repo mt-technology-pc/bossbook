@@ -30,10 +30,10 @@ export default function AccountsPayable() {
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+          <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
             Accounts Payable
           </h1>
-          <p className="mt-1 text-sm text-ink-500 dark:text-cream-400">
+          <p className="mt-1 text-sm text-ink-500">
             Every supplier you currently owe money to, and how much.
           </p>
         </div>
@@ -47,12 +47,12 @@ export default function AccountsPayable() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800"
+          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
             <Truck size={17} />
           </span>
-          <p className="mt-3 font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50">
+          <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">
             {owed.length}
           </p>
           <p className="mt-0.5 text-xs text-ink-400">Suppliers you owe</p>
@@ -61,31 +61,31 @@ export default function AccountsPayable() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, delay: 0.05 }}
-          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800"
+          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
             <Wallet size={17} />
           </span>
-          <p className="mt-3 font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50">
+          <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">
             {formatCurrency(totalPayable)}
           </p>
           <p className="mt-0.5 text-xs text-ink-400">Total payable</p>
         </motion.div>
       </div>
 
-      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
         <div className="relative max-w-xs">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by supplier name…"
-            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </div>
 
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -97,10 +97,10 @@ export default function AccountsPayable() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
               <Wallet size={20} />
             </span>
-            <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
+            <p className="mt-4 text-sm font-medium text-ink-600">
               {owed.length === 0 ? 'You don’t owe anybody right now' : 'No matches'}
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
@@ -113,7 +113,7 @@ export default function AccountsPayable() {
           <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead>
-                <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                <tr className="border-b border-ink-400/10 text-xs text-ink-400">
                   <th className="pb-3 font-medium">Supplier</th>
                   <th className="pb-3 text-right font-medium">Balance owed</th>
                   <th className="pb-3 font-medium" />
@@ -127,17 +127,17 @@ export default function AccountsPayable() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
                     onClick={() => navigate(`/dashboard/suppliers/${b.supplier_id}`)}
-                    className="cursor-pointer border-b border-ink-400/10 last:border-0 hover:bg-cream-100 dark:border-cream-100/10 dark:hover:bg-dark-700"
+                    className="cursor-pointer border-b border-ink-400/10 last:border-0 hover:bg-cream-100"
                   >
                     <td className="py-3.5 pr-3">
                       <div className="flex items-center gap-2.5">
                         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-clay-400 to-clay-600 text-xs font-semibold text-cream-50">
                           {b.name.charAt(0).toUpperCase()}
                         </span>
-                        <p className="font-medium text-ink-900 dark:text-cream-50">{b.name}</p>
+                        <p className="font-medium text-ink-900">{b.name}</p>
                       </div>
                     </td>
-                    <td className="py-3.5 pr-3 text-right font-semibold text-clay-600 dark:text-clay-400">
+                    <td className="py-3.5 pr-3 text-right font-semibold text-clay-600">
                       {formatCurrency(b.balance)}
                     </td>
                     <td className="py-3.5 text-right">
@@ -149,7 +149,7 @@ export default function AccountsPayable() {
                         >
                           <HandCoins size={13} /> Pay
                         </Button>
-                        <ChevronRight size={15} className="text-ink-300 dark:text-cream-100/30" />
+                        <ChevronRight size={15} className="text-ink-300" />
                       </div>
                     </td>
                   </motion.tr>

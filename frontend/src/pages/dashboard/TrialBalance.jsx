@@ -51,10 +51,10 @@ export default function TrialBalance() {
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+          <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
             Trial Balance
           </h1>
-          <p className="mt-1 text-sm text-ink-500 dark:text-cream-400">
+          <p className="mt-1 text-sm text-ink-500">
             Every account's balance as of a date, in its normal Debit or Credit column.
           </p>
         </div>
@@ -68,8 +68,8 @@ export default function TrialBalance() {
         <div
           className={`mt-4 flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-sm ${
             backfillMessage.type === 'error'
-              ? 'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400'
-              : 'border-clay-500/20 bg-clay-500/10 text-clay-700 dark:text-clay-300'
+              ? 'border-red-500/20 bg-red-500/10 text-red-600'
+              : 'border-clay-500/20 bg-clay-500/10 text-clay-700'
           }`}
         >
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
@@ -77,7 +77,7 @@ export default function TrialBalance() {
         </div>
       )}
 
-      <div className="mt-6 flex items-start gap-2 rounded-xl border border-ink-400/15 bg-cream-100 px-3.5 py-2.5 text-xs text-ink-500 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-400">
+      <div className="mt-6 flex items-start gap-2 rounded-xl border border-ink-400/15 bg-cream-100 px-3.5 py-2.5 text-xs text-ink-500">
         <Info size={14} className="mt-0.5 shrink-0" />
         Cost of Goods Sold entries use each item's cost at time of sale (standard/latest-cost
         method, the same one offered in the Inventory Valuation report). This can differ from the
@@ -85,17 +85,17 @@ export default function TrialBalance() {
       </div>
 
       <label className="mt-6 block max-w-xs">
-        <span className="text-xs font-medium text-ink-500 dark:text-cream-400">As of</span>
+        <span className="text-xs font-medium text-ink-500">As of</span>
         <input
           type="date"
           value={asOfDate}
           onChange={(e) => setAsOfDate(e.target.value)}
-          className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+          className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
         />
       </label>
 
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           {error}
         </div>
@@ -106,19 +106,19 @@ export default function TrialBalance() {
           <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
         </div>
       ) : rowsByType.length === 0 ? (
-        <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-400/20 bg-cream-50 py-16 text-center dark:border-cream-100/15 dark:bg-dark-800">
-          <p className="text-sm font-medium text-ink-600 dark:text-cream-300">Nothing posted yet</p>
+        <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-400/20 bg-cream-50 py-16 text-center">
+          <p className="text-sm font-medium text-ink-600">Nothing posted yet</p>
           <p className="mt-1 max-w-xs text-xs text-ink-400">
             Record a sale, purchase, payment, or expense — or run the backfill above if you
             already have historical data.
           </p>
         </div>
       ) : (
-        <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+        <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px] text-left text-sm">
               <thead>
-                <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                <tr className="border-b border-ink-400/10 text-xs text-ink-400">
                   <th className="pb-2.5 font-medium">Account</th>
                   <th className="pb-2.5 text-right font-medium">Debit</th>
                   <th className="pb-2.5 text-right font-medium">Credit</th>
@@ -133,12 +133,12 @@ export default function TrialBalance() {
                       </td>
                     </tr>
                     {group.rows.map((row) => (
-                      <tr key={row.id} className="border-b border-ink-400/10 last:border-0 dark:border-cream-100/10">
-                        <td className="py-2 pr-3 text-ink-900 dark:text-cream-50">{row.name}</td>
-                        <td className="py-2 pr-3 text-right text-ink-700 dark:text-cream-200">
+                      <tr key={row.id} className="border-b border-ink-400/10 last:border-0">
+                        <td className="py-2 pr-3 text-ink-900">{row.name}</td>
+                        <td className="py-2 pr-3 text-right text-ink-700">
                           {row.debitColumn ? formatCurrency(row.debitColumn) : '—'}
                         </td>
-                        <td className="py-2 text-right text-ink-700 dark:text-cream-200">
+                        <td className="py-2 text-right text-ink-700">
                           {row.creditColumn ? formatCurrency(row.creditColumn) : '—'}
                         </td>
                       </tr>
@@ -147,7 +147,7 @@ export default function TrialBalance() {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-ink-400/20 font-semibold text-ink-900 dark:border-cream-100/20 dark:text-cream-50">
+                <tr className="border-t-2 border-ink-400/20 font-semibold text-ink-900">
                   <td className="pt-3">Total</td>
                   <td className="pt-3 text-right">{formatCurrency(totalDebits)}</td>
                   <td className="pt-3 text-right">{formatCurrency(totalCredits)}</td>
@@ -156,7 +156,7 @@ export default function TrialBalance() {
             </table>
           </div>
 
-          <p className={`mt-4 text-center text-sm font-medium ${balanced ? 'text-clay-600 dark:text-clay-400' : 'text-red-600 dark:text-red-400'}`}>
+          <p className={`mt-4 text-center text-sm font-medium ${balanced ? 'text-clay-600' : 'text-red-600'}`}>
             {balanced ? 'Books balance — total debits equal total credits.' : 'Books do not balance. This should never happen — please report it.'}
           </p>
         </div>

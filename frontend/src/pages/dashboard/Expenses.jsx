@@ -60,10 +60,10 @@ export default function Expenses() {
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+          <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
             Expenses
           </h1>
-          <p className="mt-1 text-sm text-ink-500 dark:text-cream-400">
+          <p className="mt-1 text-sm text-ink-500">
             Rent, utilities, salaries and other money paid out of the business.
           </p>
         </div>
@@ -79,12 +79,12 @@ export default function Expenses() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: i * 0.05 }}
-            className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800"
+            className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
               <s.icon size={17} />
             </span>
-            <p className="mt-3 font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50">
+            <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">
               {s.value}
             </p>
             <p className="mt-0.5 text-xs text-ink-400">{s.label}</p>
@@ -92,19 +92,19 @@ export default function Expenses() {
         ))}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
         <div className="relative max-w-xs">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by code, category or description…"
-            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </div>
 
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -116,10 +116,10 @@ export default function Expenses() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
               <Receipt size={20} />
             </span>
-            <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
+            <p className="mt-4 text-sm font-medium text-ink-600">
               {expenses.length === 0 ? 'No expenses recorded yet' : 'No matches'}
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
@@ -137,7 +137,7 @@ export default function Expenses() {
           <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-[700px] text-left text-sm">
               <thead>
-                <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                <tr className="border-b border-ink-400/10 text-xs text-ink-400">
                   <th className="pb-3 font-medium">Code</th>
                   <th className="pb-3 font-medium">Date</th>
                   <th className="pb-3 font-medium">Category</th>
@@ -154,13 +154,13 @@ export default function Expenses() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
-                    className="border-b border-ink-400/10 last:border-0 dark:border-cream-100/10"
+                    className="border-b border-ink-400/10 last:border-0"
                   >
                     <td className="py-3.5 pr-3 font-mono text-xs text-ink-400">{e.code || '—'}</td>
-                    <td className="py-3.5 pr-3 text-ink-500 dark:text-cream-400">{formatDate(e.expense_date)}</td>
-                    <td className="py-3.5 pr-3 font-medium text-ink-900 dark:text-cream-50">{e.category}</td>
-                    <td className="py-3.5 pr-3 text-ink-500 dark:text-cream-400">{e.description || '—'}</td>
-                    <td className="py-3.5 pr-3 text-ink-500 dark:text-cream-400">
+                    <td className="py-3.5 pr-3 text-ink-500">{formatDate(e.expense_date)}</td>
+                    <td className="py-3.5 pr-3 font-medium text-ink-900">{e.category}</td>
+                    <td className="py-3.5 pr-3 text-ink-500">{e.description || '—'}</td>
+                    <td className="py-3.5 pr-3 text-ink-500">
                       {e.accounts ? (
                         <span className="flex items-center gap-1">
                           {e.accounts.type === 'bank' ? <Landmark size={12} /> : <Wallet size={12} />}
@@ -168,7 +168,7 @@ export default function Expenses() {
                         </span>
                       ) : '—'}
                     </td>
-                    <td className="py-3.5 pr-3 text-right font-semibold text-ink-900 dark:text-cream-50">
+                    <td className="py-3.5 pr-3 text-right font-semibold text-ink-900">
                       {formatCurrency(e.amount)}
                     </td>
                     <td className="py-3.5 text-right">

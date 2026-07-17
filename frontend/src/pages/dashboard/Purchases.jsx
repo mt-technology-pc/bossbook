@@ -50,10 +50,10 @@ export default function Purchases() {
     <div>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+          <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
             Purchases
           </h1>
-          <p className="mt-1 text-sm text-ink-500 dark:text-cream-400">
+          <p className="mt-1 text-sm text-ink-500">
             Record supplier bills to bring stock into your inventory.
           </p>
         </div>
@@ -77,12 +77,12 @@ export default function Purchases() {
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: i * 0.05 }}
-            className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800"
+            className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
               <s.icon size={17} />
             </span>
-            <p className="mt-3 font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50">
+            <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">
               {s.value}
             </p>
             <p className="mt-0.5 text-xs text-ink-400">{s.label}</p>
@@ -90,19 +90,19 @@ export default function Purchases() {
         ))}
       </div>
 
-      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
         <div className="relative max-w-xs">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by code, supplier or note…"
-            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </div>
 
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
             <AlertCircle size={16} className="mt-0.5 shrink-0" />
             {error}
           </div>
@@ -114,10 +114,10 @@ export default function Purchases() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
               <Receipt size={20} />
             </span>
-            <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
+            <p className="mt-4 text-sm font-medium text-ink-600">
               {purchases.length === 0 ? 'No bills recorded yet' : 'No matches'}
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
@@ -132,7 +132,7 @@ export default function Purchases() {
             )}
           </div>
         ) : (
-          <ul className="mt-5 divide-y divide-ink-400/10 dark:divide-cream-100/10">
+          <ul className="mt-5 divide-y divide-ink-400/10">
             {filtered.map((p, i) => {
               const itemCount = p.purchase_items.reduce((s, it) => s + it.quantity, 0)
               const isOpen = expanded === p.id
@@ -150,11 +150,11 @@ export default function Purchases() {
                     className="flex w-full items-center justify-between gap-3 text-left"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
                         <Receipt size={16} />
                       </span>
                       <div>
-                        <p className="flex items-center gap-2 text-sm font-medium text-ink-900 dark:text-cream-50">
+                        <p className="flex items-center gap-2 text-sm font-medium text-ink-900">
                           {p.reference || `Bill · ${formatDate(billDate)}`}
                           <span className="font-mono text-[10px] font-normal text-ink-400">
                             {p.reference || '—'}
@@ -167,7 +167,7 @@ export default function Purchases() {
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="mr-1.5 text-sm font-semibold text-ink-700 dark:text-cream-200">
+                      <span className="mr-1.5 text-sm font-semibold text-ink-700">
                         {formatCurrency(p.total_amount)}
                       </span>
                       <button
@@ -196,7 +196,7 @@ export default function Purchases() {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       transition={{ duration: 0.2 }}
-                      className="mt-3 overflow-hidden rounded-xl bg-cream-100 p-3 dark:bg-dark-700"
+                      className="mt-3 overflow-hidden rounded-xl bg-cream-100 p-3"
                     >
                       <table className="w-full text-left text-xs">
                         <thead>
@@ -208,7 +208,7 @@ export default function Purchases() {
                         </thead>
                         <tbody>
                           {p.purchase_items.map((item) => (
-                            <tr key={item.id} className="text-ink-700 dark:text-cream-200">
+                            <tr key={item.id} className="text-ink-700">
                               <td className="py-1">{item.quantity}</td>
                               <td className="py-1">{formatCurrency(item.unit_cost)}</td>
                               <td className="py-1">{formatCurrency(item.subtotal)}</td>
@@ -217,7 +217,7 @@ export default function Purchases() {
                         </tbody>
                       </table>
                       {p.notes && (
-                        <p className="mt-2 border-t border-ink-400/10 pt-2 text-xs text-ink-400 dark:border-cream-100/10">
+                        <p className="mt-2 border-t border-ink-400/10 pt-2 text-xs text-ink-400">
                           {p.notes}
                         </p>
                       )}

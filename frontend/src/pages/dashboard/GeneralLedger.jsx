@@ -34,10 +34,10 @@ export default function GeneralLedger() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+      <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
         General Ledger
       </h1>
-      <p className="mt-1 text-sm text-ink-500 dark:text-cream-400">
+      <p className="mt-1 text-sm text-ink-500">
         The real T-account for any account — every journal entry line, with a running balance.
       </p>
 
@@ -51,18 +51,18 @@ export default function GeneralLedger() {
       </div>
 
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           {error}
         </div>
       )}
 
       {!coaId ? (
-        <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-400/20 bg-cream-50 py-16 text-center dark:border-cream-100/15 dark:bg-dark-800">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600 dark:text-clay-400">
+        <div className="mt-6 flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink-400/20 bg-cream-50 py-16 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
             <BookOpen size={20} />
           </span>
-          <p className="mt-4 text-sm font-medium text-ink-600 dark:text-cream-300">
+          <p className="mt-4 text-sm font-medium text-ink-600">
             Choose an account above to see its ledger
           </p>
         </div>
@@ -71,10 +71,10 @@ export default function GeneralLedger() {
           <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
         </div>
       ) : (
-        <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800 sm:p-6">
+        <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h2 className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
+              <h2 className="font-heading text-lg font-semibold text-ink-900">
                 {account?.name}
               </h2>
               <p className="text-xs capitalize text-ink-400">
@@ -83,7 +83,7 @@ export default function GeneralLedger() {
             </div>
             <div className="text-right">
               <p className="text-xs text-ink-400">Current balance</p>
-              <p className="font-heading text-xl font-semibold text-ink-900 dark:text-cream-50">
+              <p className="font-heading text-xl font-semibold text-ink-900">
                 {formatCurrency(account?.balance ?? 0)}
               </p>
             </div>
@@ -97,7 +97,7 @@ export default function GeneralLedger() {
             <div className="mt-5 overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
                 <thead>
-                  <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                  <tr className="border-b border-ink-400/10 text-xs text-ink-400">
                     <th className="pb-2.5 font-medium">Date</th>
                     <th className="pb-2.5 font-medium">Memo</th>
                     <th className="pb-2.5 font-medium">Source</th>
@@ -108,11 +108,11 @@ export default function GeneralLedger() {
                 </thead>
                 <tbody>
                   {lines.map((l) => (
-                    <tr key={l.id} className="border-b border-ink-400/10 last:border-0 dark:border-cream-100/10">
-                      <td className="py-2.5 pr-3 text-ink-500 dark:text-cream-400">
+                    <tr key={l.id} className="border-b border-ink-400/10 last:border-0">
+                      <td className="py-2.5 pr-3 text-ink-500">
                         {formatDate(l.journal_entries?.entry_date)}
                       </td>
-                      <td className="py-2.5 pr-3 text-ink-700 dark:text-cream-200">
+                      <td className="py-2.5 pr-3 text-ink-700">
                         {l.journal_entries?.memo || '—'}
                       </td>
                       <td className="py-2.5 pr-3 text-ink-400">
@@ -120,23 +120,23 @@ export default function GeneralLedger() {
                       </td>
                       <td className="py-2.5 pr-3 text-right">
                         {l.debit ? (
-                          <span className="font-semibold text-clay-600 dark:text-clay-400">
+                          <span className="font-semibold text-clay-600">
                             {formatCurrency(l.debit)}
                           </span>
                         ) : (
-                          <span className="text-ink-300 dark:text-cream-100/20">—</span>
+                          <span className="text-ink-300">—</span>
                         )}
                       </td>
                       <td className="py-2.5 pr-3 text-right">
                         {l.credit ? (
-                          <span className="font-semibold text-ink-700 dark:text-cream-200">
+                          <span className="font-semibold text-ink-700">
                             {formatCurrency(l.credit)}
                           </span>
                         ) : (
-                          <span className="text-ink-300 dark:text-cream-100/20">—</span>
+                          <span className="text-ink-300">—</span>
                         )}
                       </td>
-                      <td className="py-2.5 text-right font-semibold text-ink-900 dark:text-cream-50">
+                      <td className="py-2.5 text-right font-semibold text-ink-900">
                         {formatCurrency(l.balance)}
                       </td>
                     </tr>

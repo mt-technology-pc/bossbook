@@ -49,7 +49,7 @@ export default function AddSupplierModal({ open, onClose, onSubmit }) {
       subtitle="Save who you buy stock from so you can bill against them faster."
     >
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           {error}
         </div>
@@ -89,13 +89,13 @@ export default function AddSupplierModal({ open, onClose, onSubmit }) {
         />
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Notes</span>
+          <span className="text-xs font-medium text-ink-500">Notes</span>
           <textarea
             value={form.notes}
             onChange={update('notes')}
             rows={3}
             placeholder="Optional — payment terms, contact person, etc."
-            className="mt-1.5 w-full resize-none rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="mt-1.5 w-full resize-none rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </label>
 
@@ -115,10 +115,10 @@ export default function AddSupplierModal({ open, onClose, onSubmit }) {
 function Field({ label, ...props }) {
   return (
     <label className="block">
-      <span className="text-xs font-medium text-ink-500 dark:text-cream-400">{label}</span>
+      <span className="text-xs font-medium text-ink-500">{label}</span>
       <input
         {...props}
-        className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+        className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
       />
     </label>
   )

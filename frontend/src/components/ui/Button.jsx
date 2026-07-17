@@ -7,11 +7,11 @@ const variants = {
   primary:
     'bg-clay-500 text-cream-50 hover:bg-clay-600 shadow-lg shadow-clay-500/20',
   secondary:
-    'bg-ink-900 text-cream-50 hover:bg-ink-800 dark:bg-cream-100 dark:text-ink-900 dark:hover:bg-white',
+    'bg-cream-200 text-ink-900 border border-ink-400/20 hover:bg-cream-300',
   ghost:
-    'bg-transparent text-ink-700 hover:bg-cream-300 dark:text-cream-200 dark:hover:bg-dark-700',
+    'bg-transparent text-ink-700 hover:bg-cream-300',
   outline:
-    'bg-transparent border border-ink-400/40 text-ink-700 hover:border-clay-500 hover:text-clay-600 dark:text-cream-200 dark:hover:text-clay-400',
+    'bg-transparent border border-ink-400/40 text-ink-700 hover:border-clay-500 hover:text-clay-600',
 }
 
 const sizes = {

@@ -46,10 +46,10 @@ export default function Features() {
           <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
             Everything in one place
           </p>
-          <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 dark:text-cream-50 sm:text-4xl">
+          <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
             Run your counter to your closing books
           </h2>
-          <p className="mt-4 text-ink-500 dark:text-cream-400">
+          <p className="mt-4 text-ink-500">
             Purpose-built tools for retailers and small businesses who need
             accounting that actually understands stock.
           </p>
@@ -61,15 +61,15 @@ export default function Features() {
               <motion.div
                 whileHover={{ y: -6 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                className="group h-full rounded-2xl border border-ink-400/15 bg-cream-50 p-6 shadow-sm transition-shadow hover:shadow-xl hover:shadow-clay-500/10 dark:border-cream-100/10 dark:bg-dark-800"
+                className="group h-full rounded-2xl border border-ink-400/15 bg-cream-50 p-6 shadow-sm transition-shadow hover:shadow-xl hover:shadow-clay-500/10"
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600 transition-colors group-hover:bg-clay-500 group-hover:text-cream-50 dark:text-clay-400">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600 transition-colors group-hover:bg-clay-500 group-hover:text-cream-50">
                   <f.icon size={20} />
                 </span>
-                <h3 className="mt-5 font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
+                <h3 className="mt-5 font-heading text-lg font-semibold text-ink-900">
                   {f.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-500 dark:text-cream-400">
+                <p className="mt-2 text-sm leading-relaxed text-ink-500">
                   {f.desc}
                 </p>
               </motion.div>

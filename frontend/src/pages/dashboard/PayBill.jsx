@@ -245,20 +245,20 @@ export default function PayBill() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-cream-100 dark:bg-dark-900">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-ink-400/10 bg-cream-50 px-4 dark:border-cream-100/10 dark:bg-dark-800 sm:px-6">
+    <div className="flex min-h-screen flex-col bg-cream-100">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-ink-400/10 bg-cream-50 px-4 sm:px-6">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
             <HandCoins size={16} />
           </span>
-          <h1 className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
+          <h1 className="font-heading text-lg font-semibold text-ink-900">
             {isEdit ? 'Edit payment' : 'Pay a bill'}
           </h1>
         </div>
         <button
           onClick={() => navigate('/dashboard/purchases/payments-made')}
           aria-label="Cancel"
-          className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 dark:hover:bg-dark-700 dark:hover:text-cream-200"
+          className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600"
         >
           <X size={20} />
         </button>
@@ -268,7 +268,7 @@ export default function PayBill() {
         <div className={`mx-auto px-4 py-8 sm:px-6 ${isEdit ? 'max-w-2xl' : 'max-w-4xl'}`}>
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div className="w-full max-w-sm">
-              <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Supplier *</span>
+              <span className="text-xs font-medium text-ink-500">Supplier *</span>
               <div className="mt-1.5">
                 <SearchSelect
                   value={supplierId}
@@ -285,7 +285,7 @@ export default function PayBill() {
               <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
                 {isEdit ? 'Balance owed' : 'Amount paid'}
               </p>
-              <p className="font-heading text-3xl font-semibold text-ink-900 dark:text-cream-50">
+              <p className="font-heading text-3xl font-semibold text-ink-900">
                 {formatCurrency(isEdit ? balance : totalPaid)}
               </p>
               {!isEdit && supplierId && (
@@ -297,7 +297,7 @@ export default function PayBill() {
           </div>
 
           {error && (
-            <div className="mt-6 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+            <div className="mt-6 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />
               {error}
             </div>
@@ -306,7 +306,7 @@ export default function PayBill() {
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
             {isEdit && (
               <label className="block">
-                <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Amount paid *</span>
+                <span className="text-xs font-medium text-ink-500">Amount paid *</span>
                 <input
                   type="number"
                   min="0.01"
@@ -314,21 +314,21 @@ export default function PayBill() {
                   value={editAmount}
                   onChange={(e) => setEditAmount(e.target.value)}
                   placeholder="0.00"
-                  className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+                  className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
                 />
               </label>
             )}
             <label className="block">
-              <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Payment date</span>
+              <span className="text-xs font-medium text-ink-500">Payment date</span>
               <input
                 type="date"
                 value={paymentDate}
                 onChange={(e) => setPaymentDate(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+                className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
               />
             </label>
             <div>
-              <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Pay from *</span>
+              <span className="text-xs font-medium text-ink-500">Pay from *</span>
               <div className="mt-1.5">
                 <SearchSelect
                   value={accountId}
@@ -344,12 +344,12 @@ export default function PayBill() {
 
           {isEdit ? (
             <label className="mt-4 block">
-              <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Apply to bill</span>
+              <span className="text-xs font-medium text-ink-500">Apply to bill</span>
               <select
                 value={editPurchaseId}
                 onChange={(e) => setEditPurchaseId(e.target.value)}
                 disabled={!supplierId}
-                className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 disabled:opacity-50 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+                className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 disabled:opacity-50"
               >
                 {editBillOptions.map((o) => (
                   <option key={o.id} value={o.id}>
@@ -364,7 +364,7 @@ export default function PayBill() {
           ) : (
             <div className="mt-8">
               <div className="flex items-center justify-between">
-                <h2 className="font-heading text-base font-semibold text-ink-900 dark:text-cream-50">
+                <h2 className="font-heading text-base font-semibold text-ink-900">
                   Outstanding transactions
                 </h2>
               </div>
@@ -376,19 +376,19 @@ export default function PayBill() {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Find bill no."
                   disabled={!supplierId}
-                  className="w-full rounded-xl border border-ink-400/20 bg-cream-50 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 disabled:opacity-50 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+                  className="w-full rounded-xl border border-ink-400/20 bg-cream-50 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 disabled:opacity-50"
                 />
               </div>
 
               {!supplierId ? (
-                <p className="mt-4 rounded-xl border border-dashed border-ink-400/20 bg-cream-50 px-4 py-6 text-center text-sm text-ink-400 dark:border-cream-100/15 dark:bg-dark-800">
+                <p className="mt-4 rounded-xl border border-dashed border-ink-400/20 bg-cream-50 px-4 py-6 text-center text-sm text-ink-400">
                   Select a supplier to see their outstanding bills.
                 </p>
               ) : (
-                <div className="mt-3 overflow-x-auto rounded-2xl border border-ink-400/15 bg-cream-50 dark:border-cream-100/10 dark:bg-dark-800">
+                <div className="mt-3 overflow-x-auto rounded-2xl border border-ink-400/15 bg-cream-50">
                   <table className="w-full min-w-[720px] text-left text-sm">
                     <thead>
-                      <tr className="border-b border-ink-400/10 text-xs text-ink-400 dark:border-cream-100/10">
+                      <tr className="border-b border-ink-400/10 text-xs text-ink-400">
                         <th className="w-10 py-2.5 pl-4" />
                         <th className="py-2.5 font-medium">Description</th>
                         <th className="py-2.5 font-medium">Due date</th>
@@ -406,7 +406,7 @@ export default function PayBill() {
                         </tr>
                       ) : (
                         filteredPurchases.map((p) => (
-                          <tr key={p.purchase_id} className="border-b border-ink-400/10 last:border-0 dark:border-cream-100/10">
+                          <tr key={p.purchase_id} className="border-b border-ink-400/10 last:border-0">
                             <td className="py-2.5 pl-4">
                               <input
                                 type="checkbox"
@@ -415,14 +415,14 @@ export default function PayBill() {
                                 className="h-4 w-4 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
                               />
                             </td>
-                            <td className="py-2.5 pr-3 font-medium text-ink-900 dark:text-cream-50">
+                            <td className="py-2.5 pr-3 font-medium text-ink-900">
                               {p.reference || `Bill · ${formatDate(p.bill_date)}`}
                             </td>
-                            <td className="py-2.5 pr-3 text-ink-500 dark:text-cream-400">{formatDate(p.due_date)}</td>
-                            <td className="py-2.5 pr-3 text-right text-ink-500 dark:text-cream-400">
+                            <td className="py-2.5 pr-3 text-ink-500">{formatDate(p.due_date)}</td>
+                            <td className="py-2.5 pr-3 text-right text-ink-500">
                               {formatCurrency(p.total_amount)}
                             </td>
-                            <td className="py-2.5 pr-3 text-right text-ink-500 dark:text-cream-400">
+                            <td className="py-2.5 pr-3 text-right text-ink-500">
                               {formatCurrency(p.outstanding)}
                             </td>
                             <td className="py-2.5 pr-4">
@@ -433,7 +433,7 @@ export default function PayBill() {
                                 value={amounts[p.purchase_id] ?? ''}
                                 onChange={(e) => setRowAmount(p.purchase_id, e.target.value)}
                                 placeholder="0.00"
-                                className="w-32 rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-1.5 text-right text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+                                className="w-32 rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-1.5 text-right text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
                               />
                             </td>
                           </tr>
@@ -448,7 +448,7 @@ export default function PayBill() {
                             className="h-4 w-4 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
                           />
                         </td>
-                        <td className="py-2.5 pr-3 text-ink-500 dark:text-cream-400" colSpan={3}>
+                        <td className="py-2.5 pr-3 text-ink-500" colSpan={3}>
                           General payment <span className="text-xs text-ink-400">(not tied to a bill)</span>
                         </td>
                         <td className="py-2.5 pr-3 text-right text-ink-400">—</td>
@@ -460,7 +460,7 @@ export default function PayBill() {
                             value={amounts[GENERAL_KEY] ?? ''}
                             onChange={(e) => setRowAmount(GENERAL_KEY, e.target.value)}
                             placeholder="0.00"
-                            className="w-32 rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-1.5 text-right text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+                            className="w-32 rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-1.5 text-right text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
                           />
                         </td>
                       </tr>
@@ -472,19 +472,19 @@ export default function PayBill() {
           )}
 
           <label className="mt-6 block max-w-xl">
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Note</span>
+            <span className="text-xs font-medium text-ink-500">Note</span>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
               placeholder="Optional — e.g. bank transfer, cash"
-              className="mt-1.5 w-full resize-none rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-800 dark:text-cream-50"
+              className="mt-1.5 w-full resize-none rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
             />
           </label>
         </div>
       </div>
 
-      <footer className="fixed inset-x-0 bottom-0 flex items-center justify-between border-t border-ink-400/10 bg-cream-50 px-4 py-3.5 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] dark:border-cream-100/10 dark:bg-dark-800 sm:px-6">
+      <footer className="fixed inset-x-0 bottom-0 flex items-center justify-between border-t border-ink-400/10 bg-cream-50 px-4 py-3.5 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] sm:px-6">
         <Button variant="ghost" onClick={() => navigate('/dashboard/purchases/payments-made')}>
           Cancel
         </Button>

@@ -95,7 +95,7 @@ export default function AddExpenseModal({ open, onClose, onSubmit }) {
       subtitle="Money paid out for rent, utilities, salaries and the like — deducted from an account right away."
     >
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           {error}
         </div>
@@ -103,14 +103,14 @@ export default function AddExpenseModal({ open, onClose, onSubmit }) {
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Category *</span>
+          <span className="text-xs font-medium text-ink-500">Category *</span>
           <input
             list="expense-categories"
             required
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             placeholder="e.g. Rent"
-            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
           <datalist id="expense-categories">
             {commonCategories.map((c) => (
@@ -121,7 +121,7 @@ export default function AddExpenseModal({ open, onClose, onSubmit }) {
 
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Amount *</span>
+            <span className="text-xs font-medium text-ink-500">Amount *</span>
             <input
               type="number"
               min="0.01"
@@ -130,22 +130,22 @@ export default function AddExpenseModal({ open, onClose, onSubmit }) {
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0.00"
-              className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+              className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
             />
           </label>
           <label className="block">
-            <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Date</span>
+            <span className="text-xs font-medium text-ink-500">Date</span>
             <input
               type="date"
               value={expenseDate}
               onChange={(e) => setExpenseDate(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+              className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
             />
           </label>
         </div>
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Paid from *</span>
+          <span className="text-xs font-medium text-ink-500">Paid from *</span>
           <div className="mt-1.5">
             <SearchSelect
               value={accountId}
@@ -159,12 +159,12 @@ export default function AddExpenseModal({ open, onClose, onSubmit }) {
         </label>
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Description</span>
+          <span className="text-xs font-medium text-ink-500">Description</span>
           <input
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Optional"
-            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </label>
 

@@ -54,7 +54,7 @@ export default function AddAccountModal({ open, onClose, onSubmit }) {
       subtitle="Track a cash drawer or bank account so sales and payments can deposit into it."
     >
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600 dark:text-red-400">
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
           <AlertCircle size={16} className="mt-0.5 shrink-0" />
           {error}
         </div>
@@ -62,18 +62,18 @@ export default function AddAccountModal({ open, onClose, onSubmit }) {
 
       <form onSubmit={handleSubmit} className="mt-5 space-y-4">
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Account name *</span>
+          <span className="text-xs font-medium text-ink-500">Account name *</span>
           <input
             required
             value={form.name}
             onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             placeholder="e.g. Cash drawer, HNB Current Account"
-            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
         </label>
 
         <div>
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Type</span>
+          <span className="text-xs font-medium text-ink-500">Type</span>
           <div className="mt-1.5 grid grid-cols-2 gap-2">
             {types.map((t) => (
               <button
@@ -82,8 +82,8 @@ export default function AddAccountModal({ open, onClose, onSubmit }) {
                 onClick={() => setForm((f) => ({ ...f, type: t.value }))}
                 className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
                   form.type === t.value
-                    ? 'border-clay-500 bg-clay-500/10 text-clay-600 dark:text-clay-400'
-                    : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40 dark:border-cream-100/15 dark:text-cream-400'
+                    ? 'border-clay-500 bg-clay-500/10 text-clay-600'
+                    : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40'
                 }`}
               >
                 <t.icon size={15} /> {t.label}
@@ -93,7 +93,7 @@ export default function AddAccountModal({ open, onClose, onSubmit }) {
         </div>
 
         <label className="block">
-          <span className="text-xs font-medium text-ink-500 dark:text-cream-400">Opening balance</span>
+          <span className="text-xs font-medium text-ink-500">Opening balance</span>
           <input
             type="number"
             min="0"
@@ -101,7 +101,7 @@ export default function AddAccountModal({ open, onClose, onSubmit }) {
             value={form.openingBalance}
             onChange={(e) => setForm((f) => ({ ...f, openingBalance: e.target.value }))}
             placeholder="0.00"
-            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 dark:border-cream-100/10 dark:bg-dark-700 dark:text-cream-50"
+            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
           <span className="mt-1 block text-xs text-ink-400">
             What&apos;s already in this account today, if anything.

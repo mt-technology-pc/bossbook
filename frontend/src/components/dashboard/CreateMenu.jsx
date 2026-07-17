@@ -53,24 +53,24 @@ export default function CreateMenu({ className }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-ink-400/15 bg-cream-50 py-1.5 shadow-xl dark:border-cream-100/10 dark:bg-dark-800"
+            className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-ink-400/15 bg-cream-50 py-1.5 shadow-xl"
           >
             {actions.map((action) => (
               <button
                 key={action.label}
                 onClick={() => handleSelect(action)}
-                className="flex w-full items-start gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-cream-200 dark:hover:bg-dark-700"
+                className="flex w-full items-start gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-cream-200"
               >
-                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
                   <action.icon size={15} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-1.5">
-                    <span className="text-sm font-medium text-ink-900 dark:text-cream-50">
+                    <span className="text-sm font-medium text-ink-900">
                       {action.label}
                     </span>
                     {action.soon && (
-                      <span className="rounded-full bg-ink-400/10 px-1.5 py-0.5 text-[9px] font-semibold text-ink-400 dark:bg-cream-100/10">
+                      <span className="rounded-full bg-ink-400/10 px-1.5 py-0.5 text-[9px] font-semibold text-ink-400">
                         Soon
                       </span>
                     )}

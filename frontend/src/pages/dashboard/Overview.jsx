@@ -93,10 +93,10 @@ export default function Overview() {
         transition={{ duration: 0.5 }}
       >
         <p className="text-sm font-medium text-clay-600">{getGreeting()}</p>
-        <h1 className="mt-1 font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50 sm:text-3xl">
+        <h1 className="mt-1 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
           Welcome back, {firstName}
         </h1>
-        <p className="mt-1.5 text-sm text-ink-500 dark:text-cream-400">
+        <p className="mt-1.5 text-sm text-ink-500">
           Here&apos;s what&apos;s happening with your business today.
         </p>
       </motion.div>
@@ -108,12 +108,12 @@ export default function Overview() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: i * 0.06 }}
-            className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 dark:border-cream-100/10 dark:bg-dark-800"
+            className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600 dark:text-clay-400">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
               <s.icon size={17} />
             </span>
-            <p className="mt-3 font-heading text-2xl font-semibold text-ink-900 dark:text-cream-50">
+            <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">
               {s.value}
             </p>
             <p className="mt-0.5 text-xs text-ink-400">{s.label}</p>
@@ -163,9 +163,9 @@ export default function Overview() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.15 }}
-          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-6 dark:border-cream-100/10 dark:bg-dark-800 lg:col-span-2"
+          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-6 lg:col-span-2"
         >
-          <h2 className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
+          <h2 className="font-heading text-lg font-semibold text-ink-900">
             Quick actions
           </h2>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -173,15 +173,15 @@ export default function Overview() {
               <button
                 key={a.title}
                 onClick={a.onClick}
-                className="group flex flex-col items-start rounded-xl border border-ink-400/15 bg-cream-100 p-4 text-left transition-colors hover:border-clay-500/40 dark:border-cream-100/10 dark:bg-dark-700"
+                className="group flex flex-col items-start rounded-xl border border-ink-400/15 bg-cream-100 p-4 text-left transition-colors hover:border-clay-500/40"
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-cream-50 text-clay-600 dark:bg-dark-800 dark:text-clay-400">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-cream-50 text-clay-600">
                   <a.icon size={16} />
                 </span>
-                <p className="mt-3 text-sm font-semibold text-ink-900 dark:text-cream-50">
+                <p className="mt-3 text-sm font-semibold text-ink-900">
                   {a.title}
                 </p>
-                <p className="mt-1 text-xs leading-relaxed text-ink-500 dark:text-cream-400">
+                <p className="mt-1 text-xs leading-relaxed text-ink-500">
                   {a.desc}
                 </p>
                 <span className="mt-3 flex items-center gap-1 text-xs font-medium text-clay-600 opacity-0 transition-opacity group-hover:opacity-100">
@@ -192,9 +192,9 @@ export default function Overview() {
           </div>
 
           {products.length === 0 ? (
-            <div className="mt-8 flex flex-col items-center justify-center rounded-xl border border-dashed border-ink-400/25 py-10 text-center dark:border-cream-100/15">
+            <div className="mt-8 flex flex-col items-center justify-center rounded-xl border border-dashed border-ink-400/25 py-10 text-center">
               <Receipt size={22} className="text-ink-400" />
-              <p className="mt-3 text-sm font-medium text-ink-600 dark:text-cream-300">
+              <p className="mt-3 text-sm font-medium text-ink-600">
                 No activity yet
               </p>
               <p className="mt-1 max-w-xs text-xs text-ink-400">
@@ -211,9 +211,9 @@ export default function Overview() {
                 {products.slice(0, 4).map((p) => (
                   <li
                     key={p.id}
-                    className="flex items-center justify-between rounded-xl bg-cream-100 px-3.5 py-2.5 dark:bg-dark-700"
+                    className="flex items-center justify-between rounded-xl bg-cream-100 px-3.5 py-2.5"
                   >
-                    <span className="text-sm font-medium text-ink-800 dark:text-cream-200">
+                    <span className="text-sm font-medium text-ink-800">
                       {p.name}
                     </span>
                     <span className="text-xs text-ink-400">
@@ -230,10 +230,10 @@ export default function Overview() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4, delay: 0.2 }}
-          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-6 dark:border-cream-100/10 dark:bg-dark-800"
+          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-6"
         >
           <div className="flex items-center justify-between">
-            <h2 className="font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
+            <h2 className="font-heading text-lg font-semibold text-ink-900">
               Getting started
             </h2>
             <span className="text-xs font-medium text-ink-400">
@@ -241,7 +241,7 @@ export default function Overview() {
             </span>
           </div>
 
-          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-cream-200 dark:bg-dark-700">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-cream-200">
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${(doneCount / checklist.length) * 100}%` }}
@@ -262,7 +262,7 @@ export default function Overview() {
                   className={
                     item.done
                       ? 'text-ink-400 line-through'
-                      : 'text-ink-700 dark:text-cream-300'
+                      : 'text-ink-700'
                   }
                 >
                   {item.label}

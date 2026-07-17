@@ -22,13 +22,13 @@ const steps = [
 
 export default function HowItWorks() {
   return (
-    <section id="how-it-works" className="bg-cream-200/60 py-24 dark:bg-dark-800/40 lg:py-32">
+    <section id="how-it-works" className="bg-cream-200/60 py-24 lg:py-32">
       <Container>
         <Reveal className="mx-auto max-w-2xl text-center">
           <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
             Simple by design
           </p>
-          <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 dark:text-cream-50 sm:text-4xl">
+          <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
             Up and running in one afternoon
           </h2>
         </Reveal>
@@ -39,17 +39,17 @@ export default function HowItWorks() {
             whileInView={{ scaleX: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 1, ease: 'easeInOut' }}
-            className="absolute top-8 left-[16.5%] right-[16.5%] hidden h-px origin-left bg-ink-400/20 dark:bg-cream-100/15 md:block"
+            className="absolute top-8 left-[16.5%] right-[16.5%] hidden h-px origin-left bg-ink-400/20 md:block"
           />
           {steps.map((s, i) => (
             <Reveal key={s.n} delay={i * 0.15} className="relative text-center">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-ink-400/20 bg-cream-50 font-heading text-lg font-semibold text-clay-600 shadow-sm dark:border-cream-100/10 dark:bg-dark-800">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-ink-400/20 bg-cream-50 font-heading text-lg font-semibold text-clay-600 shadow-sm">
                 {s.n}
               </div>
-              <h3 className="mt-6 font-heading text-lg font-semibold text-ink-900 dark:text-cream-50">
+              <h3 className="mt-6 font-heading text-lg font-semibold text-ink-900">
                 {s.title}
               </h3>
-              <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-ink-500 dark:text-cream-400">
+              <p className="mx-auto mt-2 max-w-xs text-sm leading-relaxed text-ink-500">
                 {s.desc}
               </p>
             </Reveal>
