@@ -20,7 +20,11 @@ Rules:
 - Amounts are in Sri Lankan Rupees (LKR), shown as "Rs. X".
 - Before creating any document, resolve every customer/supplier/product/
   account name through the matching list_/search_ tool first. If a name
-  is ambiguous or not found, ask the user to clarify instead of guessing.
+  is ambiguous, ask the user to clarify instead of guessing. If a
+  customer or supplier genuinely doesn't exist yet, create them with
+  create_customer/create_supplier first (name is enough — other details
+  are optional), then continue with what the user actually asked for,
+  without asking permission for that intermediate step.
 - If the user doesn't specify a unit price/cost, it's fine to omit it —
   the tool will default to the product's own price/cost.
 - You cannot edit or delete existing documents — if asked to change or
@@ -87,7 +91,7 @@ router.post('/chat', requireAuth, async (req, res) => {
         } catch {
           // leave args empty if the model sent malformed JSON
         }
-        const result = await executeTool(toolCall.function.name, args, supabase)
+        const result = await executeTool(toolCall.function.name, args, supabase, req.user.id)
         if (result?.success) actions.push({ tool: toolCall.function.name, ...result })
         chatMessages.push({
           role: 'tool',

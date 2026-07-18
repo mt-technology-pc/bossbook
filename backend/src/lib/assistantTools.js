@@ -155,6 +155,36 @@ export const toolDeclarations = [
     },
   },
   {
+    name: 'create_customer',
+    description: 'Add a new customer. Use this when the customer named in a request doesn\'t already exist (list_customers/search found no match), then proceed with whatever the user actually asked for.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        phone: { type: 'string' },
+        email: { type: 'string' },
+        address: { type: 'string' },
+        notes: { type: 'string' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'create_supplier',
+    description: 'Add a new supplier. Use this when the supplier named in a request doesn\'t already exist (list_suppliers/search found no match), then proceed with whatever the user actually asked for.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string' },
+        phone: { type: 'string' },
+        email: { type: 'string' },
+        address: { type: 'string' },
+        notes: { type: 'string' },
+      },
+      required: ['name'],
+    },
+  },
+  {
     name: 'list_products',
     description: 'Search the product catalog by (partial) name. Returns price, cost, stock on hand, and whether it tracks serial/IMEI numbers.',
     parameters: {
@@ -276,7 +306,7 @@ export const toolDeclarations = [
   },
 ]
 
-export async function executeTool(name, args, supabase) {
+export async function executeTool(name, args, supabase, ownerId) {
   switch (name) {
     case 'list_customers': {
       let q = supabase.from('customer_balances').select('customer_id, name, balance').order('name')
@@ -290,6 +320,44 @@ export async function executeTool(name, args, supabase) {
       if (args.query) q = q.ilike('name', `%${args.query}%`)
       const { data, error } = await q.limit(25)
       return error ? { error: error.message } : { suppliers: data }
+    }
+
+    case 'create_customer': {
+      const customerName = args.name?.trim()
+      if (!customerName) return { error: 'Enter a customer name.' }
+      const { data, error } = await supabase
+        .from('customers')
+        .insert({
+          owner_id: ownerId,
+          name: customerName,
+          phone: args.phone || null,
+          email: args.email || null,
+          address: args.address || null,
+          notes: args.notes || null,
+        })
+        .select('id, code, name')
+        .single()
+      if (error) return { error: error.message }
+      return { success: true, customer_id: data.id, code: data.code, name: data.name }
+    }
+
+    case 'create_supplier': {
+      const supplierName = args.name?.trim()
+      if (!supplierName) return { error: 'Enter a supplier name.' }
+      const { data, error } = await supabase
+        .from('suppliers')
+        .insert({
+          owner_id: ownerId,
+          name: supplierName,
+          phone: args.phone || null,
+          email: args.email || null,
+          address: args.address || null,
+          notes: args.notes || null,
+        })
+        .select('id, name')
+        .single()
+      if (error) return { error: error.message }
+      return { success: true, supplier_id: data.id, name: data.name }
     }
 
     case 'list_products': {

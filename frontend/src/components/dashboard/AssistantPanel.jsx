@@ -33,6 +33,8 @@ function actionLabel(action) {
   if (action.tool === 'create_purchase') return `Created bill ${action.reference} — ${formatCurrency(action.total_amount)}`
   if (action.tool === 'receive_payment') return `Recorded ${formatCurrency(action.amount)} received from ${action.customer}`
   if (action.tool === 'pay_bill') return `Recorded ${formatCurrency(action.amount)} paid to ${action.supplier}`
+  if (action.tool === 'create_customer') return `Added customer ${action.name}${action.code ? ` (${action.code})` : ''}`
+  if (action.tool === 'create_supplier') return `Added supplier ${action.name}`
   return action.tool
 }
 

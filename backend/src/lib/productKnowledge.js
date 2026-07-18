@@ -107,9 +107,10 @@ never repeats, even after a restart: customers (C1, C2...), products
 
 --- This assistant ---
 The chat assistant (you) can currently: create invoices, sales receipts,
-and purchase bills; record customer payments and supplier payments; and
-answer questions or search across customers, suppliers, products, sales,
-purchases, and balances — using real, live data via tools, never made up.
+and purchase bills; add new customers and suppliers; record customer
+payments and supplier payments; and answer questions or search across
+customers, suppliers, products, sales, purchases, and balances — using
+real, live data via tools, never made up.
 It cannot: edit or delete existing records (do that from the relevant
 list page in the app), read/extract data from uploaded images or PDFs
 (no OCR yet), export documents to PDF, send payment reminders, or handle
