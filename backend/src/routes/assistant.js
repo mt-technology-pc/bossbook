@@ -52,6 +52,21 @@ const tools = toolDeclarations.map((decl) => ({
   },
 }))
 
+// Llama models on Groq occasionally emit a tool call that doesn't parse
+// cleanly against the schema (Groq returns a 400 with a `failed_generation`
+// field) — usually a one-off generation glitch that succeeds if you just
+// ask again with the exact same input, so retry once before giving up.
+async function completeWithRetry(params) {
+  try {
+    return await groq.chat.completions.create(params)
+  } catch (err) {
+    if (err.status === 400 && err.code !== 'context_length_exceeded') {
+      return await groq.chat.completions.create(params)
+    }
+    throw err
+  }
+}
+
 router.post('/chat', requireAuth, async (req, res) => {
   const { messages } = req.body
 
@@ -72,11 +87,7 @@ router.post('/chat', requireAuth, async (req, res) => {
   const actions = []
 
   try {
-    let completion = await groq.chat.completions.create({
-      model: GROQ_MODEL,
-      messages: chatMessages,
-      tools,
-    })
+    let completion = await completeWithRetry({ model: GROQ_MODEL, messages: chatMessages, tools })
     let choice = completion.choices[0]
 
     let rounds = 0
@@ -100,18 +111,29 @@ router.post('/chat', requireAuth, async (req, res) => {
         })
       }
 
-      completion = await groq.chat.completions.create({
-        model: GROQ_MODEL,
-        messages: chatMessages,
-        tools,
-      })
+      completion = await completeWithRetry({ model: GROQ_MODEL, messages: chatMessages, tools })
       choice = completion.choices[0]
     }
 
     res.json({ reply: choice.message.content ?? '', actions })
   } catch (err) {
     console.error(err)
-    res.status(500).json({ error: err.message || 'Assistant request failed' })
+
+    if (err.status === 429) {
+      return res.json({
+        reply: "I'm getting a lot of requests right now and hit a rate limit — give it a few minutes and try again.",
+        actions: [],
+      })
+    }
+
+    if (err.status === 400) {
+      return res.json({
+        reply: "Sorry, I couldn't quite parse that one — could you try rephrasing it more simply? For example: \"create an invoice for <customer>, 2 <product> at Rs. 4500 each\".",
+        actions: [],
+      })
+    }
+
+    res.status(500).json({ error: 'Something went wrong talking to the assistant — please try again.' })
   }
 })
 
