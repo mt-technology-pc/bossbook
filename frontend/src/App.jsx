@@ -32,6 +32,7 @@ import ChartOfAccounts from './pages/dashboard/ChartOfAccounts'
 import GeneralLedger from './pages/dashboard/GeneralLedger'
 import TrialBalance from './pages/dashboard/TrialBalance'
 import Expenses from './pages/dashboard/Expenses'
+import SerialTracking from './pages/dashboard/SerialTracking'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import DashboardLayout from './layouts/DashboardLayout'
@@ -148,7 +149,7 @@ function App() {
         <Route path="sales-reps/:id" element={<SalesRepDetail />} />
         <Route path="expenses" element={<Expenses />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
-        <Route path="serial-tracking" element={<ComingSoon title="Serial tracking" />} />
+        <Route path="serial-tracking" element={<SerialTracking />} />
         <Route path="reports" element={<Reports />} />
         <Route path="reports/inventory-valuation" element={<InventoryValuationReport />} />
         <Route path="reports/inventory-valuation/:id" element={<ProductLedger />} />
