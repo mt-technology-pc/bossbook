@@ -4,6 +4,7 @@ import { X, Plus, AlertCircle, FileText, ShoppingBag } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
+import { useSalesReps } from '../../hooks/useSalesReps'
 import { useAvailableUnits } from '../../hooks/useAvailableUnits'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
@@ -30,9 +31,11 @@ export default function NewInvoice() {
   const { sales, createSale, updateSale } = useSales()
   const { products, loading: productsLoading, refetch: refetchProducts } = useProducts()
   const { customers, addCustomer } = useCustomers()
+  const { salesReps, addSalesRep } = useSalesReps()
   const availableUnits = useAvailableUnits()
 
   const [customerId, setCustomerId] = useState('')
+  const [salesRepId, setSalesRepId] = useState('')
   const [reference, setReference] = useState('')
   const [invoiceDate, setInvoiceDate] = useState(todayISO())
   const [dueDate, setDueDate] = useState(addDaysISO(30))
@@ -75,6 +78,7 @@ export default function NewInvoice() {
         })
 
         setCustomerId(existing.customer_id || '')
+        setSalesRepId(existing.sales_rep_id || '')
         setReference(existing.reference || '')
         setInvoiceDate(existing.sale_date)
         setDueDate(existing.due_date || '')
@@ -104,6 +108,12 @@ export default function NewInvoice() {
     sublabel: c.phone || c.email || '',
   }))
 
+  const salesRepOptions = salesReps.map((r) => ({
+    id: r.id,
+    label: r.name,
+    sublabel: r.code || '',
+  }))
+
   const handleCreateCustomer = async (name) => {
     const { data, error: createError } = await addCustomer({ name })
     if (createError) {
@@ -113,8 +123,18 @@ export default function NewInvoice() {
     return { id: data.id }
   }
 
+  const handleCreateSalesRep = async (name) => {
+    const { data, error: createError } = await addSalesRep({ name })
+    if (createError) {
+      setError(createError.message)
+      return null
+    }
+    return { id: data.id }
+  }
+
   const resetForm = () => {
     setCustomerId('')
+    setSalesRepId('')
     setReference('')
     setInvoiceDate(todayISO())
     setDueDate(addDaysISO(30))
@@ -140,6 +160,7 @@ export default function NewInvoice() {
 
     const payload = {
       customerId,
+      salesRepId: salesRepId || null,
       type: 'invoice',
       reference: reference.trim() || null,
       notes: notes.trim() || null,
@@ -233,6 +254,22 @@ export default function NewInvoice() {
                   <p className="font-heading text-3xl font-semibold text-ink-900">
                     {formatCurrency(total)}
                   </p>
+                </div>
+              </div>
+
+              <div className="mt-6 w-full max-w-sm">
+                <span className="text-xs font-medium text-ink-500">
+                  Sales rep <span className="font-normal text-ink-400">(optional)</span>
+                </span>
+                <div className="mt-1.5">
+                  <SearchSelect
+                    value={salesRepId}
+                    onChange={setSalesRepId}
+                    options={salesRepOptions}
+                    placeholder="Who made this sale?"
+                    createLabel="Add new"
+                    onCreate={handleCreateSalesRep}
+                  />
                 </div>
               </div>
 

@@ -11,6 +11,8 @@ import SupplierDetail from './pages/dashboard/SupplierDetail'
 import Purchases from './pages/dashboard/Purchases'
 import NewPurchase from './pages/dashboard/NewPurchase'
 import Sales from './pages/dashboard/Sales'
+import SalesReps from './pages/dashboard/SalesReps'
+import SalesRepDetail from './pages/dashboard/SalesRepDetail'
 import NewInvoice from './pages/dashboard/NewInvoice'
 import NewSalesReceipt from './pages/dashboard/NewSalesReceipt'
 import ReceivePayment from './pages/dashboard/ReceivePayment'
@@ -142,6 +144,8 @@ function App() {
         <Route path="purchases/payments-made" element={<SupplierPayments />} />
         <Route path="sales" element={<Sales />} />
         <Route path="sales/payments-received" element={<CustomerPayments />} />
+        <Route path="sales-reps" element={<SalesReps />} />
+        <Route path="sales-reps/:id" element={<SalesRepDetail />} />
         <Route path="expenses" element={<Expenses />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="serial-tracking" element={<ComingSoon title="Serial tracking" />} />

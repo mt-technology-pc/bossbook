@@ -17,7 +17,7 @@ export function useSales() {
     setLoading(true)
     const { data, error: fetchError } = await supabase
       .from('sales')
-      .select('*, customers(name), accounts(name, type), sale_items(id, product_id, quantity, unit_price, subtotal)')
+      .select('*, customers(name), accounts(name, type), sales_reps(name), sale_items(id, product_id, quantity, unit_price, subtotal)')
       .order('created_at', { ascending: false })
 
     if (fetchError) setError(fetchError.message)
@@ -32,7 +32,9 @@ export function useSales() {
     fetchSales()
   }, [fetchSales])
 
-  const buildPayload = ({ customerId, type, reference, notes, saleDate, dueDate, depositAccountId, items }) => ({
+  const buildPayload = ({
+    customerId, type, reference, notes, saleDate, dueDate, depositAccountId, items, salesRepId,
+  }) => ({
     p_customer_id: customerId || null,
     p_type: type,
     p_reference: reference || null,
@@ -41,6 +43,7 @@ export function useSales() {
     p_due_date: dueDate || null,
     p_deposit_account_id: depositAccountId || null,
     p_items: items,
+    p_sales_rep_id: salesRepId || null,
   })
 
   const createSale = async (payload) => {

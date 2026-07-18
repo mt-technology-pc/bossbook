@@ -4,6 +4,7 @@ import { X, Plus, AlertCircle, Receipt, ShoppingBag } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
+import { useSalesReps } from '../../hooks/useSalesReps'
 import { useAccounts } from '../../hooks/useAccounts'
 import { useAvailableUnits } from '../../hooks/useAvailableUnits'
 import { supabase } from '../../lib/supabase'
@@ -25,10 +26,12 @@ export default function NewSalesReceipt() {
   const { sales, createSale, updateSale } = useSales()
   const { products, loading: productsLoading, refetch: refetchProducts } = useProducts()
   const { customers, addCustomer } = useCustomers()
+  const { salesReps, addSalesRep } = useSalesReps()
   const { accounts, addAccount, refetch: refetchAccounts } = useAccounts()
   const availableUnits = useAvailableUnits()
 
   const [customerId, setCustomerId] = useState('')
+  const [salesRepId, setSalesRepId] = useState('')
   const [reference, setReference] = useState('')
   const [saleDate, setSaleDate] = useState(todayISO())
   const [depositAccountId, setDepositAccountId] = useState('')
@@ -71,6 +74,7 @@ export default function NewSalesReceipt() {
         })
 
         setCustomerId(existing.customer_id || '')
+        setSalesRepId(existing.sales_rep_id || '')
         setReference(existing.reference || '')
         setSaleDate(existing.sale_date)
         setDepositAccountId(existing.deposit_account_id || '')
@@ -106,8 +110,23 @@ export default function NewSalesReceipt() {
     sublabel: `${a.type === 'bank' ? 'Bank' : 'Cash'} · ${formatCurrency(a.balance)}`,
   }))
 
+  const salesRepOptions = salesReps.map((r) => ({
+    id: r.id,
+    label: r.name,
+    sublabel: r.code || '',
+  }))
+
   const handleCreateCustomer = async (name) => {
     const { data, error: createError } = await addCustomer({ name })
+    if (createError) {
+      setError(createError.message)
+      return null
+    }
+    return { id: data.id }
+  }
+
+  const handleCreateSalesRep = async (name) => {
+    const { data, error: createError } = await addSalesRep({ name })
     if (createError) {
       setError(createError.message)
       return null
@@ -126,6 +145,7 @@ export default function NewSalesReceipt() {
 
   const resetForm = () => {
     setCustomerId('')
+    setSalesRepId('')
     setReference('')
     setSaleDate(todayISO())
     setDepositAccountId('')
@@ -151,6 +171,7 @@ export default function NewSalesReceipt() {
 
     const payload = {
       customerId: customerId || null,
+      salesRepId: salesRepId || null,
       type: 'receipt',
       reference: reference.trim() || null,
       notes: notes.trim() || null,
@@ -247,6 +268,22 @@ export default function NewSalesReceipt() {
                   <p className="font-heading text-3xl font-semibold text-ink-900">
                     {formatCurrency(total)}
                   </p>
+                </div>
+              </div>
+
+              <div className="mt-6 w-full max-w-sm">
+                <span className="text-xs font-medium text-ink-500">
+                  Sales rep <span className="font-normal text-ink-400">(optional)</span>
+                </span>
+                <div className="mt-1.5">
+                  <SearchSelect
+                    value={salesRepId}
+                    onChange={setSalesRepId}
+                    options={salesRepOptions}
+                    placeholder="Who made this sale?"
+                    createLabel="Add new"
+                    onCreate={handleCreateSalesRep}
+                  />
                 </div>
               </div>
 

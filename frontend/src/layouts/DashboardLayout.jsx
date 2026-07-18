@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
   Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
-  ArrowDownToLine, ArrowUpFromLine,
+  ArrowDownToLine, ArrowUpFromLine, UserRound,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext'
 const nav = [
   { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, end: true },
   { label: 'Sales', to: '/dashboard/sales', icon: Receipt },
+  { label: 'Sales Reps', to: '/dashboard/sales-reps', icon: UserRound },
   { label: 'Inventory', to: '/dashboard/inventory', icon: Package },
   { label: 'Purchases', to: '/dashboard/purchases', icon: ShoppingBag },
   { label: 'Expenses', to: '/dashboard/expenses', icon: Wallet },

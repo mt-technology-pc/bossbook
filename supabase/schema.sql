@@ -136,6 +136,51 @@ create trigger set_suppliers_updated_at
   before update on public.suppliers
   for each row execute function public.set_updated_at();
 
+-- Sales reps -------------------------------------------------------------
+
+create table if not exists public.sales_reps (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  phone text,
+  email text,
+  notes text,
+  code text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists sales_reps_owner_id_idx on public.sales_reps(owner_id);
+create unique index if not exists sales_reps_owner_code_idx
+  on public.sales_reps(owner_id, code) where code is not null;
+
+alter table public.sales_reps enable row level security;
+
+drop policy if exists "Users can view own sales reps" on public.sales_reps;
+create policy "Users can view own sales reps"
+  on public.sales_reps for select
+  using (auth.uid() = owner_id);
+
+drop policy if exists "Users can insert own sales reps" on public.sales_reps;
+create policy "Users can insert own sales reps"
+  on public.sales_reps for insert
+  with check (auth.uid() = owner_id);
+
+drop policy if exists "Users can update own sales reps" on public.sales_reps;
+create policy "Users can update own sales reps"
+  on public.sales_reps for update
+  using (auth.uid() = owner_id);
+
+drop policy if exists "Users can delete own sales reps" on public.sales_reps;
+create policy "Users can delete own sales reps"
+  on public.sales_reps for delete
+  using (auth.uid() = owner_id);
+
+drop trigger if exists set_sales_reps_updated_at on public.sales_reps;
+create trigger set_sales_reps_updated_at
+  before update on public.sales_reps
+  for each row execute function public.set_updated_at();
+
 -- Purchases (bills) — recording a purchase increases product stock ----
 
 create table if not exists public.purchases (
@@ -583,6 +628,10 @@ grant select on public.account_balances to authenticated;
 -- and delete_sale so the three stay next to each other.)
 alter table public.sales add column if not exists deposit_account_id uuid references public.accounts(id) on delete set null;
 
+-- Which sales rep gets credit for this sale, if any.
+alter table public.sales add column if not exists sales_rep_id uuid references public.sales_reps(id) on delete set null;
+create index if not exists sales_sales_rep_id_idx on public.sales(sales_rep_id);
+
 -- receive_payment and pay_bill are defined once, further below, alongside
 -- their update/delete counterparts, so all four stay together.
 
@@ -769,6 +818,25 @@ left join (
 
 grant select on public.sale_balances to authenticated;
 
+-- Per-rep performance: how many sales and how much total volume each
+-- sales rep has, computed live from real sales rather than a stored
+-- running total, so it can never drift out of sync.
+drop view if exists public.sales_rep_totals;
+create view public.sales_rep_totals
+with (security_invoker = true) as
+select
+  r.id as rep_id,
+  r.owner_id,
+  r.name,
+  r.code,
+  coalesce(sum(s.total_amount), 0) as total_sales,
+  count(s.id) as sale_count
+from public.sales_reps r
+left join public.sales s on s.sales_rep_id = r.id
+group by r.id, r.owner_id, r.name, r.code;
+
+grant select on public.sales_rep_totals to authenticated;
+
 drop view if exists public.purchase_balances;
 create view public.purchase_balances
 with (security_invoker = true) as
@@ -805,7 +873,8 @@ create or replace function public.create_sale(
   p_sale_date date,
   p_due_date date,
   p_deposit_account_id uuid,
-  p_items jsonb
+  p_items jsonb,
+  p_sales_rep_id uuid default null
 )
 returns uuid
 language plpgsql
@@ -823,6 +892,7 @@ declare
   v_stock integer;
   v_tracks_serial boolean;
   v_account_owner uuid;
+  v_rep_owner uuid;
   v_product_cost numeric(12,2);
   v_cogs numeric(12,2) := 0;
   v_ar_coa uuid;
@@ -839,6 +909,13 @@ begin
 
   if p_type not in ('invoice', 'receipt') then
     raise exception 'Invalid sale type';
+  end if;
+
+  if p_sales_rep_id is not null then
+    select owner_id into v_rep_owner from public.sales_reps where id = p_sales_rep_id;
+    if v_rep_owner is null or v_rep_owner <> v_owner_id then
+      raise exception 'Invalid sales rep';
+    end if;
   end if;
 
   if p_items is null or jsonb_array_length(p_items) = 0 then
@@ -862,10 +939,10 @@ begin
   into v_total
   from jsonb_array_elements(p_items) as item;
 
-  insert into public.sales (owner_id, customer_id, type, reference, notes, sale_date, due_date, deposit_account_id, total_amount)
+  insert into public.sales (owner_id, customer_id, type, reference, notes, sale_date, due_date, deposit_account_id, total_amount, sales_rep_id)
   values (
     v_owner_id, p_customer_id, p_type, v_reference, p_notes,
-    coalesce(p_sale_date, current_date), p_due_date, p_deposit_account_id, v_total
+    coalesce(p_sale_date, current_date), p_due_date, p_deposit_account_id, v_total, p_sales_rep_id
   )
   returning id into v_sale_id;
 
@@ -984,12 +1061,14 @@ begin
 end;
 $$;
 
-grant execute on function public.create_sale(uuid, text, text, text, date, date, uuid, jsonb) to authenticated;
+grant execute on function public.create_sale(uuid, text, text, text, date, date, uuid, jsonb, uuid) to authenticated;
 
 -- Edits a posted sale by fully reversing its stock/serial/ledger effects
 -- and reapplying fresh ones from the new line items, atomically. A real,
 -- manually-linked Receive Payment against this sale is preserved (only
 -- the sale's own auto-generated charge/payment entries are replaced).
+drop function if exists public.update_sale(uuid, uuid, text, text, text, date, date, uuid, jsonb);
+
 create or replace function public.update_sale(
   p_sale_id uuid,
   p_customer_id uuid,
@@ -999,7 +1078,8 @@ create or replace function public.update_sale(
   p_sale_date date,
   p_due_date date,
   p_deposit_account_id uuid,
-  p_items jsonb
+  p_items jsonb,
+  p_sales_rep_id uuid default null
 )
 returns uuid
 language plpgsql
@@ -1017,6 +1097,7 @@ declare
   v_stock integer;
   v_tracks_serial boolean;
   v_account_owner uuid;
+  v_rep_owner uuid;
   v_total numeric(12,2) := 0;
   v_product_cost numeric(12,2);
   v_cogs numeric(12,2) := 0;
@@ -1051,6 +1132,13 @@ begin
     end if;
   end if;
 
+  if p_sales_rep_id is not null then
+    select owner_id into v_rep_owner from public.sales_reps where id = p_sales_rep_id;
+    if v_rep_owner is null or v_rep_owner <> v_owner_id then
+      raise exception 'Invalid sales rep';
+    end if;
+  end if;
+
   -- Reverse old effects
   for v_old_item in select product_id, quantity from public.sale_items where sale_id = p_sale_id
   loop
@@ -1078,7 +1166,8 @@ begin
       sale_date = coalesce(p_sale_date, sale_date),
       due_date = p_due_date,
       deposit_account_id = p_deposit_account_id,
-      total_amount = v_total
+      total_amount = v_total,
+      sales_rep_id = p_sales_rep_id
   where id = p_sale_id;
 
   -- Reapply new effects
@@ -1195,7 +1284,7 @@ begin
 end;
 $$;
 
-grant execute on function public.update_sale(uuid, uuid, text, text, text, date, date, uuid, jsonb) to authenticated;
+grant execute on function public.update_sale(uuid, uuid, text, text, text, date, date, uuid, jsonb, uuid) to authenticated;
 
 -- Deletes a sale, reversing stock/serial effects. A real, manually-linked
 -- Receive Payment survives, just unlinked (sale_id set to null via FK).
@@ -2622,6 +2711,25 @@ drop trigger if exists assign_customer_code_trigger on public.customers;
 create trigger assign_customer_code_trigger
   before insert on public.customers
   for each row execute function public.assign_customer_code();
+
+create or replace function public.assign_sales_rep_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.code is null or trim(new.code) = '' then
+    new.code := public.next_sequence_code(new.owner_id, 'sales_rep', 'REP');
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists assign_sales_rep_code_trigger on public.sales_reps;
+create trigger assign_sales_rep_code_trigger
+  before insert on public.sales_reps
+  for each row execute function public.assign_sales_rep_code();
 
 create or replace function public.assign_product_sku()
 returns trigger
