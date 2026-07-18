@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
+import FormSkeleton from '../../components/ui/FormSkeleton'
 
 let localId = 0
 const newLine = () => ({
@@ -30,7 +31,7 @@ export default function NewPurchase() {
   const { id } = useParams()
   const isEdit = Boolean(id)
   const { purchases, createPurchase, updatePurchase } = usePurchases()
-  const { products, refetch: refetchProducts } = useProducts()
+  const { products, loading: productsLoading, refetch: refetchProducts } = useProducts()
   const { suppliers, addSupplier } = useSuppliers()
   const [loaded, setLoaded] = useState(!isEdit)
 
@@ -67,7 +68,7 @@ export default function NewPurchase() {
   }))
 
   useEffect(() => {
-    if (!isEdit || loaded || purchases.length === 0 || products.length === 0) return
+    if (!isEdit || loaded || purchases.length === 0 || productsLoading) return
     const existing = purchases.find((p) => p.id === id)
     if (!existing) return
 
@@ -104,7 +105,7 @@ export default function NewPurchase() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, loaded, purchases, products, id])
+  }, [isEdit, loaded, purchases, productsLoading, id])
 
   const resetForm = () => {
     setSupplierId('')
@@ -267,10 +268,8 @@ export default function NewPurchase() {
 
       <div className="flex-1 overflow-y-auto pb-28">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-          {!loaded ? (
-            <div className="flex justify-center py-16">
-              <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
-            </div>
+          {!loaded || productsLoading ? (
+            <FormSkeleton />
           ) : products.length === 0 ? (
             <div className="flex flex-col items-center rounded-2xl border border-dashed border-ink-400/25 bg-cream-50 py-16 text-center">
               <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
@@ -502,7 +501,7 @@ export default function NewPurchase() {
         </div>
       </div>
 
-      {loaded && products.length > 0 && (
+      {loaded && !productsLoading && products.length > 0 && (
         <footer className="fixed inset-x-0 bottom-0 flex items-center justify-between border-t border-ink-400/10 bg-cream-50 px-4 py-3.5 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] sm:px-6">
           <Button variant="ghost" onClick={() => navigate('/dashboard/purchases')}>
             Cancel
