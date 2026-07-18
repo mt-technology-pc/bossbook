@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
-import { openai, OPENAI_MODEL } from '../lib/openaiClient.js'
+import { genai, GEMINI_MODEL } from '../lib/geminiClient.js'
 import { toolDeclarations, executeTool } from '../lib/assistantTools.js'
 
 const router = Router()
@@ -28,15 +28,6 @@ Rules:
 - Keep replies short and concrete. When you create something, state its
   reference code and total.`
 
-const tools = toolDeclarations.map((decl) => ({
-  type: 'function',
-  function: {
-    name: decl.name,
-    description: decl.description,
-    parameters: decl.parameters,
-  },
-}))
-
 router.post('/chat', requireAuth, async (req, res) => {
   const { messages } = req.body
 
@@ -46,54 +37,49 @@ router.post('/chat', requireAuth, async (req, res) => {
 
   const supabase = supabaseForUser(req.accessToken)
 
-  const chatMessages = [
-    { role: 'system', content: SYSTEM_INSTRUCTION },
-    ...messages.map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : 'user',
-      content: m.text,
-    })),
-  ]
+  const contents = messages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.text }],
+  }))
 
   const actions = []
 
   try {
-    let completion = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
-      messages: chatMessages,
-      tools,
+    let response = await genai.models.generateContent({
+      model: GEMINI_MODEL,
+      contents,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        tools: [{ functionDeclarations: toolDeclarations }],
+      },
     })
-    let choice = completion.choices[0]
 
     let rounds = 0
-    while (choice.message.tool_calls?.length > 0 && rounds < MAX_TOOL_ROUNDS) {
+    while (response.functionCalls?.length > 0 && rounds < MAX_TOOL_ROUNDS) {
       rounds += 1
-      chatMessages.push(choice.message)
+      contents.push(response.candidates[0].content)
 
-      for (const toolCall of choice.message.tool_calls) {
-        let args = {}
-        try {
-          args = JSON.parse(toolCall.function.arguments || '{}')
-        } catch {
-          // leave args empty if the model sent malformed JSON
-        }
-        const result = await executeTool(toolCall.function.name, args, supabase)
-        if (result?.success) actions.push({ tool: toolCall.function.name, ...result })
-        chatMessages.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          content: JSON.stringify(result),
+      const functionResponseParts = []
+      for (const call of response.functionCalls) {
+        const result = await executeTool(call.name, call.args ?? {}, supabase)
+        if (result?.success) actions.push({ tool: call.name, ...result })
+        functionResponseParts.push({
+          functionResponse: { name: call.name, response: result },
         })
       }
+      contents.push({ role: 'user', parts: functionResponseParts })
 
-      completion = await openai.chat.completions.create({
-        model: OPENAI_MODEL,
-        messages: chatMessages,
-        tools,
+      response = await genai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents,
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          tools: [{ functionDeclarations: toolDeclarations }],
+        },
       })
-      choice = completion.choices[0]
     }
 
-    res.json({ reply: choice.message.content ?? '', actions })
+    res.json({ reply: response.text ?? '', actions })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: err.message || 'Assistant request failed' })
