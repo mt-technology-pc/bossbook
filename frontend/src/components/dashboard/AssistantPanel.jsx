@@ -10,6 +10,23 @@ const SUGGESTIONS = [
   "What's my top customer's balance?",
 ]
 
+// The model replies with light markdown (**bold**, line breaks) — this
+// renders just that, not a full markdown parser, since that's all it uses.
+function renderMessageText(text) {
+  return text.split('\n').map((line, lineIndex, lines) => (
+    <span key={lineIndex}>
+      {line.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) =>
+        part.startsWith('**') && part.endsWith('**') ? (
+          <strong key={partIndex}>{part.slice(2, -2)}</strong>
+        ) : (
+          part
+        ),
+      )}
+      {lineIndex < lines.length - 1 && <br />}
+    </span>
+  ))
+}
+
 function actionLabel(action) {
   if (action.tool === 'create_invoice') return `Created invoice ${action.reference} — ${formatCurrency(action.total_amount)}`
   if (action.tool === 'create_sales_receipt') return `Created receipt ${action.reference} — ${formatCurrency(action.total_amount)}`
@@ -117,7 +134,7 @@ export default function AssistantPanel() {
                               : 'bg-cream-200 text-ink-800'
                           }`}
                         >
-                          {m.text}
+                          {renderMessageText(m.text)}
                         </div>
                         {m.actions?.length > 0 && (
                           <div className="mt-1.5 space-y-1">
