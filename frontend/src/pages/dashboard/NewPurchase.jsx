@@ -126,9 +126,12 @@ export default function NewPurchase() {
         const product = getProduct(next.productId)
         if (product?.tracks_serial) {
           const qty = Math.max(0, Number(next.quantity) || 0)
-          const serials = [...next.serials]
-          serials.length = qty
-          next.serials = serials.map((s) => s || '')
+          // Array.from with a length always produces a dense array — unlike
+          // `arr.length = qty` when growing, which leaves "holes" that
+          // Array.prototype.map/some silently skip instead of treating as
+          // empty, so fewer serial boxes end up rendering (and submitting)
+          // than the stated quantity.
+          next.serials = Array.from({ length: qty }, (_, i) => next.serials[i] || '')
         } else {
           next.serials = []
         }
