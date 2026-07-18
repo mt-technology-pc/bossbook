@@ -1,0 +1,10 @@
+ACCOUNTS (CASH/BANK) & EXPENSES
+
+Real cash/bank accounts with a running balance. Tapping into an account
+shows its full transaction ledger — every deposit and withdrawal that
+built up to the current balance, sourced from actual sales, payments,
+purchases paid, and expenses. Accounts get auto-numbered codes (ACC1,
+ACC2...).
+
+Expenses are recorded against a category and a specific cash/bank account
+(which it withdraws from). Auto-numbered codes (EXP1, EXP2...).

@@ -1,0 +1,13 @@
+PURCHASES — SUPPLIER BILLS
+
+Recording a bill from a supplier increases stock. Reference codes look
+like B1, B2, B3...
+
+Supports multiple line items and, for serial/IMEI-tracked products, entry
+of each individual unit's serial number at the time of purchase.
+
+Editing and deleting: bills can be edited or deleted the same way sales
+can, with safety checks — you can't edit or delete a bill if any serial
+unit it added has already been sold, or if doing so would drop stock
+below zero. This prevents a bill edit from silently breaking a sale that
+already happened.

@@ -1,0 +1,21 @@
+REPORTS
+
+INVENTORY VALUATION SUMMARY — quantity on hand and total inventory value
+as of any date, computed with a real event-replay engine using FIFO,
+Weighted Average, or Standard Cost, whichever the user picks. Clicking an
+item drills into its full stock-movement ledger.
+
+INCOME STATEMENT — Revenue, Cost of Goods Sold, Gross Profit, Operating
+Expenses, and Net Income over any date range, computed from real recorded
+transactions.
+
+SALES DAY BOOK / PURCHASE DAY BOOK — a chronological line-by-line ledger
+of every sale or bill, with running totals.
+
+CHART OF ACCOUNTS, GENERAL LEDGER, TRIAL BALANCE — full double-entry
+bookkeeping. Every sale, purchase, payment, and expense automatically
+posts a balanced journal entry behind the scenes to the right accounts
+(Cash, Accounts Receivable/Payable, Revenue, COGS, Inventory, Expense
+categories, etc). A one-time "Backfill existing data" button on the
+Trial Balance page generates journal entries for records that existed
+before this feature was added — needed once per account, not routinely.

@@ -1,0 +1,14 @@
+CUSTOMERS, SUPPLIERS, RECEIVABLES & PAYABLES
+
+Customers and Suppliers each have a list page and a detail page showing
+their full transaction history and a real, computed balance — not a
+stored/cached number. The balance is always derived live from actual
+invoices and payments, so it can never drift out of sync with reality.
+
+Receivables and Payables are two dedicated sidebar pages (not buried
+inside Reports) that list:
+- Receivables: every customer who currently owes money, sorted by amount,
+  with a one-click shortcut straight into Receive Payment with that
+  customer already selected.
+- Payables: every supplier you currently owe, sorted by amount, with the
+  same one-click shortcut into Pay Bill.

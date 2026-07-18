@@ -1,0 +1,26 @@
+SALES — INVOICES & SALES RECEIPTS
+
+Two kinds of sale, both created from the Sales page:
+
+INVOICE — a credit sale. Nothing is deposited immediately; it adds to the
+customer's outstanding balance, due on the due date (defaults to 30 days
+out). Reference codes look like S1, S2, S3...
+
+SALES RECEIPT — a cash/bank sale paid on the spot. Money is deposited
+immediately into a chosen cash/bank account, no balance is created.
+Reference codes look like R1, R2, R3...
+
+Both support:
+- Multiple line items, with a searchable product picker that auto-fills
+  the item's price.
+- For products that track serial/IMEI numbers, a picker to choose exactly
+  which physical units are being sold, itself searchable by serial number
+  so a shop with many units in stock doesn't have to scroll a long list.
+- An optional "Sales rep" field, attributing the sale to whoever made it
+  (see the Sales Reps document).
+
+Editing and deleting: sales can be edited or deleted from the Sales list
+(pencil/trash icons on each row). Editing or deleting reverses and
+reapplies the stock and account effects atomically — it is not just a
+label change, it correctly adjusts inventory, serial unit status, and
+account balances.

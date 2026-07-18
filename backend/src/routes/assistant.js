@@ -3,13 +3,13 @@ import { requireAuth } from '../middleware/requireAuth.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
 import { groq, GROQ_MODEL } from '../lib/groqClient.js'
 import { toolDeclarations, executeTool } from '../lib/assistantTools.js'
-import { PRODUCT_KNOWLEDGE } from '../lib/productKnowledge.js'
+import { loadKnowledgeBase } from '../lib/knowledgeBase.js'
 
 const router = Router()
 
 const MAX_TOOL_ROUNDS = 8
 
-const SYSTEM_INSTRUCTION = `You are the billing assistant inside Ledgerly, an accounting app for
+const SYSTEM_INSTRUCTION_RULES = `You are the billing assistant inside Ledgerly, an accounting app for
 small businesses. You help the signed-in user create invoices, sales
 receipts, purchase bills, and record payments, and answer questions about
 their customers, suppliers, products, and outstanding balances — entirely
@@ -39,9 +39,7 @@ tools — never guess or estimate a number.
 For questions about the software itself (how a feature works, what a
 page does, whether something is supported), answer strictly from the
 product knowledge below. If it's not covered there, say plainly that you
-don't have enough information about that instead of guessing.
-
-${PRODUCT_KNOWLEDGE}`
+don't have enough information about that instead of guessing.`
 
 const tools = toolDeclarations.map((decl) => ({
   type: 'function',
@@ -76,8 +74,10 @@ router.post('/chat', requireAuth, async (req, res) => {
 
   const supabase = supabaseForUser(req.accessToken)
 
+  const systemInstruction = `${SYSTEM_INSTRUCTION_RULES}\n\n${loadKnowledgeBase()}`
+
   const chatMessages = [
-    { role: 'system', content: SYSTEM_INSTRUCTION },
+    { role: 'system', content: systemInstruction },
     ...messages.map((m) => ({
       role: m.role === 'assistant' ? 'assistant' : 'user',
       content: m.text,

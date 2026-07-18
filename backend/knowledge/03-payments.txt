@@ -1,0 +1,16 @@
+RECEIVE PAYMENT & PAY BILL
+
+RECEIVE PAYMENT — records money collected from a customer, deposited to a
+chosen account. Can optionally be linked to one specific outstanding
+invoice so that invoice's balance reflects it, or left as a general
+payment against the customer's overall balance. Has its own list page
+(Payments Received) with edit/delete. Reference codes look like RCPT1,
+RCPT2...
+
+PAY BILL — the same idea for money paid out to a supplier against a
+purchase bill. Has its own list page (Payments Made) with edit/delete.
+Reference codes look like PAY1, PAY2...
+
+Both are separate, dedicated pages — not just modals buried inside a
+customer/supplier's detail page — so they support full search, edit, and
+delete like every other record type.

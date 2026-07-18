@@ -1,0 +1,23 @@
+INVENTORY & SERIAL/IMEI TRACKING
+
+The product catalog holds each product's name, price, cost, stock
+quantity, and a "tracks serial/IMEI" toggle. Products get auto-numbered
+codes (P1, P2, P3...).
+
+When "tracks serial/IMEI" is on for a product, every unit purchased and
+sold is tracked individually by its serial/IMEI number, not just as a
+quantity:
+- Buying stock: the purchase form asks for each unit's serial/IMEI number.
+- Selling stock: the sale form shows a searchable picker of exactly which
+  in-stock units are being sold.
+- A dedicated "Serial Tracking" page (sidebar) lists every unit ever
+  tracked, its current status (in stock / sold), which bill brought it
+  in, and which sale (and customer) took it out — searchable by serial
+  number, product, customer, or supplier, with CSV export. This is
+  read-only reporting; there is currently no way to manually mark a unit
+  as returned, damaged, or lost — status is only ever set automatically
+  by recording a purchase or a sale.
+
+Inventory Valuation (a report, see the Reports document) computes real
+stock value using FIFO, Weighted Average, or Standard Cost — the user's
+choice, not a fixed assumption.

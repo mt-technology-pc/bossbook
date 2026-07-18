@@ -1,0 +1,11 @@
+SALES REPS
+
+A dedicated sidebar page for tracking who on the sales team made which
+sale. Add a rep (name, phone, email, notes — auto-numbered REP1, REP2...),
+then optionally pick them on an Invoice or Sales Receipt at the point of
+entry.
+
+The Sales Reps list shows each rep's live total sales and sale count,
+filterable by period (Today / This week / This month / a custom date
+range / All time). Clicking into a rep shows their individual sales, plus
+a breakdown grouped by day, week, or month.
