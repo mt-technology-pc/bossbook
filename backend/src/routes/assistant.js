@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/requireAuth.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
 import { genai, GEMINI_MODEL } from '../lib/geminiClient.js'
 import { toolDeclarations, executeTool } from '../lib/assistantTools.js'
+import { PRODUCT_KNOWLEDGE } from '../lib/productKnowledge.js'
 
 const router = Router()
 
@@ -26,7 +27,17 @@ Rules:
   remove something already recorded, tell the user to do that from the
   relevant page in the app instead.
 - Keep replies short and concrete. When you create something, state its
-  reference code and total.`
+  reference code and total.
+
+For data questions (balances, sales, products, etc.) always use the
+tools — never guess or estimate a number.
+
+For questions about the software itself (how a feature works, what a
+page does, whether something is supported), answer strictly from the
+product knowledge below. If it's not covered there, say plainly that you
+don't have enough information about that instead of guessing.
+
+${PRODUCT_KNOWLEDGE}`
 
 router.post('/chat', requireAuth, async (req, res) => {
   const { messages } = req.body
