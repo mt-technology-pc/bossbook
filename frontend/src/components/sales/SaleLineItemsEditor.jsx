@@ -130,8 +130,8 @@ export default function SaleLineItemsEditor({
                     placeholder="0.00"
                     className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-2 text-sm text-ink-900 outline-none focus:border-clay-500"
                   />
-                  <div className="flex items-center justify-between gap-1 sm:justify-end">
-                    <span className="text-sm font-semibold text-ink-900">
+                  <div className="col-span-2 flex items-center justify-between gap-1 sm:justify-end">
+                    <span className="whitespace-nowrap text-sm font-semibold text-ink-900">
                       {formatCurrency((Number(line.quantity) || 0) * (Number(line.unitPrice) || 0))}
                     </span>
                     <div className="flex items-center">
