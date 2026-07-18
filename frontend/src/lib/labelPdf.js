@@ -19,15 +19,23 @@ function fit(srcW, srcH, maxW, maxH) {
   return { w: srcW * ratio, h: srcH * ratio }
 }
 
-// Fractional (0–1) positions/sizes relative to the label — free-floating
-// boxes a user can drag/resize on the canvas editor, independent of one
-// another (so hiding one doesn't reflow the rest, matching a design-tool
-// mental model rather than an auto-layout stack).
-export const DEFAULT_ELEMENTS = {
-  name: { x: 0.04, y: 0.03, w: 0.92, h: 0.20 },
-  barcode: { x: 0.04, y: 0.25, w: 0.56, h: 0.50 },
-  qr: { x: 0.64, y: 0.25, w: 0.32, h: 0.50 },
-  code: { x: 0.04, y: 0.78, w: 0.92, h: 0.18 },
+// A label is a list of independent layers — like a stripped-down design
+// tool, not an auto-layout stack. Each layer has a type ('text' | 'barcode'
+// | 'qr' | 'image') and a fractional (0–1) x/y/w/h relative to the label, so
+// a saved layout stays valid across label sizes. Text layers either bind to
+// a product field (field: 'name' | 'code', re-rendered per item) or carry
+// static custom text (field: null, `text` used verbatim on every label).
+// Barcode/QR layers always encode the product's own code/name — they aren't
+// user-editable content, just position/size.
+export const DEFAULT_ELEMENTS = [
+  { id: 'name', type: 'text', field: 'name', text: '', x: 0.04, y: 0.03, w: 0.92, h: 0.20 },
+  { id: 'barcode', type: 'barcode', x: 0.04, y: 0.25, w: 0.56, h: 0.50 },
+  { id: 'qr', type: 'qr', x: 0.64, y: 0.25, w: 0.32, h: 0.50 },
+  { id: 'code', type: 'text', field: 'code', text: '', x: 0.04, y: 0.78, w: 0.92, h: 0.18 },
+]
+
+export function cloneDefaultElements() {
+  return DEFAULT_ELEMENTS.map((el) => ({ ...el }))
 }
 
 function truncateToWidth(doc, text, maxWidth) {
@@ -58,9 +66,15 @@ export function computeA4Grid(labelWidth, labelHeight) {
   return { cols, rows, perPage: cols * rows }
 }
 
+function imageFormat(dataUrl) {
+  const match = /^data:image\/(\w+);base64,/.exec(dataUrl)
+  const type = match ? match[1].toUpperCase() : 'PNG'
+  return type === 'JPG' ? 'JPEG' : type
+}
+
 async function drawLabel(doc, x, y, w, h, item, options) {
-  const { showBarcode, showQr, showName, showCode, showBorder, elements } = options
-  const pos = { ...DEFAULT_ELEMENTS, ...elements }
+  const { showBorder, elements } = options
+  const layers = elements && elements.length ? elements : DEFAULT_ELEMENTS
 
   if (showBorder) {
     doc.setDrawColor(170)
@@ -68,49 +82,36 @@ async function drawLabel(doc, x, y, w, h, item, options) {
     doc.rect(x, y, w, h)
   }
 
-  const box = (key) => {
-    const p = pos[key] || DEFAULT_ELEMENTS[key]
-    return {
-      bx: x + p.x * w,
-      by: y + p.y * h,
-      bw: Math.max(p.w * w - PAD * 0.5, 2),
-      bh: Math.max(p.h * h - PAD * 0.5, 2),
+  for (const el of layers) {
+    const bx = x + el.x * w
+    const by = y + el.y * h
+    const bw = Math.max(el.w * w - PAD * 0.5, 2)
+    const bh = Math.max(el.h * h - PAD * 0.5, 2)
+
+    if (el.type === 'text') {
+      const content = el.field === 'name' ? item.name : el.field === 'code' ? item.code : (el.text || '')
+      if (!content) continue
+      doc.setFont('helvetica', el.field ? 'bold' : 'normal')
+      doc.setFontSize(Math.max(5, Math.min(16, bh * 2.4)))
+      const label = truncateToWidth(doc, content, bw)
+      doc.text(label, bx + bw / 2, by + bh / 2 + bh * 0.15, { align: 'center' })
+    } else if (el.type === 'barcode') {
+      const bc = barcodeImage(item.code)
+      const bcFit = fit(bc.width, bc.height, bw, bh)
+      doc.addImage(bc.dataUrl, 'PNG', bx + (bw - bcFit.w) / 2, by + (bh - bcFit.h) / 2, bcFit.w, bcFit.h)
+    } else if (el.type === 'qr') {
+      // eslint-disable-next-line no-await-in-loop
+      const qr = await qrImage(`${item.name} | ${item.code}`)
+      const qrSize = Math.min(bw, bh)
+      doc.addImage(qr.dataUrl, 'PNG', bx + (bw - qrSize) / 2, by + (bh - qrSize) / 2, qrSize, qrSize)
+    } else if (el.type === 'image' && el.src) {
+      const imgFit = fit(el.naturalW || bw, el.naturalH || bh, bw, bh)
+      doc.addImage(el.src, imageFormat(el.src), bx + (bw - imgFit.w) / 2, by + (bh - imgFit.h) / 2, imgFit.w, imgFit.h)
     }
-  }
-
-  if (showName) {
-    const { bx, by, bw, bh } = box('name')
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(Math.max(5, Math.min(16, bh * 2.4)))
-    const label = truncateToWidth(doc, item.name, bw)
-    doc.text(label, bx + bw / 2, by + bh / 2 + bh * 0.15, { align: 'center' })
-  }
-
-  if (showBarcode) {
-    const { bx, by, bw, bh } = box('barcode')
-    const bc = barcodeImage(item.code)
-    const bcFit = fit(bc.width, bc.height, bw, bh)
-    doc.addImage(bc.dataUrl, 'PNG', bx + (bw - bcFit.w) / 2, by + (bh - bcFit.h) / 2, bcFit.w, bcFit.h)
-  }
-
-  if (showQr) {
-    const { bx, by, bw, bh } = box('qr')
-    const qr = await qrImage(`${item.name} | ${item.code}`)
-    const qrSize = Math.min(bw, bh)
-    doc.addImage(qr.dataUrl, 'PNG', bx + (bw - qrSize) / 2, by + (bh - qrSize) / 2, qrSize, qrSize)
-  }
-
-  if (showCode) {
-    const { bx, by, bw, bh } = box('code')
-    doc.setFont('courier', 'normal')
-    doc.setFontSize(Math.max(5, Math.min(12, bh * 2)))
-    const label = truncateToWidth(doc, item.code, bw)
-    doc.text(label, bx + bw / 2, by + bh / 2 + bh * 0.15, { align: 'center' })
   }
 }
 
-// options: { mode: 'thermal' | 'a4', labelWidth, labelHeight, showBarcode,
-// showQr, showName, showCode, showBorder }
+// options: { mode: 'thermal' | 'a4', labelWidth, labelHeight, showBorder, elements }
 export async function buildLabelsPdf(items, options) {
   const instances = expandInstances(items)
   if (instances.length === 0) throw new Error('Add at least one product to print.')

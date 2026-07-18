@@ -6,20 +6,12 @@ import {
 } from 'lucide-react'
 import { useProducts } from '../../hooks/useProducts'
 import { useLabelDesigns } from '../../hooks/useLabelDesigns'
-import { buildLabelsPdf, expandInstances, computeA4Grid, THERMAL_PRESETS, DEFAULT_ELEMENTS } from '../../lib/labelPdf'
+import { buildLabelsPdf, expandInstances, computeA4Grid, THERMAL_PRESETS, cloneDefaultElements } from '../../lib/labelPdf'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
 import LabelCanvasEditor from '../../components/labels/LabelCanvasEditor'
 
 let localId = 0
-
-const TOGGLES = [
-  { key: 'showName', label: 'Product name' },
-  { key: 'showCode', label: 'Product number' },
-  { key: 'showBarcode', label: 'Barcode' },
-  { key: 'showQr', label: 'QR code' },
-  { key: 'showBorder', label: 'Border' },
-]
 
 export default function LabelGenerator() {
   const navigate = useNavigate()
@@ -35,10 +27,8 @@ export default function LabelGenerator() {
   const [customWidth, setCustomWidth] = useState('50')
   const [customHeight, setCustomHeight] = useState('20')
 
-  const [toggles, setToggles] = useState({
-    showName: true, showCode: true, showBarcode: true, showQr: true, showBorder: true,
-  })
-  const [elements, setElements] = useState(DEFAULT_ELEMENTS)
+  const [showBorder, setShowBorder] = useState(true)
+  const [elements, setElements] = useState(cloneDefaultElements)
 
   const { designs, saveDesign, deleteDesign } = useLabelDesigns()
   const [designName, setDesignName] = useState('')
@@ -62,18 +52,9 @@ export default function LabelGenerator() {
     setThermalPreset('custom')
     setCustomWidth(String(design.label_width))
     setCustomHeight(String(design.label_height))
-    setToggles({
-      showBarcode: design.show_barcode,
-      showQr: design.show_qr,
-      showName: design.show_name,
-      showCode: design.show_code,
-      showBorder: design.show_border,
-    })
-    setElements({ ...DEFAULT_ELEMENTS, ...(design.elements || {}) })
+    setShowBorder(design.show_border)
+    setElements(design.elements?.length ? design.elements : cloneDefaultElements())
   }
-
-  const updateElement = (key, rect) => setElements((prev) => ({ ...prev, [key]: rect }))
-  const resetLayout = () => setElements(DEFAULT_ELEMENTS)
 
   const handleSaveDesign = async () => {
     const trimmed = designName.trim()
@@ -92,11 +73,7 @@ export default function LabelGenerator() {
       mode,
       label_width: labelWidth,
       label_height: labelHeight,
-      show_barcode: toggles.showBarcode,
-      show_qr: toggles.showQr,
-      show_name: toggles.showName,
-      show_code: toggles.showCode,
-      show_border: toggles.showBorder,
+      show_border: showBorder,
       elements,
     })
     setSavingDesign(false)
@@ -171,15 +148,15 @@ export default function LabelGenerator() {
       setError('Enter a valid label width and height.')
       return
     }
-    if (!toggles.showBarcode && !toggles.showQr && !toggles.showName && !toggles.showCode) {
-      setError('Turn on at least one thing to show on the label.')
+    if (elements.length === 0) {
+      setError('Add at least one text, barcode, QR, or image element to the label.')
       return
     }
 
     setGenerating(true)
     try {
       const doc = await buildLabelsPdf(items, {
-        mode, labelWidth, labelHeight, ...toggles, elements,
+        mode, labelWidth, labelHeight, showBorder, elements,
       })
       if (action === 'download') {
         doc.save(`labels-${new Date().toISOString().slice(0, 10)}.pdf`)
@@ -431,34 +408,28 @@ export default function LabelGenerator() {
           </div>
 
           <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5">
-            <h2 className="font-heading text-base font-semibold text-ink-900">What's on the label</h2>
-            <div className="mt-3 space-y-2">
-              {TOGGLES.map((t) => (
-                <label key={t.key} className="flex items-center justify-between gap-3 rounded-lg px-1 py-1 text-sm text-ink-700">
-                  {t.label}
-                  <input
-                    type="checkbox"
-                    checked={toggles[t.key]}
-                    onChange={(e) => setToggles((prev) => ({ ...prev, [t.key]: e.target.checked }))}
-                    className="h-4 w-4 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
-                  />
-                </label>
-              ))}
+            <div className="flex items-center justify-between">
+              <h2 className="font-heading text-base font-semibold text-ink-900">Design the label</h2>
+              <label className="flex items-center gap-1.5 text-xs font-medium text-ink-600">
+                Border
+                <input
+                  type="checkbox"
+                  checked={showBorder}
+                  onChange={(e) => setShowBorder(e.target.checked)}
+                  className="h-4 w-4 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
+                />
+              </label>
             </div>
+            <p className="mt-1 text-xs text-ink-400">
+              Product name and number start pre-placed — add barcode, QR, more text, or an image, then drag to arrange.
+            </p>
 
             <div className="mt-4">
               <LabelCanvasEditor
                 labelWidth={labelWidth || 1}
                 labelHeight={labelHeight || 1}
                 elements={elements}
-                visible={{
-                  name: toggles.showName,
-                  code: toggles.showCode,
-                  barcode: toggles.showBarcode,
-                  qr: toggles.showQr,
-                }}
-                onChange={updateElement}
-                onReset={resetLayout}
+                onChange={setElements}
                 sample={{
                   name: items[0]?.name || 'Product name',
                   code: items[0]?.code || 'PRODUCT-NUMBER',

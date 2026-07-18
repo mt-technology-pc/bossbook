@@ -2921,12 +2921,9 @@ create table if not exists public.label_designs (
   mode text not null default 'thermal' check (mode in ('thermal', 'a4')),
   label_width numeric(6,2) not null,
   label_height numeric(6,2) not null,
-  show_barcode boolean not null default true,
-  show_qr boolean not null default true,
-  show_name boolean not null default true,
-  show_code boolean not null default true,
   show_border boolean not null default true,
-  elements jsonb not null default '{}'::jsonb,
+  -- Array of free-positioned layers (text/barcode/qr/image), see labelPdf.js.
+  elements jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
