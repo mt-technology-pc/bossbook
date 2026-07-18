@@ -13,7 +13,10 @@
     "@supabase/supabase-js": "^2.110.5",
     "clsx": "^2.1.1",
     "framer-motion": "^12.42.2",
+    "jsbarcode": "^3.12.3",
+    "jspdf": "^4.2.1",
     "lucide-react": "^1.24.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1"

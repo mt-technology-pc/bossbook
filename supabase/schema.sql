@@ -2907,3 +2907,55 @@ select
 from public.accounts a
 left join public.account_transactions t on t.account_id = a.id
 group by a.id, a.owner_id, a.name, a.type, a.opening_balance, a.code;
+
+-- Label designs -----------------------------------------------------------
+-- Saved barcode/QR label templates (layout + what's shown), independent of
+-- any specific product — a design is reused across many products, not tied
+-- to one. Plain client-side CRUD via RLS (no RPC needed): this has no
+-- downstream effect on stock, accounts, or anything else in the schema.
+
+create table if not exists public.label_designs (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  name text not null,
+  mode text not null default 'thermal' check (mode in ('thermal', 'a4')),
+  label_width numeric(6,2) not null,
+  label_height numeric(6,2) not null,
+  show_barcode boolean not null default true,
+  show_qr boolean not null default true,
+  show_name boolean not null default true,
+  show_code boolean not null default true,
+  show_border boolean not null default true,
+  elements jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists label_designs_owner_id_idx on public.label_designs(owner_id);
+
+alter table public.label_designs enable row level security;
+
+drop policy if exists "Users can view own label designs" on public.label_designs;
+create policy "Users can view own label designs"
+  on public.label_designs for select
+  using (auth.uid() = owner_id);
+
+drop policy if exists "Users can insert own label designs" on public.label_designs;
+create policy "Users can insert own label designs"
+  on public.label_designs for insert
+  with check (auth.uid() = owner_id);
+
+drop policy if exists "Users can update own label designs" on public.label_designs;
+create policy "Users can update own label designs"
+  on public.label_designs for update
+  using (auth.uid() = owner_id);
+
+drop policy if exists "Users can delete own label designs" on public.label_designs;
+create policy "Users can delete own label designs"
+  on public.label_designs for delete
+  using (auth.uid() = owner_id);
+
+drop trigger if exists set_label_designs_updated_at on public.label_designs;
+create trigger set_label_designs_updated_at
+  before update on public.label_designs
+  for each row execute function public.set_updated_at();

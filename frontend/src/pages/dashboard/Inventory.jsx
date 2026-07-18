@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  Plus, Search, ScanLine, Package, Layers, Trash2, AlertCircle, ArrowUpDown, ArrowRight,
+  Plus, Search, ScanLine, Package, Layers, Trash2, AlertCircle, ArrowUpDown, ArrowRight, Tag,
 } from 'lucide-react'
 import { useProducts } from '../../hooks/useProducts'
 import { useInventoryValuation } from '../../hooks/useInventoryValuation'
@@ -147,9 +147,14 @@ export default function Inventory() {
             Manage your product catalog — value computed the same way as the Inventory Valuation Summary.
           </p>
         </div>
-        <Button onClick={() => setModalOpen(true)} variant="primary">
-          <Plus size={16} /> Add product
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button onClick={() => navigate('/dashboard/inventory/labels')} variant="outline">
+            <Tag size={16} /> Print labels
+          </Button>
+          <Button onClick={() => setModalOpen(true)} variant="primary">
+            <Plus size={16} /> Add product
+          </Button>
+        </div>
       </div>
 
       <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
