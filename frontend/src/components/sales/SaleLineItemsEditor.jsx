@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, Trash2, Copy, ScanLine } from 'lucide-react'
+import { Plus, Trash2, Copy, ScanLine, Search } from 'lucide-react'
 import { formatCurrency } from '../../lib/currency'
 import { newSaleLine } from '../../lib/saleLines'
 import SearchSelect from '../ui/SearchSelect'
@@ -7,6 +8,8 @@ import SearchSelect from '../ui/SearchSelect'
 export default function SaleLineItemsEditor({
   lines, setLines, products, availableUnits, priceLabel = 'Rate', stockAdjustments = {},
 }) {
+  const [unitSearch, setUnitSearch] = useState({})
+
   const getProduct = (id) => products.find((p) => p.id === id)
 
   const productOptions = products.map((p) => ({
@@ -93,6 +96,10 @@ export default function SaleLineItemsEditor({
             const product = getProduct(line.productId)
             const units = product ? availableUnits.forProduct(product.id) : []
             const qty = Math.max(0, Number(line.quantity) || 0)
+            const search = (unitSearch[line.key] || '').trim().toLowerCase()
+            const visibleUnits = search
+              ? units.filter((u) => u.serial_number.toLowerCase().includes(search) || line.unitIds.includes(u.id))
+              : units
 
             return (
               <motion.div
@@ -165,29 +172,44 @@ export default function SaleLineItemsEditor({
                     {units.length === 0 ? (
                       <p className="mt-2 text-xs text-ink-400">No units in stock for this product.</p>
                     ) : (
-                      <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                        {units.map((u) => {
-                          const checked = line.unitIds.includes(u.id)
-                          return (
-                            <label
-                              key={u.id}
-                              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
-                                checked
-                                  ? 'border-clay-500 bg-clay-500/10 text-clay-700'
-                                  : 'border-ink-400/20 text-ink-600 hover:border-ink-400/40'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleUnit(line.key, u.id, qty)}
-                                className="h-3.5 w-3.5 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
-                              />
-                              <span className="truncate font-mono">{u.serial_number}</span>
-                            </label>
-                          )
-                        })}
-                      </div>
+                      <>
+                        <div className="relative mt-2">
+                          <Search size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" />
+                          <input
+                            value={unitSearch[line.key] || ''}
+                            onChange={(e) => setUnitSearch((prev) => ({ ...prev, [line.key]: e.target.value }))}
+                            placeholder="Search serial/IMEI…"
+                            className="w-full rounded-lg border border-ink-400/20 bg-cream-50 py-1.5 pl-7 pr-2.5 text-xs text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500"
+                          />
+                        </div>
+                        {visibleUnits.length === 0 ? (
+                          <p className="mt-2 text-xs text-ink-400">No units match &quot;{unitSearch[line.key]}&quot;.</p>
+                        ) : (
+                          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                            {visibleUnits.map((u) => {
+                              const checked = line.unitIds.includes(u.id)
+                              return (
+                                <label
+                                  key={u.id}
+                                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
+                                    checked
+                                      ? 'border-clay-500 bg-clay-500/10 text-clay-700'
+                                      : 'border-ink-400/20 text-ink-600 hover:border-ink-400/40'
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => toggleUnit(line.key, u.id, qty)}
+                                    className="h-3.5 w-3.5 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
+                                  />
+                                  <span className="truncate font-mono">{u.serial_number}</span>
+                                </label>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
