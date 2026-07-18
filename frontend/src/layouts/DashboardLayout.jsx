@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
+import AssistantPanel from '../components/dashboard/AssistantPanel'
 import { useAuth } from '../context/AuthContext'
 
 const nav = [
@@ -198,6 +199,8 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+
+      <AssistantPanel />
     </div>
   )
 }

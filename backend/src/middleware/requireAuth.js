@@ -22,6 +22,7 @@ export async function requireAuth(req, res, next) {
       email: payload.email,
       user_metadata: payload.user_metadata,
     }
+    req.accessToken = token
     next()
   } catch {
     return res.status(401).json({ error: 'Invalid or expired token' })

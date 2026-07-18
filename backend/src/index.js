@@ -4,6 +4,7 @@ import cors from 'cors'
 import morgan from 'morgan'
 import healthRouter from './routes/health.js'
 import meRouter from './routes/me.js'
+import assistantRouter from './routes/assistant.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -15,6 +16,7 @@ app.use(morgan('dev'))
 
 app.use('/api/health', healthRouter)
 app.use('/api/me', meRouter)
+app.use('/api/assistant', assistantRouter)
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' })
