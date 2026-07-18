@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -6,6 +6,21 @@ import {
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
+import { periodRange, groupByBucket } from '../../lib/dateBuckets'
+
+const PERIODS = [
+  { value: 'all', label: 'All time' },
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This week' },
+  { value: 'month', label: 'This month' },
+  { value: 'custom', label: 'Custom' },
+]
+
+const GRANULARITIES = [
+  { value: 'day', label: 'By date' },
+  { value: 'week', label: 'By week' },
+  { value: 'month', label: 'By month' },
+]
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
@@ -18,6 +33,10 @@ export default function SalesRepDetail() {
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [error, setError] = useState(null)
+  const [period, setPeriod] = useState('all')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
+  const [granularity, setGranularity] = useState('day')
 
   useEffect(() => {
     let cancelled = false
@@ -48,6 +67,21 @@ export default function SalesRepDetail() {
     }
   }, [id])
 
+  const [rangeStart, rangeEnd] = period === 'custom'
+    ? [customStart || null, customEnd || null]
+    : periodRange(period)
+
+  const filteredSales = useMemo(() => sales.filter((s) => {
+    if (rangeStart && s.sale_date < rangeStart) return false
+    if (rangeEnd && s.sale_date > rangeEnd) return false
+    return true
+  }), [sales, rangeStart, rangeEnd])
+
+  const grouped = useMemo(
+    () => groupByBucket(filteredSales, granularity, 'sale_date', 'total_amount'),
+    [filteredSales, granularity],
+  )
+
   if (loading) {
     return (
       <div className="flex justify-center py-24">
@@ -67,7 +101,7 @@ export default function SalesRepDetail() {
     )
   }
 
-  const totalSales = sales.reduce((sum, s) => sum + Number(s.total_amount), 0)
+  const totalSales = filteredSales.reduce((sum, s) => sum + Number(s.total_amount), 0)
 
   return (
     <div>
@@ -104,7 +138,7 @@ export default function SalesRepDetail() {
             <p className="flex items-center justify-end gap-1 text-xs text-ink-400">
               <ListOrdered size={12} /> Sales
             </p>
-            <p className="font-heading text-xl font-semibold text-ink-900">{sales.length}</p>
+            <p className="font-heading text-xl font-semibold text-ink-900">{filteredSales.length}</p>
           </div>
           <div className="text-right">
             <p className="flex items-center justify-end gap-1 text-xs text-ink-400">
@@ -122,9 +156,68 @@ export default function SalesRepDetail() {
       )}
 
       <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
-        <h2 className="font-heading text-lg font-semibold text-ink-900">
-          Sales
-        </h2>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <span className="text-xs font-medium text-ink-500">Period</span>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {PERIODS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setPeriod(p.value)}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                    period === p.value
+                      ? 'border-clay-500 bg-clay-500/10 text-clay-600'
+                      : 'border-ink-400/20 text-ink-600 hover:border-ink-400/40'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <span className="text-xs font-medium text-ink-500">Group by</span>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {GRANULARITIES.map((g) => (
+                <button
+                  key={g.value}
+                  onClick={() => setGranularity(g.value)}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                    granularity === g.value
+                      ? 'border-clay-500 bg-clay-500/10 text-clay-600'
+                      : 'border-ink-400/20 text-ink-600 hover:border-ink-400/40'
+                  }`}
+                >
+                  {g.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {period === 'custom' && (
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label className="block">
+              <span className="text-xs font-medium text-ink-500">Start date</span>
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-ink-500">End date</span>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+              />
+            </label>
+          </div>
+        )}
 
         {error && (
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
@@ -133,59 +226,87 @@ export default function SalesRepDetail() {
           </div>
         )}
 
-        {sales.length === 0 ? (
+        {filteredSales.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
               <TrendingUp size={20} />
             </span>
             <p className="mt-4 text-sm font-medium text-ink-600">
-              No sales attributed to {rep.name} yet
+              {sales.length === 0 ? `No sales attributed to ${rep.name} yet` : 'No sales in this period'}
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
-              Pick this rep when creating an invoice or sales receipt to see it show up here.
+              {sales.length === 0
+                ? 'Pick this rep when creating an invoice or sales receipt to see it show up here.'
+                : 'Try a different period.'}
             </p>
           </div>
         ) : (
-          <ul className="mt-5 divide-y divide-ink-400/10">
-            {sales.map((s, i) => {
-              const isInvoice = s.type === 'invoice'
-              return (
-                <motion.li
-                  key={s.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
-                  className="flex items-center justify-between gap-3 py-3.5"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
-                      {isInvoice ? <FileText size={16} /> : <Receipt size={16} />}
-                    </span>
-                    <div>
-                      <p className="flex items-center gap-2 text-sm font-medium text-ink-900">
-                        {s.reference || (isInvoice ? 'Invoice' : 'Receipt')}
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            isInvoice
-                              ? 'bg-clay-500/15 text-clay-600'
-                              : 'bg-ink-400/10 text-ink-500'
-                          }`}
-                        >
-                          {isInvoice ? 'Invoice' : 'Receipt'}
-                        </span>
-                      </p>
-                      <p className="mt-0.5 text-xs text-ink-400">
-                        {s.customers?.name || 'Walk-in customer'} · {formatDate(s.sale_date)}
-                      </p>
+          <>
+            <table className="mt-5 w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-ink-400/10 text-xs text-ink-400">
+                  <th className="pb-2.5 font-medium">
+                    {granularity === 'day' ? 'Date' : granularity === 'week' ? 'Week' : 'Month'}
+                  </th>
+                  <th className="pb-2.5 font-medium">Sales</th>
+                  <th className="pb-2.5 text-right font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {grouped.map((b) => (
+                  <tr key={b.key} className="border-b border-ink-400/10 last:border-0">
+                    <td className="py-2.5 text-ink-700">{b.label}</td>
+                    <td className="py-2.5 text-ink-500">{b.count}</td>
+                    <td className="py-2.5 text-right font-semibold text-ink-900">{formatCurrency(b.total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <h2 className="mt-8 font-heading text-base font-semibold text-ink-900">
+              Individual sales
+            </h2>
+            <ul className="mt-3 divide-y divide-ink-400/10">
+              {filteredSales.map((s, i) => {
+                const isInvoice = s.type === 'invoice'
+                return (
+                  <motion.li
+                    key={s.id}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
+                    className="flex items-center justify-between gap-3 py-3.5"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
+                        {isInvoice ? <FileText size={16} /> : <Receipt size={16} />}
+                      </span>
+                      <div>
+                        <p className="flex items-center gap-2 text-sm font-medium text-ink-900">
+                          {s.reference || (isInvoice ? 'Invoice' : 'Receipt')}
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                              isInvoice
+                                ? 'bg-clay-500/15 text-clay-600'
+                                : 'bg-ink-400/10 text-ink-500'
+                            }`}
+                          >
+                            {isInvoice ? 'Invoice' : 'Receipt'}
+                          </span>
+                        </p>
+                        <p className="mt-0.5 text-xs text-ink-400">
+                          {s.customers?.name || 'Walk-in customer'} · {formatDate(s.sale_date)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <span className="text-sm font-semibold text-ink-700">
-                    {formatCurrency(s.total_amount)}
-                  </span>
-                </motion.li>
-              )
-            })}
-          </ul>
+                    <span className="text-sm font-semibold text-ink-700">
+                      {formatCurrency(s.total_amount)}
+                    </span>
+                  </motion.li>
+                )
+              })}
+            </ul>
+          </>
         )}
       </div>
     </div>

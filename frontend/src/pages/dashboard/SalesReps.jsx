@@ -1,20 +1,32 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Plus, Search, UserRound, TrendingUp, Trash2, AlertCircle, ChevronRight,
 } from 'lucide-react'
 import { useSalesReps } from '../../hooks/useSalesReps'
-import { useSalesRepTotals } from '../../hooks/useSalesRepTotals'
+import { useRepSales } from '../../hooks/useRepSales'
+import { periodRange } from '../../lib/dateBuckets'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
 import AddSalesRepModal from '../../components/salesReps/AddSalesRepModal'
 
+const PERIODS = [
+  { value: 'all', label: 'All time' },
+  { value: 'today', label: 'Today' },
+  { value: 'week', label: 'This week' },
+  { value: 'month', label: 'This month' },
+  { value: 'custom', label: 'Custom' },
+]
+
 export default function SalesReps() {
   const { salesReps, loading, error, addSalesRep, deleteSalesRep } = useSalesReps()
-  const { totals, refetch: refetchTotals } = useSalesRepTotals()
+  const { sales: repSales, refetch: refetchRepSales } = useRepSales()
   const [modalOpen, setModalOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [period, setPeriod] = useState('all')
+  const [customStart, setCustomStart] = useState('')
+  const [customEnd, setCustomEnd] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -26,7 +38,22 @@ export default function SalesReps() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const totalsFor = (repId) => totals.find((t) => t.rep_id === repId)
+  const [rangeStart, rangeEnd] = period === 'custom'
+    ? [customStart || null, customEnd || null]
+    : periodRange(period)
+
+  const totalsByRep = useMemo(() => {
+    const map = new Map()
+    for (const s of repSales) {
+      if (rangeStart && s.sale_date < rangeStart) continue
+      if (rangeEnd && s.sale_date > rangeEnd) continue
+      const entry = map.get(s.sales_rep_id) ?? { count: 0, total: 0 }
+      entry.count += 1
+      entry.total += Number(s.total_amount)
+      map.set(s.sales_rep_id, entry)
+    }
+    return map
+  }, [repSales, rangeStart, rangeEnd])
 
   const filtered = salesReps.filter((r) => {
     const q = query.toLowerCase()
@@ -38,18 +65,18 @@ export default function SalesReps() {
     )
   })
 
-  const totalSalesAllReps = totals.reduce((sum, t) => sum + Number(t.total_sales), 0)
+  const totalSalesAllReps = Array.from(totalsByRep.values()).reduce((sum, t) => sum + t.total, 0)
 
   const handleDelete = async (e, id, name) => {
     e.stopPropagation()
     if (!window.confirm(`Remove "${name}" from your sales reps? Their past sales stay recorded, just unattributed.`)) return
     await deleteSalesRep(id)
-    refetchTotals()
+    refetchRepSales()
   }
 
   const handleAddSalesRep = async (payload) => {
     const result = await addSalesRep(payload)
-    if (!result.error) refetchTotals()
+    if (!result.error) refetchRepSales()
     return result
   }
 
@@ -95,15 +122,59 @@ export default function SalesReps() {
       </div>
 
       <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
-        <div className="relative max-w-xs">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by name, code, phone or email…"
-            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
-          />
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="relative max-w-xs">
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by name, code, phone or email…"
+              className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+            />
+          </div>
+
+          <div>
+            <span className="text-xs font-medium text-ink-500">Totals for</span>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {PERIODS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setPeriod(p.value)}
+                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                    period === p.value
+                      ? 'border-clay-500 bg-clay-500/10 text-clay-600'
+                      : 'border-ink-400/20 text-ink-600 hover:border-ink-400/40'
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
+
+        {period === 'custom' && (
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <label className="block">
+              <span className="text-xs font-medium text-ink-500">Start date</span>
+              <input
+                type="date"
+                value={customStart}
+                onChange={(e) => setCustomStart(e.target.value)}
+                className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+              />
+            </label>
+            <label className="block">
+              <span className="text-xs font-medium text-ink-500">End date</span>
+              <input
+                type="date"
+                value={customEnd}
+                onChange={(e) => setCustomEnd(e.target.value)}
+                className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+              />
+            </label>
+          </div>
+        )}
 
         {error && (
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
@@ -150,7 +221,7 @@ export default function SalesReps() {
               </thead>
               <tbody>
                 {filtered.map((r, i) => {
-                  const t = totalsFor(r.id)
+                  const t = totalsByRep.get(r.id)
                   return (
                     <motion.tr
                       key={r.id}
@@ -173,9 +244,9 @@ export default function SalesReps() {
                       </td>
                       <td className="py-3.5 pr-3 font-mono text-xs text-ink-400">{r.code || '—'}</td>
                       <td className="py-3.5 pr-3 text-ink-500">{r.phone || '—'}</td>
-                      <td className="py-3.5 pr-3 text-ink-500">{t?.sale_count ?? 0}</td>
+                      <td className="py-3.5 pr-3 text-ink-500">{t?.count ?? 0}</td>
                       <td className="py-3.5 pr-3 text-right font-semibold text-ink-900">
-                        {formatCurrency(t?.total_sales ?? 0)}
+                        {formatCurrency(t?.total ?? 0)}
                       </td>
                       <td className="py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
