@@ -22,3 +22,23 @@ export async function apiFetch(path, options = {}) {
 
   return res.json()
 }
+
+export async function apiFetchBlob(path, options = {}) {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+
+  const res = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options.headers,
+    },
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `Request failed with ${res.status}`)
+  }
+
+  return res.blob()
+}

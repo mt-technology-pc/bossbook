@@ -34,6 +34,7 @@ import GeneralLedger from './pages/dashboard/GeneralLedger'
 import TrialBalance from './pages/dashboard/TrialBalance'
 import Expenses from './pages/dashboard/Expenses'
 import SerialTracking from './pages/dashboard/SerialTracking'
+import Backup from './pages/dashboard/Backup'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import DashboardLayout from './layouts/DashboardLayout'
@@ -164,6 +165,7 @@ function App() {
         <Route path="reports/trial-balance" element={<TrialBalance />} />
         <Route path="team" element={<ComingSoon title="Team" />} />
         <Route path="settings" element={<ComingSoon title="Settings" />} />
+        <Route path="backup" element={<Backup />} />
         <Route path="*" element={<ComingSoon />} />
       </Route>
     </Routes>

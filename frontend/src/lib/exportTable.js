@@ -20,6 +20,8 @@ function download(blob, filename) {
   URL.revokeObjectURL(url)
 }
 
+export const downloadBlob = download
+
 // columns: [{ key, label }], rows: [{ [key]: value }]
 export function exportToCsv({ columns, rows, filename }) {
   const header = columns.map((c) => escapeCsvCell(c.label)).join(',')

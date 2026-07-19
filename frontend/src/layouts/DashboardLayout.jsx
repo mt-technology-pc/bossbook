@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
   Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
-  ArrowDownToLine, ArrowUpFromLine, UserRound,
+  ArrowDownToLine, ArrowUpFromLine, UserRound, DatabaseBackup,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
@@ -25,6 +25,7 @@ const nav = [
   { label: 'Serial tracking', to: '/dashboard/serial-tracking', icon: ScanLine },
   { label: 'Reports', to: '/dashboard/reports', icon: BarChart3 },
   { label: 'Settings', to: '/dashboard/settings', icon: Settings },
+  { label: 'Backup', to: '/dashboard/backup', icon: DatabaseBackup },
 ]
 
 export default function DashboardLayout() {
