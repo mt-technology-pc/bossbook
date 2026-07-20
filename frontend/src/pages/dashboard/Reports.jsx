@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
-  Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight, Landmark, BookMarked, Scale,
+  Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight, Landmark, BookMarked, Scale, TrendingUp,
 } from 'lucide-react'
 
 const reports = [
@@ -28,6 +28,12 @@ const reports = [
     title: 'Income Statement',
     desc: 'Revenue, cost of goods sold and gross profit by category, over any date range.',
     to: '/dashboard/reports/income-statement',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Gain and Loss Report',
+    desc: 'Realized profit per product, grouped by category, over any date range — sold quantity, cost, and margin.',
+    to: '/dashboard/reports/gain-and-loss',
   },
   {
     icon: Landmark,

@@ -72,5 +72,13 @@ export function periodRange(period) {
     const start = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-01`
     return [start, today]
   }
+  if (period === 'last_month') {
+    const d = new Date()
+    const lastMonth = new Date(d.getFullYear(), d.getMonth() - 1, 1)
+    const start = `${lastMonth.getFullYear()}-${pad(lastMonth.getMonth() + 1)}-01`
+    const endOfLastMonth = new Date(d.getFullYear(), d.getMonth(), 0)
+    const end = `${endOfLastMonth.getFullYear()}-${pad(endOfLastMonth.getMonth() + 1)}-${pad(endOfLastMonth.getDate())}`
+    return [start, end]
+  }
   return [null, null]
 }
