@@ -165,10 +165,10 @@ export default function AccountDetail() {
           </div>
         ) : (
           <>
-            <div className="mt-5 flex justify-end gap-2 text-right text-[10px] font-semibold uppercase tracking-wide text-ink-400">
-              <span className="w-[76px]">Debit</span>
-              <span className="w-[76px]">Credit</span>
-              <span className="w-[92px]">Balance</span>
+            <div className="mt-5 flex justify-end gap-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-ink-400 sm:gap-2">
+              <span className="w-[52px] sm:w-[76px]">Debit</span>
+              <span className="w-[52px] sm:w-[76px]">Credit</span>
+              <span className="w-[64px] sm:w-[92px]">Balance</span>
             </div>
             <ul className="divide-y divide-ink-400/10">
             {transactions.map((t, i) => (
@@ -179,7 +179,7 @@ export default function AccountDetail() {
                 transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
                 className="flex items-center justify-between gap-3 py-3.5"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
                   <span
                     className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                       t.type === 'deposit'
@@ -189,8 +189,8 @@ export default function AccountDetail() {
                   >
                     {t.type === 'deposit' ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
                   </span>
-                  <div>
-                    <p className="flex items-center gap-1.5 text-sm font-medium text-ink-900">
+                  <div className="min-w-0">
+                    <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-ink-900">
                       {t.type === 'deposit' ? 'Deposit' : 'Withdrawal'}
                       {t.sales && (
                         <span className="flex items-center gap-1 rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-500">
@@ -204,19 +204,19 @@ export default function AccountDetail() {
                         </span>
                       )}
                     </p>
-                    <p className="text-xs text-ink-400">
+                    <p className="truncate text-xs text-ink-400">
                       {formatDate(t.created_at)}{t.note ? ` · ${t.note}` : ''}
                     </p>
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 text-right text-xs sm:text-sm">
-                  <span className={`w-[76px] ${t.debit ? 'font-semibold text-clay-600' : 'text-ink-300'}`}>
+                <div className="flex shrink-0 justify-end gap-1.5 text-right text-xs sm:gap-2 sm:text-sm">
+                  <span className={`w-[52px] sm:w-[76px] ${t.debit ? 'font-semibold text-clay-600' : 'text-ink-300'}`}>
                     {t.debit ? formatCurrency(t.debit) : '—'}
                   </span>
-                  <span className={`w-[76px] ${t.credit ? 'font-semibold text-ink-700' : 'text-ink-300'}`}>
+                  <span className={`w-[52px] sm:w-[76px] ${t.credit ? 'font-semibold text-ink-700' : 'text-ink-300'}`}>
                     {t.credit ? formatCurrency(t.credit) : '—'}
                   </span>
-                  <span className="w-[92px] font-semibold text-ink-900">
+                  <span className="w-[64px] font-semibold text-ink-900 sm:w-[92px]">
                     {formatCurrency(t.balance)}
                   </span>
                 </div>

@@ -71,22 +71,22 @@ export default function ProductLedger() {
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 text-right sm:gap-6">
+        <div className="grid grid-cols-3 gap-3 text-right sm:gap-6">
           <div>
             <p className="text-xs text-ink-400">Qty on hand</p>
-            <p className="font-heading text-xl font-semibold text-ink-900">
+            <p className="font-heading text-base font-semibold text-ink-900 sm:text-xl">
               {valuation?.qtyOnHand ?? 0}
             </p>
           </div>
           <div>
             <p className="text-xs text-ink-400">Unit cost</p>
-            <p className="font-heading text-xl font-semibold text-ink-900">
+            <p className="font-heading text-base font-semibold text-ink-900 sm:text-xl">
               {formatCurrency(valuation?.unitCost ?? 0)}
             </p>
           </div>
           <div>
             <p className="text-xs text-ink-400">Total value</p>
-            <p className="font-heading text-xl font-semibold text-clay-600">
+            <p className="font-heading text-base font-semibold text-clay-600 sm:text-xl">
               {formatCurrency(valuation?.totalValue ?? 0)}
             </p>
           </div>

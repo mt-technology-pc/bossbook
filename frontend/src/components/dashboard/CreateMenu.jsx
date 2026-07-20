@@ -17,7 +17,10 @@ const actions = [
   { label: 'Add supplier', desc: 'Save a new supplier', icon: Truck, to: '/dashboard/suppliers' },
 ]
 
-export default function CreateMenu({ className }) {
+// variant "default": the inline sidebar button (desktop), dropdown opens below.
+// variant "fab": a floating circular button (mobile), list opens upward above
+// it since the trigger sits near the bottom of the screen.
+export default function CreateMenu({ className, variant = 'default' }) {
   const [open, setOpen] = useState(false)
   const ref = useRef(null)
   const navigate = useNavigate()
@@ -37,23 +40,43 @@ export default function CreateMenu({ className }) {
     else navigate(action.to, { state: { autoOpen: true } })
   }
 
+  const isFab = variant === 'fab'
+
   return (
     <div ref={ref} className={`relative ${className ?? ''}`}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-center gap-2 rounded-xl bg-clay-500 px-3.5 py-2.5 text-sm font-semibold text-cream-50 shadow-md shadow-clay-500/25 transition-colors hover:bg-clay-600"
-      >
-        <Plus size={16} /> Create new
-      </button>
+      {isFab ? (
+        <motion.button
+          onClick={() => setOpen((o) => !o)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          aria-label="Create new"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-clay-400 to-clay-600 text-cream-50 shadow-xl shadow-clay-500/30"
+        >
+          <motion.span animate={{ rotate: open ? 45 : 0 }} transition={{ duration: 0.2 }}>
+            <Plus size={24} />
+          </motion.span>
+        </motion.button>
+      ) : (
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-clay-500 px-3.5 py-2.5 text-sm font-semibold text-cream-50 shadow-md shadow-clay-500/25 transition-colors hover:bg-clay-600"
+        >
+          <Plus size={16} /> Create new
+        </button>
+      )}
 
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: -8 }}
+            initial={{ opacity: 0, y: isFab ? 8 : -8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
+            exit={{ opacity: 0, y: isFab ? 8 : -8 }}
             transition={{ duration: 0.15 }}
-            className="absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-ink-400/15 bg-cream-50 py-1.5 shadow-xl"
+            className={
+              isFab
+                ? 'absolute bottom-full left-0 z-50 mb-3 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 py-1.5 shadow-2xl'
+                : 'absolute left-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-xl border border-ink-400/15 bg-cream-50 py-1.5 shadow-xl'
+            }
           >
             {actions.map((action) => (
               <button

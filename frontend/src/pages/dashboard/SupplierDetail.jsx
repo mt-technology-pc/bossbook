@@ -165,10 +165,10 @@ export default function SupplierDetail() {
           </div>
         ) : (
           <>
-            <div className="mt-5 flex justify-end gap-2 text-right text-[10px] font-semibold uppercase tracking-wide text-ink-400">
-              <span className="w-[76px]">Debit</span>
-              <span className="w-[76px]">Credit</span>
-              <span className="w-[92px]">Balance</span>
+            <div className="mt-5 flex justify-end gap-1.5 text-right text-[10px] font-semibold uppercase tracking-wide text-ink-400 sm:gap-2">
+              <span className="w-[52px] sm:w-[76px]">Debit</span>
+              <span className="w-[52px] sm:w-[76px]">Credit</span>
+              <span className="w-[64px] sm:w-[92px]">Balance</span>
               <span className="w-[15px]" />
             </div>
             <ul className="divide-y divide-ink-400/10">
@@ -187,7 +187,7 @@ export default function SupplierDetail() {
                     onClick={() => isBill && setExpanded(isOpen ? null : entry.id)}
                     className="flex w-full items-center justify-between gap-3 text-left"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
                       <span
                         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
                           isBill
@@ -197,24 +197,24 @@ export default function SupplierDetail() {
                       >
                         {isBill ? <Receipt size={16} /> : <HandCoins size={16} />}
                       </span>
-                      <div>
-                        <p className="text-sm font-medium text-ink-900">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-ink-900">
                           {isBill ? (entry.reference || 'Bill') : 'Payment made'}
                         </p>
-                        <p className="text-xs text-ink-400">
+                        <p className="truncate text-xs text-ink-400">
                           {formatDate(entry.date)}{!isBill && entry.note ? ` · ${entry.note}` : ''}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex justify-end gap-2 text-right text-xs sm:text-sm">
-                        <span className={`w-[76px] ${entry.debit ? 'font-semibold text-clay-600' : 'text-ink-300'}`}>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <div className="flex justify-end gap-1.5 text-right text-xs sm:gap-2 sm:text-sm">
+                        <span className={`w-[52px] sm:w-[76px] ${entry.debit ? 'font-semibold text-clay-600' : 'text-ink-300'}`}>
                           {entry.debit ? formatCurrency(entry.debit) : '—'}
                         </span>
-                        <span className={`w-[76px] ${entry.credit ? 'font-semibold text-ink-700' : 'text-ink-300'}`}>
+                        <span className={`w-[52px] sm:w-[76px] ${entry.credit ? 'font-semibold text-ink-700' : 'text-ink-300'}`}>
                           {entry.credit ? formatCurrency(entry.credit) : '—'}
                         </span>
-                        <span className="w-[92px] font-semibold text-ink-900">
+                        <span className="w-[64px] font-semibold text-ink-900 sm:w-[92px]">
                           {formatCurrency(entry.balance)}
                         </span>
                       </div>

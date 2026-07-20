@@ -62,7 +62,7 @@ export default function AssistantPanel() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         aria-label="Open assistant"
-        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-clay-500 text-cream-50 shadow-xl shadow-clay-500/30 hover:bg-clay-600 print:hidden"
+        className="fixed bottom-6 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-clay-500 text-cream-50 shadow-xl shadow-clay-500/30 hover:bg-clay-600 sm:right-6 print:hidden"
       >
         {open ? <X size={22} /> : <Sparkles size={22} />}
       </motion.button>
@@ -74,7 +74,7 @@ export default function AssistantPanel() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.97 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-6 z-40 flex h-[32rem] w-[23rem] max-w-[calc(100vw-3rem)] flex-col overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 shadow-2xl print:hidden"
+            className="fixed bottom-24 right-4 z-40 flex h-[32rem] max-h-[calc(100vh-7rem)] w-[23rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 shadow-2xl sm:right-6 print:hidden"
           >
             <div className="flex items-center justify-between border-b border-ink-400/10 px-4 py-3.5">
               <div className="flex items-center gap-2">

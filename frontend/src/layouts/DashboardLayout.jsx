@@ -91,27 +91,30 @@ export default function DashboardLayout() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-ink-900/40 lg:hidden"
+            className="fixed inset-0 z-40 flex items-end bg-ink-900/40 lg:hidden"
             onClick={() => setOpen(false)}
           >
             <motion.aside
-              initial={{ x: -280 }}
-              animate={{ x: 0 }}
-              exit={{ x: -280 }}
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
               transition={{ type: 'spring', stiffness: 320, damping: 34 }}
               onClick={(e) => e.stopPropagation()}
-              className="flex h-full w-64 flex-col bg-cream-50"
+              className="flex max-h-[85vh] w-full flex-col rounded-t-3xl bg-cream-50 shadow-2xl"
             >
-              <div className="flex h-16 items-center justify-between px-6">
+              <div className="flex justify-center pt-3">
+                <span className="h-1.5 w-10 rounded-full bg-ink-400/25" />
+              </div>
+              <div className="flex items-center justify-between px-6 pb-1 pt-2">
                 <Logo />
                 <button onClick={() => setOpen(false)} className="text-ink-500">
                   <X size={20} />
                 </button>
               </div>
-              <div className="px-3">
+              <div className="px-3 pt-2">
                 <CreateMenu />
               </div>
-              <nav className="flex-1 space-y-1 px-3 py-4">
+              <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
                 {nav.map((item) => (
                   <NavLink
                     key={item.label}
@@ -131,7 +134,7 @@ export default function DashboardLayout() {
                   </NavLink>
                 ))}
               </nav>
-              <div className="border-t border-ink-400/10 p-3">
+              <div className="border-t border-ink-400/10 p-3" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom))' }}>
                 <button
                   onClick={handleSignOut}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-500"
@@ -146,16 +149,7 @@ export default function DashboardLayout() {
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
-          <button
-            className="text-ink-600 lg:hidden"
-            onClick={() => setOpen(true)}
-          >
-            <Menu size={22} />
-          </button>
-
-          <div className="hidden lg:block" />
-
+        <header className="flex h-16 items-center justify-end border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
           <div className="flex items-center gap-3">
             <div className="relative">
               <button
@@ -201,9 +195,22 @@ export default function DashboardLayout() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 p-4 pb-24 sm:p-6 lg:p-8 lg:pb-8">
           <Outlet />
         </main>
+      </div>
+
+      <div className="fixed bottom-6 left-4 z-40 flex items-center gap-3 lg:hidden print:hidden">
+        <motion.button
+          onClick={() => setOpen((o) => !o)}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          aria-label={open ? 'Close menu' : 'Open menu'}
+          className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink-900 text-cream-50 shadow-xl shadow-ink-900/25 hover:bg-ink-800"
+        >
+          {open ? <X size={22} /> : <Menu size={22} />}
+        </motion.button>
+        <CreateMenu variant="fab" />
       </div>
 
       <AssistantPanel />
