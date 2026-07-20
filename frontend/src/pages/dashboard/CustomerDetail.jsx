@@ -8,6 +8,7 @@ import {
 import { supabase } from '../../lib/supabase'
 import { useCustomerTransactions } from '../../hooks/useCustomerTransactions'
 import { formatCurrency } from '../../lib/currency'
+import { SRI_LANKA_DISTRICTS } from '../../lib/districts'
 import Button from '../../components/ui/Button'
 import AddTransactionModal from '../../components/customers/AddTransactionModal'
 
@@ -48,6 +49,17 @@ export default function CustomerDetail() {
     if (!window.confirm(`Remove "${customer.name}" from your customers?`)) return
     await supabase.from('customers').delete().eq('id', id)
     navigate('/dashboard/customers')
+  }
+
+  const handleDistrictChange = async (e) => {
+    const district = e.target.value || null
+    const { data } = await supabase
+      .from('customers')
+      .update({ district })
+      .eq('id', id)
+      .select()
+      .single()
+    if (data) setCustomer(data)
   }
 
   if (loadingCustomer) {
@@ -97,6 +109,19 @@ export default function CustomerDetail() {
               {customer.address && (
                 <span className="flex items-center gap-1"><MapPin size={12} /> {customer.address}</span>
               )}
+              <span className="flex items-center gap-1">
+                <MapPin size={12} />
+                <select
+                  value={customer.district || ''}
+                  onChange={handleDistrictChange}
+                  className="rounded border-none bg-transparent text-xs text-ink-400 outline-none focus:text-ink-700"
+                >
+                  <option value="">Unspecified district</option>
+                  {SRI_LANKA_DISTRICTS.map((d) => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
+              </span>
             </div>
           </div>
         </div>

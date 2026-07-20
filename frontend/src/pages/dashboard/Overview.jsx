@@ -13,6 +13,7 @@ import RadialStat from '../../components/dashboard/RadialStat'
 import AccountsPanel from '../../components/dashboard/AccountsPanel'
 import AccountStatusCard from '../../components/dashboard/AccountStatusCard'
 import QuickLinksGrid from '../../components/dashboard/QuickLinksGrid'
+import ClientDistrictsCard from '../../components/dashboard/ClientDistrictsCard'
 
 function getGreeting() {
   const h = new Date().getHours()
@@ -279,6 +280,15 @@ export default function Overview() {
           </button>
         </motion.div>
       </div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.25 }}
+        className="mt-6"
+      >
+        <ClientDistrictsCard />
+      </motion.div>
     </div>
   )
 }

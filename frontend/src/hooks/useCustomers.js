@@ -47,11 +47,25 @@ export function useCustomers() {
     return { data }
   }
 
+  const updateCustomer = async (id, fields) => {
+    const { data, error: updateError } = await supabase
+      .from('customers')
+      .update(fields)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) return { error: updateError }
+
+    setCustomers((prev) => prev.map((c) => (c.id === id ? data : c)))
+    return { data }
+  }
+
   const deleteCustomer = async (id) => {
     const { error: deleteError } = await supabase.from('customers').delete().eq('id', id)
     if (!deleteError) setCustomers((prev) => prev.filter((c) => c.id !== id))
     return { error: deleteError }
   }
 
-  return { customers, loading, error, addCustomer, deleteCustomer, refetch: fetchCustomers }
+  return { customers, loading, error, addCustomer, updateCustomer, deleteCustomer, refetch: fetchCustomers }
 }

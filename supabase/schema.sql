@@ -2956,3 +2956,9 @@ drop trigger if exists set_label_designs_updated_at on public.label_designs;
 create trigger set_label_designs_updated_at
   before update on public.label_designs
   for each row execute function public.set_updated_at();
+
+-- Customer district ---------------------------------------------------------
+-- Free-text district name (one of Sri Lanka's 25 districts, or null for
+-- untagged customers) — used to roll up registered/active client counts by
+-- district on the dashboard. No new RLS needed; covered by customers' own.
+alter table public.customers add column if not exists district text;

@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { AlertCircle } from 'lucide-react'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
+import { SRI_LANKA_DISTRICTS } from '../../lib/districts'
 
-const initialForm = { name: '', phone: '', email: '', address: '', notes: '' }
+const initialForm = { name: '', phone: '', email: '', address: '', district: '', notes: '' }
 
 export default function AddCustomerModal({ open, onClose, onSubmit }) {
   const [form, setForm] = useState(initialForm)
@@ -28,6 +29,7 @@ export default function AddCustomerModal({ open, onClose, onSubmit }) {
       phone: form.phone.trim() || null,
       email: form.email.trim() || null,
       address: form.address.trim() || null,
+      district: form.district || null,
       notes: form.notes.trim() || null,
     })
 
@@ -87,6 +89,20 @@ export default function AddCustomerModal({ open, onClose, onSubmit }) {
           onChange={update('address')}
           placeholder="Optional"
         />
+
+        <label className="block">
+          <span className="text-xs font-medium text-ink-500">District</span>
+          <select
+            value={form.district}
+            onChange={update('district')}
+            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+          >
+            <option value="">Unspecified</option>
+            {SRI_LANKA_DISTRICTS.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        </label>
 
         <label className="block">
           <span className="text-xs font-medium text-ink-500">Notes</span>
