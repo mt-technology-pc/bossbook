@@ -119,14 +119,14 @@ export default function Login() {
             className="mt-12 rounded-2xl border border-ink-400/15 bg-cream-100 p-5 backdrop-blur-sm"
           >
             <p className="text-sm leading-relaxed text-ink-600">
-              We&apos;re early — sign up now and help shape what Ledgerly
+              We&apos;re early — sign up now and help shape what BossBooks
               becomes.
             </p>
           </motion.div>
         </div>
 
         <p className="relative z-10 text-xs text-ink-400">
-          &copy; {new Date().getFullYear()} Ledgerly. All rights reserved.
+          &copy; {new Date().getFullYear()} BossBooks. All rights reserved.
         </p>
       </div>
 

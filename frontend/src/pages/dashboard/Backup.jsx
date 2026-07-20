@@ -13,7 +13,7 @@ export default function Backup() {
     setError(null)
     try {
       const blob = await apiFetchBlob('/api/backup/download')
-      const filename = `ledgerly-backup-${new Date().toISOString().slice(0, 10)}.zip`
+      const filename = `bossbooks-backup-${new Date().toISOString().slice(0, 10)}.zip`
       downloadBlob(blob, filename)
     } catch (err) {
       setError(err.message || 'Could not generate the backup.')

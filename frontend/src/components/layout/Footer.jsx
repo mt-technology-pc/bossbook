@@ -63,7 +63,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-ink-400/10 pt-8 text-xs text-ink-400 sm:flex-row">
-          <p>&copy; {new Date().getFullYear()} Ledgerly. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} BossBooks. All rights reserved.</p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-clay-600">Privacy</a>
             <a href="#" className="hover:text-clay-600">Terms</a>

@@ -149,7 +149,7 @@ export default function SalesDayBookReport() {
           invoices show the full line as outstanding at the point of sale
           since nothing was collected yet; sales receipts show the full line
           as received. Payments collected later against an invoice belong to
-          Customer Balances, not here. Discount always shows as 0 (Ledgerly
+          Customer Balances, not here. Discount always shows as 0 (BossBooks
           doesn&apos;t track a separate discount field — a lower price is
           simply entered directly), and Salesperson shows as &mdash; since
           staff attribution isn&apos;t tracked yet.

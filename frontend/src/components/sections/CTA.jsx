@@ -21,7 +21,7 @@ export default function CTA() {
             </h2>
             <p className="mx-auto mt-4 max-w-md text-sm text-ink-500 sm:text-base">
               We&apos;re onboarding early users now. Start your free trial
-              and help shape where Ledgerly goes next.
+              and help shape where BossBooks goes next.
             </p>
             <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Button to="/login" variant="primary" size="lg">

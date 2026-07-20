@@ -22,7 +22,7 @@ function tableInsertSql(name, rows) {
 // tables: [{ name, rows }] — data-only dump (no CREATE TABLE), assumes
 // supabase/schema.sql has already been applied wherever this is restored.
 export function buildBackupSql(tables) {
-  const header = `-- Ledgerly data backup
+  const header = `-- BossBooks data backup
 -- Generated ${new Date().toISOString()}
 -- Data-only dump: run supabase/schema.sql against an empty database first,
 -- then run this file to restore records.

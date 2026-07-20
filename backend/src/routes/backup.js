@@ -27,7 +27,7 @@ router.get('/download', requireAuth, async (req, res, next) => {
     const sql = buildBackupSql(tables)
     const xlsxBuffer = await buildBackupWorkbook(tables)
 
-    const filename = `ledgerly-backup-${new Date().toISOString().slice(0, 10)}.zip`
+    const filename = `bossbooks-backup-${new Date().toISOString().slice(0, 10)}.zip`
     res.setHeader('Content-Type', 'application/zip')
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
 

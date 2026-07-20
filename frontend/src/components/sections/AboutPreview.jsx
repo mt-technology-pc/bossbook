@@ -35,7 +35,7 @@ export default function AboutPreview() {
             Accounting software that understands stock
           </h2>
           <p className="mt-4 text-ink-500">
-            We&apos;re a small team building Ledgerly because too many
+            We&apos;re a small team building BossBooks because too many
             businesses are stuck between spreadsheets and bloated
             accounting suites that were never designed around inventory.
             We&apos;re early — and building it in the open with the

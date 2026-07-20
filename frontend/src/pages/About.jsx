@@ -60,13 +60,13 @@ export default function About() {
         <Container className="text-center">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
-              About Ledgerly
+              About BossBooks
             </p>
             <h1 className="mx-auto mt-3 max-w-2xl font-heading text-4xl font-semibold tracking-tight text-ink-900 sm:text-5xl">
               We&apos;re just getting started
             </h1>
             <p className="mx-auto mt-5 max-w-xl text-ink-500">
-              Ledgerly is a new accounting and inventory tool for small
+              BossBooks is a new accounting and inventory tool for small
               businesses — built to handle everyday stock, not just
               spreadsheets pretending to be one.
             </p>
@@ -98,7 +98,7 @@ export default function About() {
 
           <Reveal delay={0.15}>
             <p className="text-xs font-semibold uppercase tracking-widest text-clay-600">
-              Why Ledgerly
+              Why BossBooks
             </p>
             <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
               Accounting tools weren&apos;t built for stock-heavy businesses
@@ -106,7 +106,7 @@ export default function About() {
             <p className="mt-4 text-ink-500">
               Most accounting software treats inventory as an afterthought,
               and most inventory tools ignore the books entirely. We&apos;re
-              building Ledgerly to close that gap — starting with the
+              building BossBooks to close that gap — starting with the
               features stock-heavy businesses ask for first: clean
               invoicing, live stock counts, and individual unit tracking
               for anything with a serial number or IMEI.
@@ -199,14 +199,14 @@ export default function About() {
               Get involved
             </p>
             <h2 className="mt-3 font-heading text-3xl font-semibold tracking-tight text-ink-900 sm:text-4xl">
-              Help shape Ledgerly from day one
+              Help shape BossBooks from day one
             </h2>
             <p className="mt-4 text-ink-500">
               We&apos;re a small team and we read every message. If you run
               a business and want a say in what we build next, we&apos;d
               love to hear from you.
             </p>
-            <Button href="mailto:hello@ledgerly.app" variant="outline" className="mt-6">
+            <Button href="mailto:hello@bossbooks.app" variant="outline" className="mt-6">
               Get in touch <ArrowRight size={16} />
             </Button>
           </Reveal>

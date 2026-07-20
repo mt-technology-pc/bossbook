@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "Ledgerly API server",
+  "description": "BossBooks API server",
   "main": "src/index.js",
   "type": "module",
   "scripts": {

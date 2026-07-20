@@ -9,7 +9,7 @@ function cellValue(value) {
 // tables: [{ name, rows }] — one worksheet per table, header row + data rows.
 export async function buildBackupWorkbook(tables) {
   const workbook = new ExcelJS.Workbook()
-  workbook.creator = 'Ledgerly'
+  workbook.creator = 'BossBooks'
   workbook.created = new Date()
 
   for (const { name, rows } of tables) {

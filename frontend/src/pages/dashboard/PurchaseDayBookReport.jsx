@@ -134,7 +134,7 @@ export default function PurchaseDayBookReport() {
       <div className="mt-4 flex items-start gap-2 rounded-xl border border-ink-400/15 bg-cream-200/60 px-4 py-3 text-xs leading-relaxed text-ink-500 print:hidden">
         <Info size={14} className="mt-0.5 shrink-0" />
         <p>
-          Every purchase here is recorded as a credit bill — Ledgerly
+          Every purchase here is recorded as a credit bill — BossBooks
           doesn&apos;t yet support marking a bill as paid at the time of
           purchase. Payments are recorded separately (Pay Bill) and reduce a
           supplier&apos;s overall balance rather than a specific bill, which

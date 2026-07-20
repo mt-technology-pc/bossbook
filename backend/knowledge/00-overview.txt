@@ -1,6 +1,6 @@
-LEDGERLY — OVERVIEW
+BOSSBOOKS — OVERVIEW
 
-Ledgerly is an accounting and inventory system for small businesses. It is
+BossBooks is an accounting and inventory system for small businesses. It is
 not limited to mobile phone shops, though it has first-class support for
 serial/IMEI-level stock tracking, which most general-purpose accounting
 software lacks — useful for any business that sells individually
