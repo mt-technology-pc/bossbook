@@ -16,7 +16,7 @@ export const SRI_LANKA_DISTRICTS = [
   'Mannar',
   'Matale',
   'Matara',
-  'Monaragala',
+  'Moneragala',
   'Mullaitivu',
   'Nuwara Eliya',
   'Polonnaruwa',

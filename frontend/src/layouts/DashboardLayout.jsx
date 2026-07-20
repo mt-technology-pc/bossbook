@@ -9,6 +9,7 @@ import {
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
 import AssistantPanel from '../components/dashboard/AssistantPanel'
+import AccountStatusCard from '../components/dashboard/AccountStatusCard'
 import { useAuth } from '../context/AuthContext'
 
 const nav = [
@@ -177,11 +178,14 @@ export default function DashboardLayout() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-48 overflow-hidden rounded-xl border border-ink-400/15 bg-cream-50 py-1 shadow-xl"
+                    className="absolute right-0 mt-2 w-60 overflow-hidden rounded-xl border border-ink-400/15 bg-cream-50 py-1 shadow-xl"
                   >
                     <div className="border-b border-ink-400/10 px-3.5 py-2.5">
                       <p className="truncate text-sm font-medium text-ink-900">{displayName}</p>
                       <p className="truncate text-xs text-ink-400">{user?.email}</p>
+                    </div>
+                    <div className="border-b border-ink-400/10">
+                      <AccountStatusCard user={user} />
                     </div>
                     <button
                       onClick={handleSignOut}

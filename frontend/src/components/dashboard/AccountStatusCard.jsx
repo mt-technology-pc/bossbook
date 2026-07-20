@@ -16,31 +16,23 @@ function formatDate(dateStr) {
   })
 }
 
+// Compact account-status block for the navbar's profile dropdown — trial
+// countdown, member-since, and last sign-in, without a standalone card
+// wrapper since it now lives inside DashboardLayout's existing menu.
 export default function AccountStatusCard({ user }) {
   const elapsed = daysSince(user?.created_at)
   const daysLeft = Math.max(TRIAL_DAYS - elapsed, 0)
 
   return (
-    <div className="flex h-full flex-col rounded-2xl border border-ink-400/15 bg-cream-50 p-6">
+    <div className="px-3.5 py-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">
-          Account status
-        </p>
-        <span className="flex items-center gap-1 rounded-full bg-clay-500/10 px-2.5 py-1 text-[11px] font-semibold text-clay-600">
-          <ShieldCheck size={12} /> Owner
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-ink-700">
+          <Clock size={13} className="text-clay-600" />
+          {daysLeft > 0 ? `${daysLeft} days left on trial` : 'Trial ended'}
         </span>
-      </div>
-
-      <div className="mt-4 flex items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600">
-          <Clock size={19} />
+        <span className="flex items-center gap-1 rounded-full bg-clay-500/10 px-2 py-0.5 text-[10px] font-semibold text-clay-600">
+          <ShieldCheck size={10} /> Owner
         </span>
-        <div>
-          <p className="font-heading text-xl font-semibold text-ink-900">
-            {daysLeft > 0 ? `${daysLeft} days left` : 'Trial ended'}
-          </p>
-          <p className="text-xs text-ink-400">on your free trial</p>
-        </div>
       </div>
 
       <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-cream-200">
@@ -50,10 +42,10 @@ export default function AccountStatusCard({ user }) {
         />
       </div>
 
-      <div className="mt-5 space-y-3 border-t border-ink-400/10 pt-4 text-sm">
+      <div className="mt-3 space-y-1.5 text-xs">
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-ink-400">
-            <CalendarClock size={13} /> Member since
+            <CalendarClock size={12} /> Member since
           </span>
           <span className="font-medium text-ink-700">
             {formatDate(user?.created_at)}
@@ -61,7 +53,7 @@ export default function AccountStatusCard({ user }) {
         </div>
         <div className="flex items-center justify-between">
           <span className="flex items-center gap-1.5 text-ink-400">
-            <Clock size={13} /> Last sign-in
+            <Clock size={12} /> Last sign-in
           </span>
           <span className="font-medium text-ink-700">
             {formatDate(user?.last_sign_in_at)}

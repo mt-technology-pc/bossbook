@@ -34,7 +34,7 @@ export function useClientDistricts() {
     setLoading(true)
 
     const [customersRes, salesRes] = await Promise.all([
-      supabase.from('customers').select('id, district'),
+      supabase.from('customers').select('id, name, district'),
       supabase.from('sales').select('customer_id, sale_date'),
     ])
 
@@ -62,14 +62,16 @@ export function useClientDistricts() {
     )
 
     const buckets = new Map()
-    SRI_LANKA_DISTRICTS.forEach((d) => buckets.set(d, { district: d, registered: 0, active: 0 }))
-    buckets.set('Unspecified', { district: 'Unspecified', registered: 0, active: 0 })
+    SRI_LANKA_DISTRICTS.forEach((d) => buckets.set(d, { district: d, registered: 0, active: 0, customers: [] }))
+    buckets.set('Unspecified', { district: 'Unspecified', registered: 0, active: 0, customers: [] })
 
     customers.forEach((c) => {
       const key = c.district && buckets.has(c.district) ? c.district : 'Unspecified'
       const bucket = buckets.get(key)
+      const isActive = activeCustomerIds.has(c.id)
       bucket.registered += 1
-      if (activeCustomerIds.has(c.id)) bucket.active += 1
+      if (isActive) bucket.active += 1
+      bucket.customers.push({ id: c.id, name: c.name, active: isActive })
     })
 
     const rows = [...buckets.values()]
