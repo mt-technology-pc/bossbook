@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { X, Plus, AlertCircle, FileText, ShoppingBag } from 'lucide-react'
+import { X, Plus, AlertCircle, FileText, ShoppingBag, Download, Printer } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
@@ -9,9 +9,12 @@ import { useAvailableUnits } from '../../hooks/useAvailableUnits'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import { newSaleLine, saleLineTotal, validateSaleLines, buildSaleItems } from '../../lib/saleLines'
+import { buildSaleDocumentData, saleDocumentFilename } from '../../lib/saleDocument'
+import { buildSaleDocumentPdf } from '../../lib/saleDocumentPdf'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
 import SaleLineItemsEditor from '../../components/sales/SaleLineItemsEditor'
+import SaleDocument from '../../components/sales/SaleDocument'
 import FormSkeleton from '../../components/ui/FormSkeleton'
 
 function todayISO() {
@@ -145,6 +148,29 @@ export default function NewInvoice() {
 
   const total = saleLineTotal(lines)
 
+  const [downloadingPdf, setDownloadingPdf] = useState(false)
+
+  const documentData = useMemo(() => {
+    if (!isEdit || !loaded) return null
+    const existing = sales.find((s) => s.id === id)
+    if (!existing) return null
+    const customer = customers.find((c) => c.id === existing.customer_id) || null
+    return buildSaleDocumentData({ sale: existing, customer, products })
+  }, [isEdit, loaded, sales, id, customers, products])
+
+  const handleDownloadPdf = async () => {
+    if (!documentData) return
+    setDownloadingPdf(true)
+    try {
+      const doc = await buildSaleDocumentPdf(documentData)
+      doc.save(saleDocumentFilename(documentData))
+    } catch (err) {
+      setError(err.message || 'Could not generate the PDF.')
+    } finally {
+      setDownloadingPdf(false)
+    }
+  }
+
   const submit = async ({ andNew }) => {
     if (!customerId) {
       setError('Select a customer for this invoice.')
@@ -189,7 +215,7 @@ export default function NewInvoice() {
 
   return (
     <div className="flex min-h-screen flex-col bg-cream-100">
-      <header className="flex h-16 shrink-0 items-center justify-between border-b border-ink-400/10 bg-cream-50 px-4 sm:px-6">
+      <header className="flex h-16 shrink-0 items-center justify-between border-b border-ink-400/10 bg-cream-50 px-4 print:hidden sm:px-6">
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
             <FileText size={16} />
@@ -198,16 +224,39 @@ export default function NewInvoice() {
             {isEdit ? 'Edit invoice' : 'New invoice'}
           </h1>
         </div>
-        <button
-          onClick={() => navigate('/dashboard/sales')}
-          aria-label="Cancel"
-          className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600"
-        >
-          <X size={20} />
-        </button>
+        <div className="flex items-center gap-1">
+          {documentData && (
+            <>
+              <button
+                onClick={handleDownloadPdf}
+                disabled={downloadingPdf}
+                title="Download PDF"
+                aria-label="Download PDF"
+                className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 disabled:opacity-50"
+              >
+                <Download size={18} />
+              </button>
+              <button
+                onClick={() => window.print()}
+                title="Print"
+                aria-label="Print"
+                className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600"
+              >
+                <Printer size={18} />
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => navigate('/dashboard/sales')}
+            aria-label="Cancel"
+            className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600"
+          >
+            <X size={20} />
+          </button>
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto pb-28">
+      <div className="flex-1 overflow-y-auto pb-28 print:hidden">
         <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
           {!loaded || productsLoading ? (
             <FormSkeleton />
@@ -345,7 +394,7 @@ export default function NewInvoice() {
       </div>
 
       {loaded && !productsLoading && products.length > 0 && (
-        <footer className="fixed inset-x-0 bottom-0 flex items-center justify-between border-t border-ink-400/10 bg-cream-50 px-4 py-3.5 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] sm:px-6">
+        <footer className="fixed inset-x-0 bottom-0 flex items-center justify-between border-t border-ink-400/10 bg-cream-50 px-4 py-3.5 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] print:hidden sm:px-6">
           <Button variant="ghost" onClick={() => navigate('/dashboard/sales')}>
             Cancel
           </Button>
@@ -360,6 +409,12 @@ export default function NewInvoice() {
             </Button>
           </div>
         </footer>
+      )}
+
+      {documentData && (
+        <div className="hidden print:block">
+          <SaleDocument data={documentData} />
+        </div>
       )}
     </div>
   )
