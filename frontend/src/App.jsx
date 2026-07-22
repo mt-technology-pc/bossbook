@@ -39,138 +39,145 @@ import Backup from './pages/dashboard/Backup'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import DashboardLayout from './layouts/DashboardLayout'
+import UtilityWidgets from './components/widgets/UtilityWidgets'
+import { useAuth } from './context/AuthContext'
 
 function App() {
+  const { user } = useAuth()
+
   return (
-    <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/about" element={<About />} />
-      <Route path="/login" element={<Login />} />
+    <>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/login" element={<Login />} />
 
-      <Route
-        path="/dashboard/purchases/new"
-        element={
-          <ProtectedRoute>
-            <NewPurchase />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/purchases/new/:id"
-        element={
-          <ProtectedRoute>
-            <NewPurchase />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/sales/new-invoice"
-        element={
-          <ProtectedRoute>
-            <NewInvoice />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/sales/new-invoice/:id"
-        element={
-          <ProtectedRoute>
-            <NewInvoice />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/sales/new-receipt"
-        element={
-          <ProtectedRoute>
-            <NewSalesReceipt />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/sales/new-receipt/:id"
-        element={
-          <ProtectedRoute>
-            <NewSalesReceipt />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/sales/receive-payment"
-        element={
-          <ProtectedRoute>
-            <ReceivePayment />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/sales/receive-payment/:id"
-        element={
-          <ProtectedRoute>
-            <ReceivePayment />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/purchases/pay-bill"
-        element={
-          <ProtectedRoute>
-            <PayBill />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/dashboard/purchases/pay-bill/:id"
-        element={
-          <ProtectedRoute>
-            <PayBill />
-          </ProtectedRoute>
-        }
-      />
+        <Route
+          path="/dashboard/purchases/new"
+          element={
+            <ProtectedRoute>
+              <NewPurchase />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/purchases/new/:id"
+          element={
+            <ProtectedRoute>
+              <NewPurchase />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/sales/new-invoice"
+          element={
+            <ProtectedRoute>
+              <NewInvoice />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/sales/new-invoice/:id"
+          element={
+            <ProtectedRoute>
+              <NewInvoice />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/sales/new-receipt"
+          element={
+            <ProtectedRoute>
+              <NewSalesReceipt />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/sales/new-receipt/:id"
+          element={
+            <ProtectedRoute>
+              <NewSalesReceipt />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/sales/receive-payment"
+          element={
+            <ProtectedRoute>
+              <ReceivePayment />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/sales/receive-payment/:id"
+          element={
+            <ProtectedRoute>
+              <ReceivePayment />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/purchases/pay-bill"
+          element={
+            <ProtectedRoute>
+              <PayBill />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/purchases/pay-bill/:id"
+          element={
+            <ProtectedRoute>
+              <PayBill />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardLayout />
-          </ProtectedRoute>
-        }
-      >
-        <Route index element={<Overview />} />
-        <Route path="inventory" element={<Inventory />} />
-        <Route path="inventory/labels" element={<LabelGenerator />} />
-        <Route path="customers" element={<Customers />} />
-        <Route path="customers/:id" element={<CustomerDetail />} />
-        <Route path="receivables" element={<AccountsReceivable />} />
-        <Route path="suppliers" element={<Suppliers />} />
-        <Route path="suppliers/:id" element={<SupplierDetail />} />
-        <Route path="payables" element={<AccountsPayable />} />
-        <Route path="purchases" element={<Purchases />} />
-        <Route path="purchases/payments-made" element={<SupplierPayments />} />
-        <Route path="sales" element={<Sales />} />
-        <Route path="sales/payments-received" element={<CustomerPayments />} />
-        <Route path="sales-reps" element={<SalesReps />} />
-        <Route path="sales-reps/:id" element={<SalesRepDetail />} />
-        <Route path="expenses" element={<Expenses />} />
-        <Route path="accounts/:id" element={<AccountDetail />} />
-        <Route path="serial-tracking" element={<SerialTracking />} />
-        <Route path="reports" element={<Reports />} />
-        <Route path="reports/inventory-valuation" element={<InventoryValuationReport />} />
-        <Route path="reports/inventory-valuation/:id" element={<ProductLedger />} />
-        <Route path="reports/income-statement" element={<IncomeStatementReport />} />
-        <Route path="reports/gain-and-loss" element={<GainLossReport />} />
-        <Route path="reports/sales-day-book" element={<SalesDayBookReport />} />
-        <Route path="reports/purchase-day-book" element={<PurchaseDayBookReport />} />
-        <Route path="reports/chart-of-accounts" element={<ChartOfAccounts />} />
-        <Route path="reports/general-ledger" element={<GeneralLedger />} />
-        <Route path="reports/general-ledger/:coaId" element={<GeneralLedger />} />
-        <Route path="reports/trial-balance" element={<TrialBalance />} />
-        <Route path="team" element={<ComingSoon title="Team" />} />
-        <Route path="settings" element={<ComingSoon title="Settings" />} />
-        <Route path="backup" element={<Backup />} />
-        <Route path="*" element={<ComingSoon />} />
-      </Route>
-    </Routes>
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<Overview />} />
+          <Route path="inventory" element={<Inventory />} />
+          <Route path="inventory/labels" element={<LabelGenerator />} />
+          <Route path="customers" element={<Customers />} />
+          <Route path="customers/:id" element={<CustomerDetail />} />
+          <Route path="receivables" element={<AccountsReceivable />} />
+          <Route path="suppliers" element={<Suppliers />} />
+          <Route path="suppliers/:id" element={<SupplierDetail />} />
+          <Route path="payables" element={<AccountsPayable />} />
+          <Route path="purchases" element={<Purchases />} />
+          <Route path="purchases/payments-made" element={<SupplierPayments />} />
+          <Route path="sales" element={<Sales />} />
+          <Route path="sales/payments-received" element={<CustomerPayments />} />
+          <Route path="sales-reps" element={<SalesReps />} />
+          <Route path="sales-reps/:id" element={<SalesRepDetail />} />
+          <Route path="expenses" element={<Expenses />} />
+          <Route path="accounts/:id" element={<AccountDetail />} />
+          <Route path="serial-tracking" element={<SerialTracking />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="reports/inventory-valuation" element={<InventoryValuationReport />} />
+          <Route path="reports/inventory-valuation/:id" element={<ProductLedger />} />
+          <Route path="reports/income-statement" element={<IncomeStatementReport />} />
+          <Route path="reports/gain-and-loss" element={<GainLossReport />} />
+          <Route path="reports/sales-day-book" element={<SalesDayBookReport />} />
+          <Route path="reports/purchase-day-book" element={<PurchaseDayBookReport />} />
+          <Route path="reports/chart-of-accounts" element={<ChartOfAccounts />} />
+          <Route path="reports/general-ledger" element={<GeneralLedger />} />
+          <Route path="reports/general-ledger/:coaId" element={<GeneralLedger />} />
+          <Route path="reports/trial-balance" element={<TrialBalance />} />
+          <Route path="team" element={<ComingSoon title="Team" />} />
+          <Route path="settings" element={<ComingSoon title="Settings" />} />
+          <Route path="backup" element={<Backup />} />
+          <Route path="*" element={<ComingSoon />} />
+        </Route>
+      </Routes>
+      {user && <UtilityWidgets />}
+    </>
   )
 }
 
