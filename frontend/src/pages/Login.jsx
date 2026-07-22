@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft, AlertCircle,
-  Smartphone, Receipt, BarChart3,
+  Smartphone, Receipt, BarChart3, Building2,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import Button from '../components/ui/Button'
@@ -44,10 +44,11 @@ export default function Login() {
     const email = formData.get('email')
     const password = formData.get('password')
     const fullName = formData.get('fullName')
+    const companyName = formData.get('companyName')
 
     const { data, error: authError } = isLogin
       ? await signIn({ email, password })
-      : await signUp({ email, password, fullName })
+      : await signUp({ email, password, fullName, companyName })
 
     setLoading(false)
 
@@ -207,7 +208,10 @@ export default function Login() {
 
               <form onSubmit={handleSubmit} className="mt-7 space-y-4">
                 {!isLogin && (
-                  <Field icon={User} name="fullName" type="text" placeholder="Full name" autoComplete="name" required />
+                  <>
+                    <Field icon={User} name="fullName" type="text" placeholder="Full name" autoComplete="name" required />
+                    <Field icon={Building2} name="companyName" type="text" placeholder="Business name" autoComplete="organization" required />
+                  </>
                 )}
                 <Field icon={Mail} name="email" type="email" placeholder="Email address" autoComplete="email" required />
                 <div className="relative">

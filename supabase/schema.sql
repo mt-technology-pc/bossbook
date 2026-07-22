@@ -3005,3 +3005,2354 @@ drop trigger if exists set_sticky_notes_updated_at on public.sticky_notes;
 create trigger set_sticky_notes_updated_at
   before update on public.sticky_notes
   for each row execute function public.set_updated_at();
+
+-- ===========================================================================
+-- MULTI-TENANCY MIGRATION — company entity + RLS/RPC rewrite
+-- ===========================================================================
+-- Everything above this line still uses owner_id = auth.uid() as the tenant
+-- boundary (one auth user = one business). Everything below introduces a
+-- real `companies` entity so a company can eventually have more than one
+-- login, and rewires every RLS policy + security-definer RPC to scope by
+-- company_id instead. owner_id is kept on every table, unchanged — it still
+-- means "the individual user who created this row" (useful once multiple
+-- staff share a company); it just stops being the isolation boundary.
+--
+-- IMPORTANT: test this whole block against a scratch/staging Supabase
+-- project before running it against production, given the isolation
+-- stakes — see the plan file's Verification section for a cross-tenant
+-- test script.
+
+-- Companies + company membership --------------------------------------------
+
+create table if not exists public.companies (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  -- Per-company feature toggles — a flexible bag so a future admin panel's
+  -- "select and add features" can add new ones without another migration.
+  features jsonb not null default '{"serial_tracking": true, "label_generator": true, "ai_assistant": true}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.company_users (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  company_id uuid not null references public.companies(id) on delete cascade,
+  role text not null default 'owner' check (role in ('owner', 'staff')),
+  created_at timestamptz not null default now(),
+  primary key (user_id, company_id)
+);
+
+create index if not exists company_users_company_id_idx on public.company_users(company_id);
+
+alter table public.companies enable row level security;
+alter table public.company_users enable row level security;
+
+-- current_company_id() is the one new primitive everything else hangs off —
+-- stable + security definer so it can be used both as a column DEFAULT and
+-- inside RLS policies.
+create or replace function public.current_company_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select company_id from public.company_users where user_id = auth.uid() limit 1;
+$$;
+
+grant execute on function public.current_company_id() to authenticated;
+
+drop policy if exists "Users can view own company" on public.companies;
+create policy "Users can view own company"
+  on public.companies for select
+  using (id = public.current_company_id());
+
+drop policy if exists "Users can view own company membership" on public.company_users;
+create policy "Users can view own company membership"
+  on public.company_users for select
+  using (user_id = auth.uid() or company_id = public.current_company_id());
+
+-- Platform super-admins -------------------------------------------------------
+-- A platform admin is not a member of any company at all — a separate
+-- concept from company_users, checked via its own function, so a regular
+-- business owner logging in at the admin login can never accidentally pass
+-- this check. No public signup path: admins are provisioned manually
+-- (service-role insert), not through the regular signup form.
+
+create table if not exists public.platform_admins (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+alter table public.platform_admins enable row level security;
+
+create or replace function public.is_platform_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (select 1 from public.platform_admins where user_id = auth.uid());
+$$;
+
+grant execute on function public.is_platform_admin() to authenticated;
+
+drop policy if exists "Admins can view own admin row" on public.platform_admins;
+create policy "Admins can view own admin row"
+  on public.platform_admins for select
+  using (user_id = auth.uid());
+
+-- Data backfill: one company per EXISTING auth user (not a single shared
+-- "default company" for everyone — that would incorrectly merge every
+-- existing customer's separate business into one tenant). Idempotent: only
+-- ever creates a company for a user who doesn't already have one, so it's
+-- safe if schema.sql is re-run later and also correctly leaves alone any
+-- user who already got a company via the handle_new_user() trigger below.
+with eligible_users as (
+  select
+    u.id as user_id,
+    gen_random_uuid() as new_company_id,
+    coalesce(u.raw_user_meta_data->>'full_name', split_part(u.email, '@', 1)) || '''s Business' as company_name
+  from auth.users u
+  where not exists (select 1 from public.company_users cu where cu.user_id = u.id)
+),
+inserted_companies as (
+  insert into public.companies (id, name)
+  select new_company_id, company_name from eligible_users
+  returning id
+)
+insert into public.company_users (user_id, company_id, role)
+select user_id, new_company_id, 'owner' from eligible_users;
+
+-- Auto-provision a company for every future signup, via a trigger on
+-- Supabase's own auth.users table — not something the frontend has to
+-- remember to call, so it can't be skipped or raced.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_company_id uuid;
+begin
+  if exists (select 1 from public.company_users where user_id = new.id) then
+    return new;
+  end if;
+
+  insert into public.companies (name)
+  values (coalesce(new.raw_user_meta_data->>'company_name', coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)) || '''s Business'))
+  returning id into v_company_id;
+
+  insert into public.company_users (user_id, company_id, role)
+  values (new.id, v_company_id, 'owner');
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- company_id column + RLS rewrite, same 5-step pattern on every table:
+-- add the column, backfill it from company_users via owner_id, make it
+-- required, default it to current_company_id() so plain client inserts
+-- (which only ever set owner_id) still populate it, then index it.
+-- Policies are rewritten from `auth.uid() = owner_id` to
+-- `company_id = current_company_id()` — owner_id itself is untouched.
+
+-- products
+alter table public.products add column if not exists company_id uuid references public.companies(id);
+update public.products t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.products alter column company_id set not null;
+alter table public.products alter column company_id set default public.current_company_id();
+create index if not exists products_company_id_idx on public.products(company_id);
+
+drop policy if exists "Users can view own products" on public.products;
+create policy "Users can view own products" on public.products for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own products" on public.products;
+create policy "Users can insert own products" on public.products for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can update own products" on public.products;
+create policy "Users can update own products" on public.products for update using (company_id = public.current_company_id());
+drop policy if exists "Users can delete own products" on public.products;
+create policy "Users can delete own products" on public.products for delete using (company_id = public.current_company_id());
+
+-- customers
+alter table public.customers add column if not exists company_id uuid references public.companies(id);
+update public.customers t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.customers alter column company_id set not null;
+alter table public.customers alter column company_id set default public.current_company_id();
+create index if not exists customers_company_id_idx on public.customers(company_id);
+
+drop policy if exists "Users can view own customers" on public.customers;
+create policy "Users can view own customers" on public.customers for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own customers" on public.customers;
+create policy "Users can insert own customers" on public.customers for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can update own customers" on public.customers;
+create policy "Users can update own customers" on public.customers for update using (company_id = public.current_company_id());
+drop policy if exists "Users can delete own customers" on public.customers;
+create policy "Users can delete own customers" on public.customers for delete using (company_id = public.current_company_id());
+
+-- suppliers
+alter table public.suppliers add column if not exists company_id uuid references public.companies(id);
+update public.suppliers t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.suppliers alter column company_id set not null;
+alter table public.suppliers alter column company_id set default public.current_company_id();
+create index if not exists suppliers_company_id_idx on public.suppliers(company_id);
+
+drop policy if exists "Users can view own suppliers" on public.suppliers;
+create policy "Users can view own suppliers" on public.suppliers for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own suppliers" on public.suppliers;
+create policy "Users can insert own suppliers" on public.suppliers for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can update own suppliers" on public.suppliers;
+create policy "Users can update own suppliers" on public.suppliers for update using (company_id = public.current_company_id());
+drop policy if exists "Users can delete own suppliers" on public.suppliers;
+create policy "Users can delete own suppliers" on public.suppliers for delete using (company_id = public.current_company_id());
+
+-- sales_reps
+alter table public.sales_reps add column if not exists company_id uuid references public.companies(id);
+update public.sales_reps t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.sales_reps alter column company_id set not null;
+alter table public.sales_reps alter column company_id set default public.current_company_id();
+create index if not exists sales_reps_company_id_idx on public.sales_reps(company_id);
+
+drop policy if exists "Users can view own sales reps" on public.sales_reps;
+create policy "Users can view own sales reps" on public.sales_reps for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own sales reps" on public.sales_reps;
+create policy "Users can insert own sales reps" on public.sales_reps for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can update own sales reps" on public.sales_reps;
+create policy "Users can update own sales reps" on public.sales_reps for update using (company_id = public.current_company_id());
+drop policy if exists "Users can delete own sales reps" on public.sales_reps;
+create policy "Users can delete own sales reps" on public.sales_reps for delete using (company_id = public.current_company_id());
+
+-- purchases (no update policy — edits go through update_purchase())
+alter table public.purchases add column if not exists company_id uuid references public.companies(id);
+update public.purchases t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.purchases alter column company_id set not null;
+alter table public.purchases alter column company_id set default public.current_company_id();
+create index if not exists purchases_company_id_idx on public.purchases(company_id);
+
+drop policy if exists "Users can view own purchases" on public.purchases;
+create policy "Users can view own purchases" on public.purchases for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own purchases" on public.purchases;
+create policy "Users can insert own purchases" on public.purchases for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can delete own purchases" on public.purchases;
+create policy "Users can delete own purchases" on public.purchases for delete using (company_id = public.current_company_id());
+
+-- purchase_items (view/insert only)
+alter table public.purchase_items add column if not exists company_id uuid references public.companies(id);
+update public.purchase_items t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.purchase_items alter column company_id set not null;
+alter table public.purchase_items alter column company_id set default public.current_company_id();
+create index if not exists purchase_items_company_id_idx on public.purchase_items(company_id);
+
+drop policy if exists "Users can view own purchase items" on public.purchase_items;
+create policy "Users can view own purchase items" on public.purchase_items for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own purchase items" on public.purchase_items;
+create policy "Users can insert own purchase items" on public.purchase_items for insert with check (company_id = public.current_company_id());
+
+-- product_units (view/insert/update only, no delete)
+alter table public.product_units add column if not exists company_id uuid references public.companies(id);
+update public.product_units t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.product_units alter column company_id set not null;
+alter table public.product_units alter column company_id set default public.current_company_id();
+create index if not exists product_units_company_id_idx on public.product_units(company_id);
+
+drop policy if exists "Users can view own product units" on public.product_units;
+create policy "Users can view own product units" on public.product_units for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own product units" on public.product_units;
+create policy "Users can insert own product units" on public.product_units for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can update own product units" on public.product_units;
+create policy "Users can update own product units" on public.product_units for update using (company_id = public.current_company_id());
+
+-- supplier_payments (no update — edits go through update_supplier_payment())
+alter table public.supplier_payments add column if not exists company_id uuid references public.companies(id);
+update public.supplier_payments t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.supplier_payments alter column company_id set not null;
+alter table public.supplier_payments alter column company_id set default public.current_company_id();
+create index if not exists supplier_payments_company_id_idx on public.supplier_payments(company_id);
+
+drop policy if exists "Users can view own supplier payments" on public.supplier_payments;
+create policy "Users can view own supplier payments" on public.supplier_payments for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own supplier payments" on public.supplier_payments;
+create policy "Users can insert own supplier payments" on public.supplier_payments for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can delete own supplier payments" on public.supplier_payments;
+create policy "Users can delete own supplier payments" on public.supplier_payments for delete using (company_id = public.current_company_id());
+
+-- customer_transactions (no update — edits go through update_customer_payment())
+alter table public.customer_transactions add column if not exists company_id uuid references public.companies(id);
+update public.customer_transactions t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.customer_transactions alter column company_id set not null;
+alter table public.customer_transactions alter column company_id set default public.current_company_id();
+create index if not exists customer_transactions_company_id_idx on public.customer_transactions(company_id);
+
+drop policy if exists "Users can view own customer transactions" on public.customer_transactions;
+create policy "Users can view own customer transactions" on public.customer_transactions for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own customer transactions" on public.customer_transactions;
+create policy "Users can insert own customer transactions" on public.customer_transactions for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can delete own customer transactions" on public.customer_transactions;
+create policy "Users can delete own customer transactions" on public.customer_transactions for delete using (company_id = public.current_company_id());
+
+-- sales (no update — edits go through update_sale())
+alter table public.sales add column if not exists company_id uuid references public.companies(id);
+update public.sales t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.sales alter column company_id set not null;
+alter table public.sales alter column company_id set default public.current_company_id();
+create index if not exists sales_company_id_idx on public.sales(company_id);
+
+drop policy if exists "Users can view own sales" on public.sales;
+create policy "Users can view own sales" on public.sales for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own sales" on public.sales;
+create policy "Users can insert own sales" on public.sales for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can delete own sales" on public.sales;
+create policy "Users can delete own sales" on public.sales for delete using (company_id = public.current_company_id());
+
+-- sale_items (view/insert only)
+alter table public.sale_items add column if not exists company_id uuid references public.companies(id);
+update public.sale_items t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.sale_items alter column company_id set not null;
+alter table public.sale_items alter column company_id set default public.current_company_id();
+create index if not exists sale_items_company_id_idx on public.sale_items(company_id);
+
+drop policy if exists "Users can view own sale items" on public.sale_items;
+create policy "Users can view own sale items" on public.sale_items for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own sale items" on public.sale_items;
+create policy "Users can insert own sale items" on public.sale_items for insert with check (company_id = public.current_company_id());
+
+-- accounts (no update — accounts are only ever created/deleted, not edited)
+alter table public.accounts add column if not exists company_id uuid references public.companies(id);
+update public.accounts t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.accounts alter column company_id set not null;
+alter table public.accounts alter column company_id set default public.current_company_id();
+create index if not exists accounts_company_id_idx on public.accounts(company_id);
+
+drop policy if exists "Users can view own accounts" on public.accounts;
+create policy "Users can view own accounts" on public.accounts for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own accounts" on public.accounts;
+create policy "Users can insert own accounts" on public.accounts for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can delete own accounts" on public.accounts;
+create policy "Users can delete own accounts" on public.accounts for delete using (company_id = public.current_company_id());
+
+-- account_transactions (view/insert only — edits go through the payment RPCs)
+alter table public.account_transactions add column if not exists company_id uuid references public.companies(id);
+update public.account_transactions t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.account_transactions alter column company_id set not null;
+alter table public.account_transactions alter column company_id set default public.current_company_id();
+create index if not exists account_transactions_company_id_idx on public.account_transactions(company_id);
+
+drop policy if exists "Users can view own account transactions" on public.account_transactions;
+create policy "Users can view own account transactions" on public.account_transactions for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own account transactions" on public.account_transactions;
+create policy "Users can insert own account transactions" on public.account_transactions for insert with check (company_id = public.current_company_id());
+
+-- expenses (no update — edits aren't supported today, only record/delete)
+alter table public.expenses add column if not exists company_id uuid references public.companies(id);
+update public.expenses t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.expenses alter column company_id set not null;
+alter table public.expenses alter column company_id set default public.current_company_id();
+create index if not exists expenses_company_id_idx on public.expenses(company_id);
+
+drop policy if exists "Users can view own expenses" on public.expenses;
+create policy "Users can view own expenses" on public.expenses for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own expenses" on public.expenses;
+create policy "Users can insert own expenses" on public.expenses for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can delete own expenses" on public.expenses;
+create policy "Users can delete own expenses" on public.expenses for delete using (company_id = public.current_company_id());
+
+-- chart_of_accounts (view only — writes only ever happen via the ensure_* RPCs)
+alter table public.chart_of_accounts add column if not exists company_id uuid references public.companies(id);
+update public.chart_of_accounts t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.chart_of_accounts alter column company_id set not null;
+alter table public.chart_of_accounts alter column company_id set default public.current_company_id();
+create index if not exists chart_of_accounts_company_id_idx on public.chart_of_accounts(company_id);
+
+drop policy if exists "Users can view own chart of accounts" on public.chart_of_accounts;
+create policy "Users can view own chart of accounts" on public.chart_of_accounts for select using (company_id = public.current_company_id());
+
+-- journal_entries (view only — writes only ever happen via post_journal_entry())
+alter table public.journal_entries add column if not exists company_id uuid references public.companies(id);
+update public.journal_entries t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.journal_entries alter column company_id set not null;
+alter table public.journal_entries alter column company_id set default public.current_company_id();
+create index if not exists journal_entries_company_id_idx on public.journal_entries(company_id);
+
+drop policy if exists "Users can view own journal entries" on public.journal_entries;
+create policy "Users can view own journal entries" on public.journal_entries for select using (company_id = public.current_company_id());
+
+-- journal_entry_lines (view only)
+alter table public.journal_entry_lines add column if not exists company_id uuid references public.companies(id);
+update public.journal_entry_lines t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.journal_entry_lines alter column company_id set not null;
+alter table public.journal_entry_lines alter column company_id set default public.current_company_id();
+create index if not exists journal_entry_lines_company_id_idx on public.journal_entry_lines(company_id);
+
+drop policy if exists "Users can view own journal entry lines" on public.journal_entry_lines;
+create policy "Users can view own journal entry lines" on public.journal_entry_lines for select using (company_id = public.current_company_id());
+
+-- label_designs
+alter table public.label_designs add column if not exists company_id uuid references public.companies(id);
+update public.label_designs t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.label_designs alter column company_id set not null;
+alter table public.label_designs alter column company_id set default public.current_company_id();
+create index if not exists label_designs_company_id_idx on public.label_designs(company_id);
+
+drop policy if exists "Users can view own label designs" on public.label_designs;
+create policy "Users can view own label designs" on public.label_designs for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own label designs" on public.label_designs;
+create policy "Users can insert own label designs" on public.label_designs for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can update own label designs" on public.label_designs;
+create policy "Users can update own label designs" on public.label_designs for update using (company_id = public.current_company_id());
+drop policy if exists "Users can delete own label designs" on public.label_designs;
+create policy "Users can delete own label designs" on public.label_designs for delete using (company_id = public.current_company_id());
+
+-- sticky_notes
+alter table public.sticky_notes add column if not exists company_id uuid references public.companies(id);
+update public.sticky_notes t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.sticky_notes alter column company_id set not null;
+alter table public.sticky_notes alter column company_id set default public.current_company_id();
+create index if not exists sticky_notes_company_id_idx on public.sticky_notes(company_id);
+
+drop policy if exists "Users can view own sticky notes" on public.sticky_notes;
+create policy "Users can view own sticky notes" on public.sticky_notes for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own sticky notes" on public.sticky_notes;
+create policy "Users can insert own sticky notes" on public.sticky_notes for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can update own sticky notes" on public.sticky_notes;
+create policy "Users can update own sticky notes" on public.sticky_notes for update using (company_id = public.current_company_id());
+drop policy if exists "Users can delete own sticky notes" on public.sticky_notes;
+create policy "Users can delete own sticky notes" on public.sticky_notes for delete using (company_id = public.current_company_id());
+
+-- sequence_counters — re-keyed from (owner_id, key) to (company_id, key) so
+-- auto-numbering (invoice/bill/customer/etc. codes) is shared across a
+-- company's staff instead of counting separately per individual login.
+-- owner_id is dropped here (unlike every other table) since a shared
+-- counter has no single meaningful "owner" once more than one person at a
+-- company can trigger it.
+alter table public.sequence_counters add column if not exists company_id uuid references public.companies(id);
+update public.sequence_counters t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+alter table public.sequence_counters alter column company_id set not null;
+
+drop policy if exists "Users can view own sequence counters" on public.sequence_counters;
+create policy "Users can view own sequence counters" on public.sequence_counters for select using (company_id = public.current_company_id());
+
+alter table public.sequence_counters drop constraint if exists sequence_counters_pkey;
+alter table public.sequence_counters add primary key (company_id, key);
+alter table public.sequence_counters drop column if exists owner_id;
+
+-- next_sequence_number/next_sequence_code keep the same (uuid, text[, text])
+-- argument TYPES, but Postgres still refuses `create or replace function`
+-- when a parameter NAME changes (p_owner_id -> p_company_id) — it requires
+-- an explicit drop first, or errors with "cannot change name of input
+-- parameter". No caller uses named-parameter syntax, so the rename itself
+-- is safe; it just needs the drop before the replace.
+drop function if exists public.next_sequence_number(uuid, text);
+create or replace function public.next_sequence_number(p_company_id uuid, p_key text)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_next integer;
+begin
+  insert into public.sequence_counters (company_id, key, next_value)
+  values (p_company_id, p_key, 2)
+  on conflict (company_id, key) do update set next_value = public.sequence_counters.next_value + 1
+  returning next_value - 1 into v_next;
+
+  return v_next;
+end;
+$$;
+
+grant execute on function public.next_sequence_number(uuid, text) to authenticated;
+
+drop function if exists public.next_sequence_code(uuid, text, text);
+create or replace function public.next_sequence_code(p_company_id uuid, p_key text, p_prefix text default '')
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_n integer;
+begin
+  v_n := public.next_sequence_number(p_company_id, p_key);
+  return p_prefix || lpad(v_n::text, 3, '0');
+end;
+$$;
+
+grant execute on function public.next_sequence_code(uuid, text, text) to authenticated;
+
+-- Uniqueness constraints re-keyed from (owner_id, ...) to (company_id, ...)
+-- — codes/serials are unique within a company now, not within an
+-- individual login. Login email uniqueness is unaffected (enforced by
+-- Supabase Auth's own auth.users table, nothing to change here).
+
+drop index if exists public.sales_reps_owner_code_idx;
+create unique index if not exists sales_reps_company_code_idx
+  on public.sales_reps(company_id, code) where code is not null;
+
+drop index if exists public.customers_owner_code_idx;
+create unique index if not exists customers_company_code_idx
+  on public.customers(company_id, code) where code is not null;
+
+drop index if exists public.customer_transactions_owner_code_idx;
+create unique index if not exists customer_transactions_company_code_idx
+  on public.customer_transactions(company_id, code) where code is not null;
+
+drop index if exists public.supplier_payments_owner_code_idx;
+create unique index if not exists supplier_payments_company_code_idx
+  on public.supplier_payments(company_id, code) where code is not null;
+
+drop index if exists public.accounts_owner_code_idx;
+create unique index if not exists accounts_company_code_idx
+  on public.accounts(company_id, code) where code is not null;
+
+drop index if exists public.expenses_owner_code_idx;
+create unique index if not exists expenses_company_code_idx
+  on public.expenses(company_id, code) where code is not null;
+
+drop index if exists public.chart_of_accounts_owner_system_key_idx;
+create unique index if not exists chart_of_accounts_company_system_key_idx
+  on public.chart_of_accounts(company_id, system_key) where system_key is not null;
+
+drop index if exists public.chart_of_accounts_owner_account_id_idx;
+create unique index if not exists chart_of_accounts_company_account_id_idx
+  on public.chart_of_accounts(company_id, account_id) where account_id is not null;
+
+drop index if exists public.chart_of_accounts_owner_category_idx;
+create unique index if not exists chart_of_accounts_company_category_idx
+  on public.chart_of_accounts(company_id, category) where category is not null;
+
+alter table public.product_units drop constraint if exists product_units_owner_id_serial_number_key;
+alter table public.product_units drop constraint if exists product_units_company_serial_key;
+alter table public.product_units add constraint product_units_company_serial_key unique (company_id, serial_number);
+-- RPC function rewrites — company_id-aware versions. Every function keeps
+-- its exact original public signature (same params/types), so each
+-- create-or-replace here cleanly supersedes the earlier definition further
+-- up the file with no preceding drop function needed. Pattern applied
+-- uniformly: v_company_id := current_company_id() added alongside the
+-- existing v_owner_id := auth.uid(); every cross-table ownership check now
+-- compares company_id instead of owner_id; every insert carries both
+-- owner_id (unchanged meaning: who personally did this) and company_id
+-- (the new isolation boundary).
+
+create or replace function public.create_purchase(
+  p_supplier_id uuid,
+  p_reference text,
+  p_notes text,
+  p_items jsonb,
+  p_bill_date date default current_date,
+  p_due_date date default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_purchase_id uuid;
+  v_item jsonb;
+  v_total numeric(12,2) := 0;
+  v_serial text;
+  v_product_company uuid;
+  v_inventory_coa uuid;
+  v_ap_coa uuid;
+  v_reference text := nullif(trim(coalesce(p_reference, '')), '');
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'A bill needs at least one line item';
+  end if;
+
+  if v_reference is null then
+    v_reference := public.next_sequence_code(v_company_id, 'purchase', 'B');
+  end if;
+
+  select coalesce(sum((item->>'quantity')::int * (item->>'unit_cost')::numeric), 0)
+  into v_total
+  from jsonb_array_elements(p_items) as item;
+
+  insert into public.purchases (owner_id, company_id, supplier_id, reference, notes, total_amount, bill_date, due_date)
+  values (v_owner_id, v_company_id, p_supplier_id, v_reference, p_notes, v_total, coalesce(p_bill_date, current_date), p_due_date)
+  returning id into v_purchase_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    select company_id into v_product_company
+    from public.products
+    where id = (v_item->>'product_id')::uuid;
+
+    if v_product_company is null or v_product_company <> v_company_id then
+      raise exception 'Invalid product on this bill';
+    end if;
+
+    insert into public.purchase_items (owner_id, company_id, purchase_id, product_id, quantity, unit_cost, subtotal)
+    values (
+      v_owner_id,
+      v_company_id,
+      v_purchase_id,
+      (v_item->>'product_id')::uuid,
+      (v_item->>'quantity')::int,
+      (v_item->>'unit_cost')::numeric,
+      (v_item->>'quantity')::int * (v_item->>'unit_cost')::numeric
+    );
+
+    update public.products
+    set stock_quantity = stock_quantity + (v_item->>'quantity')::int,
+        cost = (v_item->>'unit_cost')::numeric
+    where id = (v_item->>'product_id')::uuid;
+
+    if (v_item ? 'serials') then
+      for v_serial in select jsonb_array_elements_text(v_item->'serials')
+      loop
+        insert into public.product_units (owner_id, company_id, product_id, purchase_id, serial_number, status)
+        values (v_owner_id, v_company_id, (v_item->>'product_id')::uuid, v_purchase_id, v_serial, 'in_stock');
+      end loop;
+    end if;
+  end loop;
+
+  if v_total > 0 then
+    v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+    v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+    perform public.post_journal_entry(
+      coalesce(p_bill_date, current_date), 'Bill ' || v_reference, 'purchases', v_purchase_id,
+      jsonb_build_array(
+        jsonb_build_object('account_id', v_inventory_coa, 'debit', v_total, 'credit', 0),
+        jsonb_build_object('account_id', v_ap_coa, 'debit', 0, 'credit', v_total)
+      )
+    );
+  end if;
+
+  return v_purchase_id;
+end;
+$$;
+
+create or replace function public.record_expense(
+  p_account_id uuid,
+  p_category text,
+  p_description text,
+  p_amount numeric,
+  p_expense_date date default current_date
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_account_company uuid;
+  v_expense_id uuid;
+  v_when timestamptz := coalesce(p_expense_date, current_date);
+  v_category text := trim(coalesce(p_category, ''));
+  v_expense_coa uuid;
+  v_cash_coa uuid;
+  v_code text;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  if v_category = '' then
+    raise exception 'Enter a category';
+  end if;
+
+  select company_id into v_account_company from public.accounts where id = p_account_id;
+  if v_account_company is null or v_account_company <> v_company_id then
+    raise exception 'Invalid account';
+  end if;
+
+  v_code := public.next_sequence_code(v_company_id, 'expense', 'EXP');
+
+  insert into public.expenses (owner_id, company_id, account_id, category, description, amount, expense_date, code)
+  values (v_owner_id, v_company_id, p_account_id, v_category, p_description, p_amount, coalesce(p_expense_date, current_date), v_code)
+  returning id into v_expense_id;
+
+  insert into public.account_transactions (owner_id, company_id, account_id, type, amount, note, expense_id, created_at)
+  values (
+    v_owner_id, v_company_id, p_account_id, 'withdrawal', p_amount,
+    v_category || coalesce(': ' || nullif(p_description, ''), ''),
+    v_expense_id, v_when
+  );
+
+  v_expense_coa := public.ensure_expense_category_account(v_category);
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  perform public.post_journal_entry(
+    coalesce(p_expense_date, current_date), v_category || coalesce(': ' || nullif(p_description, ''), ''),
+    'expenses', v_expense_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_expense_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
+
+  return v_expense_id;
+end;
+$$;
+
+create or replace function public.delete_expense(p_expense_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_expense_company uuid;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select company_id into v_expense_company from public.expenses where id = p_expense_id;
+  if v_expense_company is null or v_expense_company <> v_company_id then
+    raise exception 'Invalid expense';
+  end if;
+
+  delete from public.account_transactions where expense_id = p_expense_id and company_id = v_company_id;
+  delete from public.expenses where id = p_expense_id and company_id = v_company_id;
+  perform public.reverse_journal_entries('expenses', p_expense_id);
+end;
+$$;
+
+create or replace function public.create_sale(
+  p_customer_id uuid,
+  p_type text,
+  p_reference text,
+  p_notes text,
+  p_sale_date date,
+  p_due_date date,
+  p_deposit_account_id uuid,
+  p_items jsonb,
+  p_sales_rep_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_sale_id uuid;
+  v_item jsonb;
+  v_total numeric(12,2) := 0;
+  v_unit_id uuid;
+  v_product_id uuid;
+  v_product_company uuid;
+  v_stock integer;
+  v_tracks_serial boolean;
+  v_account_company uuid;
+  v_rep_company uuid;
+  v_product_cost numeric(12,2);
+  v_cogs numeric(12,2) := 0;
+  v_ar_coa uuid;
+  v_revenue_coa uuid;
+  v_cogs_coa uuid;
+  v_inventory_coa uuid;
+  v_cash_coa uuid;
+  v_lines jsonb;
+  v_reference text := nullif(trim(coalesce(p_reference, '')), '');
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_type not in ('invoice', 'receipt') then
+    raise exception 'Invalid sale type';
+  end if;
+
+  if p_sales_rep_id is not null then
+    select company_id into v_rep_company from public.sales_reps where id = p_sales_rep_id;
+    if v_rep_company is null or v_rep_company <> v_company_id then
+      raise exception 'Invalid sales rep';
+    end if;
+  end if;
+
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'A sale needs at least one line item';
+  end if;
+
+  if p_type = 'receipt' and p_deposit_account_id is not null then
+    select company_id into v_account_company from public.accounts where id = p_deposit_account_id;
+    if v_account_company is null or v_account_company <> v_company_id then
+      raise exception 'Invalid deposit account';
+    end if;
+  end if;
+
+  if v_reference is null then
+    v_reference := public.next_sequence_code(
+      v_company_id, p_type, case when p_type = 'invoice' then 'S' else 'R' end
+    );
+  end if;
+
+  select coalesce(sum((item->>'quantity')::int * (item->>'unit_price')::numeric), 0)
+  into v_total
+  from jsonb_array_elements(p_items) as item;
+
+  insert into public.sales (owner_id, company_id, customer_id, type, reference, notes, sale_date, due_date, deposit_account_id, total_amount, sales_rep_id)
+  values (
+    v_owner_id, v_company_id, p_customer_id, p_type, v_reference, p_notes,
+    coalesce(p_sale_date, current_date), p_due_date, p_deposit_account_id, v_total, p_sales_rep_id
+  )
+  returning id into v_sale_id;
+
+  for v_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_product_id := (v_item->>'product_id')::uuid;
+
+    select company_id, stock_quantity, tracks_serial, cost
+    into v_product_company, v_stock, v_tracks_serial, v_product_cost
+    from public.products
+    where id = v_product_id;
+
+    if v_product_company is null or v_product_company <> v_company_id then
+      raise exception 'Invalid product on this sale';
+    end if;
+
+    if v_stock < (v_item->>'quantity')::int then
+      raise exception 'Not enough stock for one of the products on this sale';
+    end if;
+
+    insert into public.sale_items (owner_id, company_id, sale_id, product_id, quantity, unit_price, subtotal, unit_cost)
+    values (
+      v_owner_id,
+      v_company_id,
+      v_sale_id,
+      v_product_id,
+      (v_item->>'quantity')::int,
+      (v_item->>'unit_price')::numeric,
+      (v_item->>'quantity')::int * (v_item->>'unit_price')::numeric,
+      v_product_cost
+    );
+
+    v_cogs := v_cogs + (v_item->>'quantity')::int * coalesce(v_product_cost, 0);
+
+    update public.products
+    set stock_quantity = stock_quantity - (v_item->>'quantity')::int
+    where id = v_product_id;
+
+    if v_tracks_serial and (v_item ? 'unit_ids') then
+      for v_unit_id in select (jsonb_array_elements_text(v_item->'unit_ids'))::uuid
+      loop
+        update public.product_units
+        set status = 'sold', sale_id = v_sale_id
+        where id = v_unit_id
+          and company_id = v_company_id
+          and product_id = v_product_id
+          and status = 'in_stock';
+
+        if not found then
+          raise exception 'One of the selected serial/IMEI units is no longer in stock';
+        end if;
+      end loop;
+    end if;
+  end loop;
+
+  if p_customer_id is not null then
+    if p_type = 'invoice' then
+      insert into public.customer_transactions (owner_id, company_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, v_company_id, p_customer_id, 'charge', v_total, 'Invoice ' || v_reference, v_sale_id, true);
+    elsif p_type = 'receipt' then
+      insert into public.customer_transactions (owner_id, company_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, v_company_id, p_customer_id, 'charge', v_total, 'Sale receipt ' || v_reference, v_sale_id, true);
+      insert into public.customer_transactions (owner_id, company_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, v_company_id, p_customer_id, 'payment', v_total, 'Paid in full at time of sale', v_sale_id, true);
+    end if;
+  end if;
+
+  if p_type = 'receipt' and p_deposit_account_id is not null then
+    insert into public.account_transactions (owner_id, company_id, account_id, type, amount, note, sale_id)
+    values (v_owner_id, v_company_id, p_deposit_account_id, 'deposit', v_total, 'Sale receipt ' || v_reference, v_sale_id);
+  end if;
+
+  if v_total > 0 then
+    v_revenue_coa := public.ensure_system_account('sales_revenue', 'Sales Revenue', 'income', 'credit');
+    v_lines := '[]'::jsonb;
+
+    if p_type = 'invoice' then
+      v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_ar_coa, 'debit', v_total, 'credit', 0)
+      );
+    else
+      if p_deposit_account_id is not null then
+        v_cash_coa := public.ensure_account_coa_row(p_deposit_account_id);
+      else
+        v_cash_coa := public.ensure_system_account('undeposited_funds', 'Undeposited Funds', 'asset', 'debit');
+      end if;
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_cash_coa, 'debit', v_total, 'credit', 0)
+      );
+    end if;
+
+    v_lines := v_lines || jsonb_build_array(
+      jsonb_build_object('account_id', v_revenue_coa, 'debit', 0, 'credit', v_total)
+    );
+
+    if v_cogs > 0 then
+      v_cogs_coa := public.ensure_system_account('cogs', 'Cost of Goods Sold', 'expense', 'debit');
+      v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_cogs_coa, 'debit', v_cogs, 'credit', 0),
+        jsonb_build_object('account_id', v_inventory_coa, 'debit', 0, 'credit', v_cogs)
+      );
+    end if;
+
+    perform public.post_journal_entry(
+      coalesce(p_sale_date, current_date),
+      (case when p_type = 'invoice' then 'Invoice ' else 'Sale receipt ' end) || v_reference,
+      'sales', v_sale_id, v_lines
+    );
+  end if;
+
+  return v_sale_id;
+end;
+$$;
+
+create or replace function public.update_sale(
+  p_sale_id uuid,
+  p_customer_id uuid,
+  p_type text,
+  p_reference text,
+  p_notes text,
+  p_sale_date date,
+  p_due_date date,
+  p_deposit_account_id uuid,
+  p_items jsonb,
+  p_sales_rep_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_old_company uuid;
+  v_old_item record;
+  v_new_item jsonb;
+  v_unit_id uuid;
+  v_product_id uuid;
+  v_product_company uuid;
+  v_stock integer;
+  v_tracks_serial boolean;
+  v_account_company uuid;
+  v_rep_company uuid;
+  v_total numeric(12,2) := 0;
+  v_product_cost numeric(12,2);
+  v_cogs numeric(12,2) := 0;
+  v_ar_coa uuid;
+  v_revenue_coa uuid;
+  v_cogs_coa uuid;
+  v_inventory_coa uuid;
+  v_cash_coa uuid;
+  v_lines jsonb;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select company_id into v_old_company from public.sales where id = p_sale_id;
+  if v_old_company is null or v_old_company <> v_company_id then
+    raise exception 'Invalid sale';
+  end if;
+
+  if p_type not in ('invoice', 'receipt') then
+    raise exception 'Invalid sale type';
+  end if;
+
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'A sale needs at least one line item';
+  end if;
+
+  if p_type = 'receipt' and p_deposit_account_id is not null then
+    select company_id into v_account_company from public.accounts where id = p_deposit_account_id;
+    if v_account_company is null or v_account_company <> v_company_id then
+      raise exception 'Invalid deposit account';
+    end if;
+  end if;
+
+  if p_sales_rep_id is not null then
+    select company_id into v_rep_company from public.sales_reps where id = p_sales_rep_id;
+    if v_rep_company is null or v_rep_company <> v_company_id then
+      raise exception 'Invalid sales rep';
+    end if;
+  end if;
+
+  -- Reverse old effects
+  for v_old_item in select product_id, quantity from public.sale_items where sale_id = p_sale_id
+  loop
+    update public.products
+    set stock_quantity = stock_quantity + v_old_item.quantity
+    where id = v_old_item.product_id;
+  end loop;
+
+  update public.product_units set status = 'in_stock', sale_id = null where sale_id = p_sale_id;
+
+  delete from public.account_transactions where sale_id = p_sale_id;
+  delete from public.customer_transactions where sale_id = p_sale_id and auto_generated = true;
+  delete from public.sale_items where sale_id = p_sale_id;
+  perform public.reverse_journal_entries('sales', p_sale_id);
+
+  select coalesce(sum((item->>'quantity')::int * (item->>'unit_price')::numeric), 0)
+  into v_total
+  from jsonb_array_elements(p_items) as item;
+
+  update public.sales
+  set customer_id = p_customer_id,
+      type = p_type,
+      reference = p_reference,
+      notes = p_notes,
+      sale_date = coalesce(p_sale_date, sale_date),
+      due_date = p_due_date,
+      deposit_account_id = p_deposit_account_id,
+      total_amount = v_total,
+      sales_rep_id = p_sales_rep_id
+  where id = p_sale_id;
+
+  -- Reapply new effects
+  for v_new_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_product_id := (v_new_item->>'product_id')::uuid;
+
+    select company_id, stock_quantity, tracks_serial, cost
+    into v_product_company, v_stock, v_tracks_serial, v_product_cost
+    from public.products
+    where id = v_product_id;
+
+    if v_product_company is null or v_product_company <> v_company_id then
+      raise exception 'Invalid product on this sale';
+    end if;
+
+    if v_stock < (v_new_item->>'quantity')::int then
+      raise exception 'Not enough stock for one of the products on this sale';
+    end if;
+
+    insert into public.sale_items (owner_id, company_id, sale_id, product_id, quantity, unit_price, subtotal, unit_cost)
+    values (
+      v_owner_id, v_company_id, p_sale_id, v_product_id,
+      (v_new_item->>'quantity')::int,
+      (v_new_item->>'unit_price')::numeric,
+      (v_new_item->>'quantity')::int * (v_new_item->>'unit_price')::numeric,
+      v_product_cost
+    );
+
+    v_cogs := v_cogs + (v_new_item->>'quantity')::int * coalesce(v_product_cost, 0);
+
+    update public.products
+    set stock_quantity = stock_quantity - (v_new_item->>'quantity')::int
+    where id = v_product_id;
+
+    if v_tracks_serial and (v_new_item ? 'unit_ids') then
+      for v_unit_id in select (jsonb_array_elements_text(v_new_item->'unit_ids'))::uuid
+      loop
+        update public.product_units
+        set status = 'sold', sale_id = p_sale_id
+        where id = v_unit_id
+          and company_id = v_company_id
+          and product_id = v_product_id
+          and status = 'in_stock';
+
+        if not found then
+          raise exception 'One of the selected serial/IMEI units is no longer in stock';
+        end if;
+      end loop;
+    end if;
+  end loop;
+
+  if p_customer_id is not null then
+    if p_type = 'invoice' then
+      insert into public.customer_transactions (owner_id, company_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, v_company_id, p_customer_id, 'charge', v_total, coalesce('Invoice ' || p_reference, 'Invoice'), p_sale_id, true);
+    elsif p_type = 'receipt' then
+      insert into public.customer_transactions (owner_id, company_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, v_company_id, p_customer_id, 'charge', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), p_sale_id, true);
+      insert into public.customer_transactions (owner_id, company_id, customer_id, type, amount, note, sale_id, auto_generated)
+      values (v_owner_id, v_company_id, p_customer_id, 'payment', v_total, 'Paid in full at time of sale', p_sale_id, true);
+    end if;
+  end if;
+
+  if p_type = 'receipt' and p_deposit_account_id is not null then
+    insert into public.account_transactions (owner_id, company_id, account_id, type, amount, note, sale_id)
+    values (v_owner_id, v_company_id, p_deposit_account_id, 'deposit', v_total, coalesce('Sale receipt ' || p_reference, 'Sale receipt'), p_sale_id);
+  end if;
+
+  if v_total > 0 then
+    v_revenue_coa := public.ensure_system_account('sales_revenue', 'Sales Revenue', 'income', 'credit');
+    v_lines := '[]'::jsonb;
+
+    if p_type = 'invoice' then
+      v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_ar_coa, 'debit', v_total, 'credit', 0)
+      );
+    else
+      if p_deposit_account_id is not null then
+        v_cash_coa := public.ensure_account_coa_row(p_deposit_account_id);
+      else
+        v_cash_coa := public.ensure_system_account('undeposited_funds', 'Undeposited Funds', 'asset', 'debit');
+      end if;
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_cash_coa, 'debit', v_total, 'credit', 0)
+      );
+    end if;
+
+    v_lines := v_lines || jsonb_build_array(
+      jsonb_build_object('account_id', v_revenue_coa, 'debit', 0, 'credit', v_total)
+    );
+
+    if v_cogs > 0 then
+      v_cogs_coa := public.ensure_system_account('cogs', 'Cost of Goods Sold', 'expense', 'debit');
+      v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_cogs_coa, 'debit', v_cogs, 'credit', 0),
+        jsonb_build_object('account_id', v_inventory_coa, 'debit', 0, 'credit', v_cogs)
+      );
+    end if;
+
+    perform public.post_journal_entry(
+      coalesce(p_sale_date, current_date),
+      case when p_type = 'invoice'
+        then coalesce('Invoice ' || p_reference, 'Invoice')
+        else coalesce('Sale receipt ' || p_reference, 'Sale receipt')
+      end,
+      'sales', p_sale_id, v_lines
+    );
+  end if;
+
+  return p_sale_id;
+end;
+$$;
+
+create or replace function public.delete_sale(p_sale_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_old_company uuid;
+  v_old_item record;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select company_id into v_old_company from public.sales where id = p_sale_id;
+  if v_old_company is null or v_old_company <> v_company_id then
+    raise exception 'Invalid sale';
+  end if;
+
+  for v_old_item in select product_id, quantity from public.sale_items where sale_id = p_sale_id
+  loop
+    update public.products
+    set stock_quantity = stock_quantity + v_old_item.quantity
+    where id = v_old_item.product_id;
+  end loop;
+
+  update public.product_units set status = 'in_stock', sale_id = null where sale_id = p_sale_id;
+
+  delete from public.account_transactions where sale_id = p_sale_id;
+  delete from public.customer_transactions where sale_id = p_sale_id and auto_generated = true;
+  delete from public.sale_items where sale_id = p_sale_id;
+  delete from public.sales where id = p_sale_id;
+  perform public.reverse_journal_entries('sales', p_sale_id);
+end;
+$$;
+
+create or replace function public.update_purchase(
+  p_purchase_id uuid,
+  p_supplier_id uuid,
+  p_reference text,
+  p_notes text,
+  p_bill_date date,
+  p_due_date date,
+  p_items jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_old_company uuid;
+  v_old_item record;
+  v_new_item jsonb;
+  v_serial text;
+  v_product_id uuid;
+  v_product_company uuid;
+  v_total numeric(12,2) := 0;
+  v_current_stock integer;
+  v_product_name text;
+  v_inventory_coa uuid;
+  v_ap_coa uuid;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select company_id into v_old_company from public.purchases where id = p_purchase_id;
+  if v_old_company is null or v_old_company <> v_company_id then
+    raise exception 'Invalid purchase';
+  end if;
+
+  if p_items is null or jsonb_array_length(p_items) = 0 then
+    raise exception 'A bill needs at least one line item';
+  end if;
+
+  if exists (select 1 from public.product_units where purchase_id = p_purchase_id and status <> 'in_stock') then
+    raise exception 'Cannot edit this bill: one or more of its serial/IMEI units have already been sold';
+  end if;
+
+  for v_old_item in select product_id, quantity from public.purchase_items where purchase_id = p_purchase_id
+  loop
+    select stock_quantity, name into v_current_stock, v_product_name
+    from public.products where id = v_old_item.product_id;
+
+    if v_current_stock < v_old_item.quantity then
+      raise exception 'Cannot edit this bill: % has less stock remaining than this bill added — some has already been sold or removed', v_product_name;
+    end if;
+  end loop;
+
+  -- Reverse old effects
+  for v_old_item in select product_id, quantity from public.purchase_items where purchase_id = p_purchase_id
+  loop
+    update public.products
+    set stock_quantity = stock_quantity - v_old_item.quantity
+    where id = v_old_item.product_id;
+  end loop;
+
+  delete from public.product_units where purchase_id = p_purchase_id;
+  delete from public.purchase_items where purchase_id = p_purchase_id;
+  perform public.reverse_journal_entries('purchases', p_purchase_id);
+
+  select coalesce(sum((item->>'quantity')::int * (item->>'unit_cost')::numeric), 0)
+  into v_total
+  from jsonb_array_elements(p_items) as item;
+
+  update public.purchases
+  set supplier_id = p_supplier_id,
+      reference = p_reference,
+      notes = p_notes,
+      bill_date = coalesce(p_bill_date, bill_date),
+      due_date = p_due_date,
+      total_amount = v_total
+  where id = p_purchase_id;
+
+  for v_new_item in select * from jsonb_array_elements(p_items)
+  loop
+    v_product_id := (v_new_item->>'product_id')::uuid;
+
+    select company_id into v_product_company from public.products where id = v_product_id;
+    if v_product_company is null or v_product_company <> v_company_id then
+      raise exception 'Invalid product on this bill';
+    end if;
+
+    insert into public.purchase_items (owner_id, company_id, purchase_id, product_id, quantity, unit_cost, subtotal)
+    values (
+      v_owner_id, v_company_id, p_purchase_id, v_product_id,
+      (v_new_item->>'quantity')::int,
+      (v_new_item->>'unit_cost')::numeric,
+      (v_new_item->>'quantity')::int * (v_new_item->>'unit_cost')::numeric
+    );
+
+    update public.products
+    set stock_quantity = stock_quantity + (v_new_item->>'quantity')::int,
+        cost = (v_new_item->>'unit_cost')::numeric
+    where id = v_product_id;
+
+    if (v_new_item ? 'serials') then
+      for v_serial in select jsonb_array_elements_text(v_new_item->'serials')
+      loop
+        insert into public.product_units (owner_id, company_id, product_id, purchase_id, serial_number, status)
+        values (v_owner_id, v_company_id, v_product_id, p_purchase_id, v_serial, 'in_stock');
+      end loop;
+    end if;
+  end loop;
+
+  if v_total > 0 then
+    v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+    v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+    perform public.post_journal_entry(
+      coalesce(p_bill_date, current_date), coalesce('Bill ' || p_reference, 'Bill'), 'purchases', p_purchase_id,
+      jsonb_build_array(
+        jsonb_build_object('account_id', v_inventory_coa, 'debit', v_total, 'credit', 0),
+        jsonb_build_object('account_id', v_ap_coa, 'debit', 0, 'credit', v_total)
+      )
+    );
+  end if;
+
+  return p_purchase_id;
+end;
+$$;
+
+create or replace function public.delete_purchase(p_purchase_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_old_company uuid;
+  v_old_item record;
+  v_current_stock integer;
+  v_product_name text;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select company_id into v_old_company from public.purchases where id = p_purchase_id;
+  if v_old_company is null or v_old_company <> v_company_id then
+    raise exception 'Invalid purchase';
+  end if;
+
+  if exists (select 1 from public.product_units where purchase_id = p_purchase_id and status <> 'in_stock') then
+    raise exception 'Cannot delete this bill: one or more of its serial/IMEI units have already been sold';
+  end if;
+
+  for v_old_item in select product_id, quantity from public.purchase_items where purchase_id = p_purchase_id
+  loop
+    select stock_quantity, name into v_current_stock, v_product_name
+    from public.products where id = v_old_item.product_id;
+
+    if v_current_stock < v_old_item.quantity then
+      raise exception 'Cannot delete this bill: % has less stock remaining than this bill added — some has already been sold or removed', v_product_name;
+    end if;
+  end loop;
+
+  for v_old_item in select product_id, quantity from public.purchase_items where purchase_id = p_purchase_id
+  loop
+    update public.products
+    set stock_quantity = stock_quantity - v_old_item.quantity
+    where id = v_old_item.product_id;
+  end loop;
+
+  delete from public.product_units where purchase_id = p_purchase_id;
+  delete from public.purchase_items where purchase_id = p_purchase_id;
+  delete from public.purchases where id = p_purchase_id;
+  perform public.reverse_journal_entries('purchases', p_purchase_id);
+end;
+$$;
+
+create or replace function public.receive_payment(
+  p_customer_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date default current_date,
+  p_sale_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_customer_company uuid;
+  v_account_company uuid;
+  v_transaction_id uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ar_coa uuid;
+  v_code text;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select company_id into v_customer_company from public.customers where id = p_customer_id;
+  if v_customer_company is null or v_customer_company <> v_company_id then
+    raise exception 'Invalid customer';
+  end if;
+
+  select company_id into v_account_company from public.accounts where id = p_account_id;
+  if v_account_company is null or v_account_company <> v_company_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_sale_id is not null then
+    if not exists (
+      select 1 from public.sales where id = p_sale_id and company_id = v_company_id and customer_id = p_customer_id
+    ) then
+      raise exception 'Invalid invoice for this customer';
+    end if;
+  end if;
+
+  v_code := public.next_sequence_code(v_company_id, 'customer_payment', 'RCPT');
+
+  insert into public.customer_transactions (owner_id, company_id, customer_id, type, amount, note, sale_id, created_at, code)
+  values (v_owner_id, v_company_id, p_customer_id, 'payment', p_amount, coalesce(p_note, 'Payment received'), p_sale_id, v_when, v_code)
+  returning id into v_transaction_id;
+
+  insert into public.account_transactions (owner_id, company_id, account_id, type, amount, note, customer_transaction_id, created_at)
+  values (v_owner_id, v_company_id, p_account_id, 'deposit', p_amount, coalesce(p_note, 'Payment received'), v_transaction_id, v_when);
+
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+  perform public.post_journal_entry(
+    coalesce(p_payment_date, current_date), coalesce(p_note, 'Payment received'), 'customer_transactions', v_transaction_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_cash_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_ar_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
+
+  return v_transaction_id;
+end;
+$$;
+
+create or replace function public.update_customer_payment(
+  p_payment_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date,
+  p_sale_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_payment_company uuid;
+  v_payment_type text;
+  v_customer_id uuid;
+  v_account_company uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ar_coa uuid;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select company_id, type, customer_id into v_payment_company, v_payment_type, v_customer_id
+  from public.customer_transactions where id = p_payment_id;
+
+  if v_payment_company is null or v_payment_company <> v_company_id then
+    raise exception 'Invalid payment';
+  end if;
+  if v_payment_type <> 'payment' then
+    raise exception 'Only payments can be edited here';
+  end if;
+
+  select company_id into v_account_company from public.accounts where id = p_account_id;
+  if v_account_company is null or v_account_company <> v_company_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_sale_id is not null then
+    if not exists (
+      select 1 from public.sales where id = p_sale_id and company_id = v_company_id and customer_id = v_customer_id
+    ) then
+      raise exception 'Invalid invoice for this customer';
+    end if;
+  end if;
+
+  update public.customer_transactions
+  set amount = p_amount, note = p_note, created_at = v_when, sale_id = p_sale_id
+  where id = p_payment_id;
+
+  update public.account_transactions
+  set account_id = p_account_id, amount = p_amount, note = p_note, created_at = v_when
+  where customer_transaction_id = p_payment_id;
+
+  perform public.reverse_journal_entries('customer_transactions', p_payment_id);
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+  perform public.post_journal_entry(
+    coalesce(p_payment_date, current_date), coalesce(p_note, 'Payment received'), 'customer_transactions', p_payment_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_cash_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_ar_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
+end;
+$$;
+
+create or replace function public.delete_customer_payment(p_payment_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_payment_company uuid;
+  v_payment_type text;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select company_id, type into v_payment_company, v_payment_type
+  from public.customer_transactions where id = p_payment_id;
+
+  if v_payment_company is null or v_payment_company <> v_company_id then
+    raise exception 'Invalid payment';
+  end if;
+  if v_payment_type <> 'payment' then
+    raise exception 'Only payments can be deleted here';
+  end if;
+
+  delete from public.account_transactions where customer_transaction_id = p_payment_id;
+  delete from public.customer_transactions where id = p_payment_id;
+  perform public.reverse_journal_entries('customer_transactions', p_payment_id);
+end;
+$$;
+
+create or replace function public.pay_bill(
+  p_supplier_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date default current_date,
+  p_purchase_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_supplier_company uuid;
+  v_account_company uuid;
+  v_payment_id uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ap_coa uuid;
+  v_code text;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select company_id into v_supplier_company from public.suppliers where id = p_supplier_id;
+  if v_supplier_company is null or v_supplier_company <> v_company_id then
+    raise exception 'Invalid supplier';
+  end if;
+
+  select company_id into v_account_company from public.accounts where id = p_account_id;
+  if v_account_company is null or v_account_company <> v_company_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_purchase_id is not null then
+    if not exists (
+      select 1 from public.purchases where id = p_purchase_id and company_id = v_company_id and supplier_id = p_supplier_id
+    ) then
+      raise exception 'Invalid bill for this supplier';
+    end if;
+  end if;
+
+  v_code := public.next_sequence_code(v_company_id, 'supplier_payment', 'PAY');
+
+  insert into public.supplier_payments (owner_id, company_id, supplier_id, amount, note, purchase_id, created_at, code)
+  values (v_owner_id, v_company_id, p_supplier_id, p_amount, coalesce(p_note, 'Bill payment'), p_purchase_id, v_when, v_code)
+  returning id into v_payment_id;
+
+  insert into public.account_transactions (owner_id, company_id, account_id, type, amount, note, supplier_payment_id, created_at)
+  values (v_owner_id, v_company_id, p_account_id, 'withdrawal', p_amount, coalesce(p_note, 'Bill payment'), v_payment_id, v_when);
+
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+  perform public.post_journal_entry(
+    coalesce(p_payment_date, current_date), coalesce(p_note, 'Bill payment'), 'supplier_payments', v_payment_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_ap_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
+
+  return v_payment_id;
+end;
+$$;
+
+create or replace function public.update_supplier_payment(
+  p_payment_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date,
+  p_purchase_id uuid default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_payment_company uuid;
+  v_supplier_id uuid;
+  v_account_company uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ap_coa uuid;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select company_id, supplier_id into v_payment_company, v_supplier_id
+  from public.supplier_payments where id = p_payment_id;
+
+  if v_payment_company is null or v_payment_company <> v_company_id then
+    raise exception 'Invalid payment';
+  end if;
+
+  select company_id into v_account_company from public.accounts where id = p_account_id;
+  if v_account_company is null or v_account_company <> v_company_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_purchase_id is not null then
+    if not exists (
+      select 1 from public.purchases where id = p_purchase_id and company_id = v_company_id and supplier_id = v_supplier_id
+    ) then
+      raise exception 'Invalid bill for this supplier';
+    end if;
+  end if;
+
+  update public.supplier_payments
+  set amount = p_amount, note = p_note, created_at = v_when, purchase_id = p_purchase_id
+  where id = p_payment_id;
+
+  update public.account_transactions
+  set account_id = p_account_id, amount = p_amount, note = p_note, created_at = v_when
+  where supplier_payment_id = p_payment_id;
+
+  perform public.reverse_journal_entries('supplier_payments', p_payment_id);
+  v_cash_coa := public.ensure_account_coa_row(p_account_id);
+  v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+  perform public.post_journal_entry(
+    coalesce(p_payment_date, current_date), coalesce(p_note, 'Bill payment'), 'supplier_payments', p_payment_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_ap_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
+end;
+$$;
+
+create or replace function public.delete_supplier_payment(p_payment_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_payment_company uuid;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select company_id into v_payment_company from public.supplier_payments where id = p_payment_id;
+  if v_payment_company is null or v_payment_company <> v_company_id then
+    raise exception 'Invalid payment';
+  end if;
+
+  delete from public.account_transactions where supplier_payment_id = p_payment_id;
+  delete from public.supplier_payments where id = p_payment_id;
+  perform public.reverse_journal_entries('supplier_payments', p_payment_id);
+end;
+$$;
+
+create or replace function public.ensure_system_account(
+  p_system_key text,
+  p_name text,
+  p_type text,
+  p_normal_balance text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_id uuid;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select id into v_id from public.chart_of_accounts
+  where company_id = v_company_id and system_key = p_system_key;
+
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  insert into public.chart_of_accounts (owner_id, company_id, name, type, normal_balance, system_key)
+  values (v_owner_id, v_company_id, p_name, p_type, p_normal_balance, p_system_key)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+create or replace function public.ensure_account_coa_row(p_account_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_id uuid;
+  v_name text;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select id into v_id from public.chart_of_accounts
+  where company_id = v_company_id and account_id = p_account_id;
+
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  select name into v_name from public.accounts where id = p_account_id and company_id = v_company_id;
+  if v_name is null then
+    raise exception 'Invalid account';
+  end if;
+
+  insert into public.chart_of_accounts (owner_id, company_id, name, type, normal_balance, account_id)
+  values (v_owner_id, v_company_id, v_name, 'asset', 'debit', p_account_id)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+create or replace function public.ensure_expense_category_account(p_category text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_id uuid;
+  v_category text := trim(coalesce(p_category, ''));
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+  if v_category = '' then
+    raise exception 'Category required';
+  end if;
+
+  select id into v_id from public.chart_of_accounts
+  where company_id = v_company_id and category = v_category;
+
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  insert into public.chart_of_accounts (owner_id, company_id, name, type, normal_balance, category)
+  values (v_owner_id, v_company_id, v_category, 'expense', 'debit', v_category)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+create or replace function public.post_journal_entry(
+  p_entry_date date,
+  p_memo text,
+  p_source_table text,
+  p_source_id uuid,
+  p_lines jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_entry_id uuid;
+  v_line jsonb;
+  v_total_debit numeric(12,2) := 0;
+  v_total_credit numeric(12,2) := 0;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_lines is null or jsonb_array_length(p_lines) < 2 then
+    raise exception 'A journal entry needs at least two lines';
+  end if;
+
+  select
+    coalesce(sum((line->>'debit')::numeric), 0),
+    coalesce(sum((line->>'credit')::numeric), 0)
+  into v_total_debit, v_total_credit
+  from jsonb_array_elements(p_lines) as line;
+
+  if round(v_total_debit, 2) <> round(v_total_credit, 2) then
+    raise exception 'Journal entry is not balanced: debits % vs credits %', v_total_debit, v_total_credit;
+  end if;
+
+  insert into public.journal_entries (owner_id, company_id, entry_date, memo, source_table, source_id)
+  values (v_owner_id, v_company_id, coalesce(p_entry_date, current_date), p_memo, p_source_table, p_source_id)
+  returning id into v_entry_id;
+
+  for v_line in select * from jsonb_array_elements(p_lines)
+  loop
+    insert into public.journal_entry_lines (owner_id, company_id, entry_id, account_id, debit, credit)
+    values (
+      v_owner_id, v_company_id, v_entry_id, (v_line->>'account_id')::uuid,
+      coalesce((v_line->>'debit')::numeric, 0), coalesce((v_line->>'credit')::numeric, 0)
+    );
+  end loop;
+
+  return v_entry_id;
+end;
+$$;
+
+create or replace function public.reverse_journal_entries(p_source_table text, p_source_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  delete from public.journal_entries
+  where company_id = v_company_id and source_table = p_source_table and source_id = p_source_id;
+end;
+$$;
+
+-- Trigger functions: post_account_opening_balance/post_product_opening_stock
+-- never referenced owner_id at all (they call ensure_*, which now resolve
+-- company internally) — no change needed there. Only the cleanup_* pair
+-- (which explicitly filtered by old.owner_id) needs to switch to
+-- old.company_id, now that the column exists on both accounts and products.
+
+create or replace function public.cleanup_account_journal_entries()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.journal_entries where company_id = old.company_id and source_table = 'accounts' and source_id = old.id;
+  return old;
+end;
+$$;
+
+create or replace function public.cleanup_product_journal_entries()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  delete from public.journal_entries where company_id = old.company_id and source_table = 'products' and source_id = old.id;
+  return old;
+end;
+$$;
+
+create or replace function public.delete_account(p_account_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_company uuid;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  select company_id into v_company from public.accounts where id = p_account_id;
+  if v_company is null or v_company <> v_company_id then
+    raise exception 'Invalid account';
+  end if;
+
+  begin
+    delete from public.accounts where id = p_account_id;
+  exception
+    when foreign_key_violation then
+      raise exception 'Cannot delete this account: it has real transaction history posted to the ledger. Remove those transactions first.';
+  end;
+end;
+$$;
+
+-- backfill_journal_entries / backfill_record_codes are one-time (but safely
+-- re-runnable) migration helpers a user could still choose to run again —
+-- re-scoped from owner_id to company_id for consistency with everything
+-- else, even though they're not part of the app's normal request flow.
+
+create or replace function public.backfill_journal_entries()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_acc record;
+  v_prod record;
+  v_purch record;
+  v_sale record;
+  v_item record;
+  v_pay record;
+  v_exp record;
+  v_cash_coa uuid;
+  v_equity_coa uuid;
+  v_inventory_coa uuid;
+  v_ap_coa uuid;
+  v_ar_coa uuid;
+  v_revenue_coa uuid;
+  v_cogs_coa uuid;
+  v_expense_coa uuid;
+  v_value numeric(12,2);
+  v_cogs numeric(12,2);
+  v_lines jsonb;
+  v_account_id uuid;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  -- 1. Account opening balances
+  for v_acc in select * from public.accounts where company_id = v_company_id
+  loop
+    if v_acc.opening_balance is not null and v_acc.opening_balance <> 0
+       and not exists (
+         select 1 from public.journal_entries
+         where company_id = v_company_id and source_table = 'accounts' and source_id = v_acc.id
+       )
+    then
+      v_cash_coa := public.ensure_account_coa_row(v_acc.id);
+      v_equity_coa := public.ensure_system_account(
+        'opening_balance_equity', 'Opening Balance Equity', 'equity', 'credit'
+      );
+      v_value := abs(v_acc.opening_balance);
+      if v_acc.opening_balance > 0 then
+        perform public.post_journal_entry(
+          v_acc.created_at::date, 'Opening balance: ' || v_acc.name, 'accounts', v_acc.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_cash_coa, 'debit', v_value, 'credit', 0),
+            jsonb_build_object('account_id', v_equity_coa, 'debit', 0, 'credit', v_value)
+          )
+        );
+      else
+        perform public.post_journal_entry(
+          v_acc.created_at::date, 'Opening balance: ' || v_acc.name, 'accounts', v_acc.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_equity_coa, 'debit', v_value, 'credit', 0),
+            jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', v_value)
+          )
+        );
+      end if;
+    end if;
+  end loop;
+
+  -- 2. Derived product opening stock
+  for v_prod in
+    select p.id, p.name, p.created_at, p.cost,
+      p.stock_quantity
+        - coalesce((select sum(quantity) from public.purchase_items where product_id = p.id), 0)
+        + coalesce((select sum(quantity) from public.sale_items where product_id = p.id), 0)
+      as opening_qty
+    from public.products p
+    where p.company_id = v_company_id
+  loop
+    if v_prod.opening_qty > 0
+       and not exists (
+         select 1 from public.journal_entries
+         where company_id = v_company_id and source_table = 'products' and source_id = v_prod.id
+       )
+    then
+      v_value := v_prod.opening_qty * coalesce(v_prod.cost, 0);
+      if v_value > 0 then
+        v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+        v_equity_coa := public.ensure_system_account(
+          'opening_balance_equity', 'Opening Balance Equity', 'equity', 'credit'
+        );
+        perform public.post_journal_entry(
+          v_prod.created_at::date, 'Opening stock: ' || v_prod.name, 'products', v_prod.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_inventory_coa, 'debit', v_value, 'credit', 0),
+            jsonb_build_object('account_id', v_equity_coa, 'debit', 0, 'credit', v_value)
+          )
+        );
+      end if;
+    end if;
+  end loop;
+
+  -- 3. Purchases
+  for v_purch in select * from public.purchases where company_id = v_company_id
+  loop
+    if v_purch.total_amount > 0
+       and not exists (
+         select 1 from public.journal_entries
+         where company_id = v_company_id and source_table = 'purchases' and source_id = v_purch.id
+       )
+    then
+      v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+      v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+      perform public.post_journal_entry(
+        v_purch.bill_date, coalesce('Bill ' || v_purch.reference, 'Bill'), 'purchases', v_purch.id,
+        jsonb_build_array(
+          jsonb_build_object('account_id', v_inventory_coa, 'debit', v_purch.total_amount, 'credit', 0),
+          jsonb_build_object('account_id', v_ap_coa, 'debit', 0, 'credit', v_purch.total_amount)
+        )
+      );
+    end if;
+  end loop;
+
+  -- 4. Sales
+  for v_sale in select * from public.sales where company_id = v_company_id
+  loop
+    if v_sale.total_amount > 0
+       and not exists (
+         select 1 from public.journal_entries
+         where company_id = v_company_id and source_table = 'sales' and source_id = v_sale.id
+       )
+    then
+      v_cogs := 0;
+      for v_item in
+        select si.quantity, coalesce(si.unit_cost, p.cost, 0) as cost
+        from public.sale_items si
+        join public.products p on p.id = si.product_id
+        where si.sale_id = v_sale.id
+      loop
+        v_cogs := v_cogs + v_item.quantity * v_item.cost;
+      end loop;
+
+      v_revenue_coa := public.ensure_system_account('sales_revenue', 'Sales Revenue', 'income', 'credit');
+      v_lines := '[]'::jsonb;
+
+      if v_sale.type = 'invoice' then
+        v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+        v_lines := v_lines || jsonb_build_array(
+          jsonb_build_object('account_id', v_ar_coa, 'debit', v_sale.total_amount, 'credit', 0)
+        );
+      else
+        if v_sale.deposit_account_id is not null then
+          v_cash_coa := public.ensure_account_coa_row(v_sale.deposit_account_id);
+        else
+          v_cash_coa := public.ensure_system_account('undeposited_funds', 'Undeposited Funds', 'asset', 'debit');
+        end if;
+        v_lines := v_lines || jsonb_build_array(
+          jsonb_build_object('account_id', v_cash_coa, 'debit', v_sale.total_amount, 'credit', 0)
+        );
+      end if;
+
+      v_lines := v_lines || jsonb_build_array(
+        jsonb_build_object('account_id', v_revenue_coa, 'debit', 0, 'credit', v_sale.total_amount)
+      );
+
+      if v_cogs > 0 then
+        v_cogs_coa := public.ensure_system_account('cogs', 'Cost of Goods Sold', 'expense', 'debit');
+        v_inventory_coa := public.ensure_system_account('inventory', 'Inventory', 'asset', 'debit');
+        v_lines := v_lines || jsonb_build_array(
+          jsonb_build_object('account_id', v_cogs_coa, 'debit', v_cogs, 'credit', 0),
+          jsonb_build_object('account_id', v_inventory_coa, 'debit', 0, 'credit', v_cogs)
+        );
+      end if;
+
+      perform public.post_journal_entry(
+        v_sale.sale_date,
+        case when v_sale.type = 'invoice'
+          then coalesce('Invoice ' || v_sale.reference, 'Invoice')
+          else coalesce('Sale receipt ' || v_sale.reference, 'Sale receipt')
+        end,
+        'sales', v_sale.id, v_lines
+      );
+    end if;
+  end loop;
+
+  -- 5. Customer payments
+  for v_pay in select * from public.customer_transactions where company_id = v_company_id and type = 'payment'
+  loop
+    if not exists (
+      select 1 from public.journal_entries
+      where company_id = v_company_id and source_table = 'customer_transactions' and source_id = v_pay.id
+    ) then
+      select account_id into v_account_id from public.account_transactions
+      where customer_transaction_id = v_pay.id limit 1;
+
+      if v_account_id is not null then
+        v_cash_coa := public.ensure_account_coa_row(v_account_id);
+        v_ar_coa := public.ensure_system_account('accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+        perform public.post_journal_entry(
+          v_pay.created_at::date, coalesce(v_pay.note, 'Payment received'), 'customer_transactions', v_pay.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_cash_coa, 'debit', v_pay.amount, 'credit', 0),
+            jsonb_build_object('account_id', v_ar_coa, 'debit', 0, 'credit', v_pay.amount)
+          )
+        );
+      end if;
+    end if;
+  end loop;
+
+  -- 6. Supplier payments
+  for v_pay in select * from public.supplier_payments where company_id = v_company_id
+  loop
+    if not exists (
+      select 1 from public.journal_entries
+      where company_id = v_company_id and source_table = 'supplier_payments' and source_id = v_pay.id
+    ) then
+      select account_id into v_account_id from public.account_transactions
+      where supplier_payment_id = v_pay.id limit 1;
+
+      if v_account_id is not null then
+        v_cash_coa := public.ensure_account_coa_row(v_account_id);
+        v_ap_coa := public.ensure_system_account('accounts_payable', 'Accounts Payable', 'liability', 'credit');
+        perform public.post_journal_entry(
+          v_pay.created_at::date, coalesce(v_pay.note, 'Bill payment'), 'supplier_payments', v_pay.id,
+          jsonb_build_array(
+            jsonb_build_object('account_id', v_ap_coa, 'debit', v_pay.amount, 'credit', 0),
+            jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', v_pay.amount)
+          )
+        );
+      end if;
+    end if;
+  end loop;
+
+  -- 7. Expenses
+  for v_exp in select * from public.expenses where company_id = v_company_id
+  loop
+    if v_exp.account_id is not null
+       and not exists (
+         select 1 from public.journal_entries
+         where company_id = v_company_id and source_table = 'expenses' and source_id = v_exp.id
+       )
+    then
+      v_expense_coa := public.ensure_expense_category_account(v_exp.category);
+      v_cash_coa := public.ensure_account_coa_row(v_exp.account_id);
+      perform public.post_journal_entry(
+        v_exp.expense_date, v_exp.category || coalesce(': ' || nullif(v_exp.description, ''), ''),
+        'expenses', v_exp.id,
+        jsonb_build_array(
+          jsonb_build_object('account_id', v_expense_coa, 'debit', v_exp.amount, 'credit', 0),
+          jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', v_exp.amount)
+        )
+      );
+    end if;
+  end loop;
+end;
+$$;
+
+create or replace function public.backfill_record_codes()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_row record;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  for v_row in
+    select id from public.customers
+    where company_id = v_company_id and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.customers set code = public.next_sequence_code(v_company_id, 'customer', 'C')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.products
+    where company_id = v_company_id and (sku is null or trim(sku) = '')
+    order by created_at asc
+  loop
+    update public.products set sku = public.next_sequence_code(v_company_id, 'product', 'P')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.purchases
+    where company_id = v_company_id and (reference is null or trim(reference) = '')
+    order by created_at asc
+  loop
+    update public.purchases set reference = public.next_sequence_code(v_company_id, 'purchase', 'B')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id, type from public.sales
+    where company_id = v_company_id and (reference is null or trim(reference) = '')
+    order by created_at asc
+  loop
+    update public.sales
+    set reference = public.next_sequence_code(
+      v_company_id, v_row.type, case when v_row.type = 'invoice' then 'S' else 'R' end
+    )
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.customer_transactions
+    where company_id = v_company_id and type = 'payment' and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.customer_transactions set code = public.next_sequence_code(v_company_id, 'customer_payment', 'RCPT')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.supplier_payments
+    where company_id = v_company_id and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.supplier_payments set code = public.next_sequence_code(v_company_id, 'supplier_payment', 'PAY')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.accounts
+    where company_id = v_company_id and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.accounts set code = public.next_sequence_code(v_company_id, 'account', 'ACC')
+    where id = v_row.id;
+  end loop;
+
+  for v_row in
+    select id from public.expenses
+    where company_id = v_company_id and (code is null or trim(code) = '')
+    order by created_at asc
+  loop
+    update public.expenses set code = public.next_sequence_code(v_company_id, 'expense', 'EXP')
+    where id = v_row.id;
+  end loop;
+end;
+$$;
+
+-- Auto-code assignment triggers (customers/sales_reps/products/accounts) —
+-- switch from new.owner_id to new.company_id as the counter key.
+
+create or replace function public.assign_customer_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.code is null or trim(new.code) = '' then
+    new.code := public.next_sequence_code(new.company_id, 'customer', 'C');
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.assign_sales_rep_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.code is null or trim(new.code) = '' then
+    new.code := public.next_sequence_code(new.company_id, 'sales_rep', 'REP');
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.assign_product_sku()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.sku is null or trim(new.sku) = '' then
+    new.sku := public.next_sequence_code(new.company_id, 'product', 'P');
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.assign_account_code()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.code is null or trim(new.code) = '' then
+    new.code := public.next_sequence_code(new.company_id, 'account', 'ACC');
+  end if;
+  return new;
+end;
+$$;

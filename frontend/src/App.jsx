@@ -38,8 +38,11 @@ import SerialTracking from './pages/dashboard/SerialTracking'
 import Backup from './pages/dashboard/Backup'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
+import AdminRoute from './components/auth/AdminRoute'
 import DashboardLayout from './layouts/DashboardLayout'
 import UtilityWidgets from './components/widgets/UtilityWidgets'
+import AdminLogin from './pages/admin/AdminLogin'
+import AdminDashboard from './pages/admin/AdminDashboard'
 import { useAuth } from './context/AuthContext'
 
 function App() {
@@ -51,6 +54,15 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/about" element={<About />} />
         <Route path="/login" element={<Login />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route
+          path="/admin"
+          element={
+            <AdminRoute>
+              <AdminDashboard />
+            </AdminRoute>
+          }
+        />
 
         <Route
           path="/dashboard/purchases/new"
