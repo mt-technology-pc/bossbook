@@ -8,11 +8,13 @@ import QRCode from 'qrcode'
 // Both return { dataUrl, width, height } (pixel dimensions of the source
 // canvas) so the PDF layout can preserve aspect ratio instead of
 // stretching/squashing the image to fit a fixed box.
-export function barcodeImage(text) {
+export function barcodeImage(text, options = {}) {
+  const { format = 'CODE128', displayValue = false, fontSize = 20 } = options
   const canvas = document.createElement('canvas')
   JsBarcode(canvas, text, {
-    format: 'CODE128',
-    displayValue: false,
+    format,
+    displayValue,
+    fontSize,
     margin: 0,
     height: 80,
   })

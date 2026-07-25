@@ -1,12 +1,16 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  ArrowLeft, Plus, Trash2, Tag, Download, Printer, AlertCircle, Save, FolderOpen,
+  ArrowLeft, Plus, Trash2, Tag, Download, Printer, AlertCircle, Save, FolderOpen, Image as ImageIcon,
 } from 'lucide-react'
 import { useProducts } from '../../hooks/useProducts'
 import { useLabelDesigns } from '../../hooks/useLabelDesigns'
-import { buildLabelsPdf, expandInstances, computeA4Grid, THERMAL_PRESETS, cloneDefaultElements } from '../../lib/labelPdf'
+import { useLabelHistory } from '../../hooks/useLabelHistory'
+import {
+  buildLabelsPdf, expandInstances, computeA4Grid, THERMAL_PRESETS, SHEET_PRESETS, cloneDefaultElements,
+} from '../../lib/labelPdf'
+import { LABEL_TEMPLATES, cloneTemplate } from '../../lib/labelTemplates'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
 import LabelCanvasEditor from '../../components/labels/LabelCanvasEditor'
@@ -16,19 +20,24 @@ let localId = 0
 export default function LabelGenerator() {
   const navigate = useNavigate()
   const { products } = useProducts()
+  const stageRef = useRef(null)
 
   const [items, setItems] = useState([])
   const [productPick, setProductPick] = useState('')
   const [manualName, setManualName] = useState('')
   const [manualCode, setManualCode] = useState('')
+  const [manualPrice, setManualPrice] = useState('')
 
   const [mode, setMode] = useState('thermal')
   const [thermalPreset, setThermalPreset] = useState('50x20')
   const [customWidth, setCustomWidth] = useState('50')
   const [customHeight, setCustomHeight] = useState('20')
+  const [sheetPresetId, setSheetPresetId] = useState('auto')
 
   const [showBorder, setShowBorder] = useState(true)
-  const [elements, setElements] = useState(cloneDefaultElements)
+  const {
+    elements, setElements, resetElements, undo, redo, canUndo, canRedo,
+  } = useLabelHistory(cloneDefaultElements())
 
   const { designs, saveDesign, deleteDesign } = useLabelDesigns()
   const [designName, setDesignName] = useState('')
@@ -53,7 +62,15 @@ export default function LabelGenerator() {
     setCustomWidth(String(design.label_width))
     setCustomHeight(String(design.label_height))
     setShowBorder(design.show_border)
-    setElements(design.elements?.length ? design.elements : cloneDefaultElements())
+    resetElements(design.elements?.length ? design.elements : cloneDefaultElements())
+  }
+
+  const applyTemplate = (id) => {
+    const template = cloneTemplate(id)
+    setThermalPreset('custom')
+    setCustomWidth(String(template.width))
+    setCustomHeight(String(template.height))
+    resetElements(template.elements)
   }
 
   const handleSaveDesign = async () => {
@@ -89,7 +106,7 @@ export default function LabelGenerator() {
     await deleteDesign(id)
   }
 
-  const addItem = (name, code) => {
+  const addItem = (name, code, price) => {
     const trimmedName = name.trim()
     const trimmedCode = code.trim()
     if (!trimmedName || !trimmedCode) {
@@ -102,7 +119,7 @@ export default function LabelGenerator() {
       if (existing) {
         return prev.map((it) => (it.code === trimmedCode ? { ...it, quantity: it.quantity + 1 } : it))
       }
-      return [...prev, { id: `label-${++localId}`, name: trimmedName, code: trimmedCode, quantity: 1 }]
+      return [...prev, { id: `label-${++localId}`, name: trimmedName, code: trimmedCode, price: price ?? null, quantity: 1 }]
     })
   }
 
@@ -116,15 +133,16 @@ export default function LabelGenerator() {
       setError(`${product.name} has no product number/SKU set — add one in Inventory first.`)
       return
     }
-    addItem(product.name, product.sku)
+    addItem(product.name, product.sku, product.price)
     setProductPick('')
   }
 
   const handleAddManual = () => {
-    addItem(manualName, manualCode)
+    addItem(manualName, manualCode, manualPrice.trim() ? Number(manualPrice) : null)
     if (!error) {
       setManualName('')
       setManualCode('')
+      setManualPrice('')
     }
   }
 
@@ -135,7 +153,7 @@ export default function LabelGenerator() {
   const removeItem = (id) => setItems((prev) => prev.filter((it) => it.id !== id))
 
   const totalLabels = items.reduce((sum, it) => sum + it.quantity, 0)
-  const grid = mode === 'a4' && labelWidth > 0 && labelHeight > 0 ? computeA4Grid(labelWidth, labelHeight) : null
+  const grid = mode === 'a4' && labelWidth > 0 && labelHeight > 0 ? computeA4Grid(labelWidth, labelHeight, sheetPresetId) : null
 
   const generate = async (action) => {
     setError(null)
@@ -156,7 +174,7 @@ export default function LabelGenerator() {
     setGenerating(true)
     try {
       const doc = await buildLabelsPdf(items, {
-        mode, labelWidth, labelHeight, showBorder, elements,
+        mode, labelWidth, labelHeight, showBorder, elements, sheetPresetId,
       })
       if (action === 'download') {
         doc.save(`labels-${new Date().toISOString().slice(0, 10)}.pdf`)
@@ -172,6 +190,21 @@ export default function LabelGenerator() {
   }
 
   const previewCount = useMemo(() => expandInstances(items).length, [items])
+
+  // Snapshot of the current design canvas (Konva's Stage.toDataURL() —
+  // free with the Konva choice, no extra library). This exports the
+  // single design preview, not one PNG per batch item — for a batch,
+  // the PDF path above is the correct format (nobody wants N separate
+  // PNG files for N labels).
+  const handleDownloadPng = () => {
+    const stage = stageRef.current
+    if (!stage) return
+    const uri = stage.toDataURL({ pixelRatio: 3 })
+    const link = document.createElement('a')
+    link.href = uri
+    link.download = `label-design-${new Date().toISOString().slice(0, 10)}.png`
+    link.click()
+  }
 
   return (
     <div>
@@ -225,6 +258,15 @@ export default function LabelGenerator() {
                 onChange={(e) => setManualCode(e.target.value)}
                 placeholder="Product number"
                 className="flex-1 rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={manualPrice}
+                onChange={(e) => setManualPrice(e.target.value)}
+                placeholder="Price (optional)"
+                className="w-36 rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
               />
               <Button variant="outline" onClick={handleAddManual}>
                 <Plus size={15} /> Add
@@ -289,6 +331,23 @@ export default function LabelGenerator() {
 
         {/* Right: layout + customization + generate */}
         <div className="space-y-4">
+          <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5">
+            <h2 className="font-heading text-base font-semibold text-ink-900">Start from a template</h2>
+            <p className="mt-1 text-xs text-ink-400">Replaces the current design and size with a ready-made starting layout.</p>
+            <div className="mt-3 grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+              {LABEL_TEMPLATES.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => applyTemplate(t.id)}
+                  className="rounded-lg border border-ink-400/20 px-2.5 py-2 text-center text-xs font-medium text-ink-600 hover:border-clay-500 hover:bg-clay-500/5 hover:text-clay-600"
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5">
             <h2 className="flex items-center gap-1.5 font-heading text-base font-semibold text-ink-900">
               <FolderOpen size={16} className="text-clay-600" /> Saved designs
@@ -395,6 +454,20 @@ export default function LabelGenerator() {
               </div>
             )}
 
+            {mode === 'a4' && (
+              <label className="mt-3 block">
+                <span className="text-xs font-medium text-ink-500">Sheet layout</span>
+                <select
+                  value={sheetPresetId}
+                  onChange={(e) => setSheetPresetId(e.target.value)}
+                  className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+                >
+                  {SHEET_PRESETS.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             {mode === 'a4' && grid && (
               <p className="mt-3 text-xs text-ink-400">
                 {grid.cols} × {grid.rows} labels fit per A4 page ({grid.perPage} per sheet).
@@ -430,9 +503,15 @@ export default function LabelGenerator() {
                 labelHeight={labelHeight || 1}
                 elements={elements}
                 onChange={setElements}
+                undo={undo}
+                redo={redo}
+                canUndo={canUndo}
+                canRedo={canRedo}
+                stageRef={stageRef}
                 sample={{
                   name: items[0]?.name || 'Product name',
                   code: items[0]?.code || 'PRODUCT-NUMBER',
+                  price: items[0]?.price != null ? String(items[0].price) : '0.00',
                 }}
               />
             </div>
@@ -453,6 +532,9 @@ export default function LabelGenerator() {
               <Download size={15} /> {generating ? 'Generating…' : 'Download PDF'}
             </Button>
           </div>
+          <Button variant="ghost" className="w-full" onClick={handleDownloadPng}>
+            <ImageIcon size={15} /> Download design as PNG
+          </Button>
           <p className="text-center text-xs text-ink-400">{previewCount} label{previewCount === 1 ? '' : 's'} will be generated</p>
         </div>
       </div>
