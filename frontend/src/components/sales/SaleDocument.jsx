@@ -82,8 +82,29 @@ export default function SaleDocument({ data }) {
             <span>Total</span>
             <span>{formatCurrency(data.total)}</span>
           </div>
+          {!data.isSettled && (
+            <>
+              <div className="mt-2 flex items-center justify-between text-sm text-ink-600">
+                <span>Amount Paid</span>
+                <span>{formatCurrency(data.amountPaid)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm font-semibold text-red-600">
+                <span>Balance Due</span>
+                <span>{formatCurrency(data.balanceDue)}</span>
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      {!data.isSettled && (
+        <div className="mt-3 flex justify-end">
+          <div className="w-full max-w-xs rounded-lg border border-red-500/30 bg-red-500/5 px-3 py-2 text-right text-xs font-medium text-red-600">
+            Balance not fully settled — {formatCurrency(data.balanceDue)} due
+            {data.isInvoice && data.dueDate ? ` by ${formatDate(data.dueDate)}` : ''}.
+          </div>
+        </div>
+      )}
 
       {data.isInvoice && data.dueDate && (
         <p className="mt-6 text-xs text-ink-500">

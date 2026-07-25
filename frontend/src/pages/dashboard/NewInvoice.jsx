@@ -6,6 +6,7 @@ import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useSalesReps } from '../../hooks/useSalesReps'
 import { useAvailableUnits } from '../../hooks/useAvailableUnits'
+import { useSaleBalances } from '../../hooks/useSaleBalances'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import { newSaleLine, saleLineTotal, validateSaleLines, buildSaleItems } from '../../lib/saleLines'
@@ -37,6 +38,7 @@ export default function NewInvoice() {
   const { customers, addCustomer } = useCustomers()
   const { salesReps, addSalesRep } = useSalesReps()
   const availableUnits = useAvailableUnits()
+  const { balances } = useSaleBalances()
 
   const [customerId, setCustomerId] = useState('')
   const [salesRepId, setSalesRepId] = useState('')
@@ -156,8 +158,8 @@ export default function NewInvoice() {
     const existing = sales.find((s) => s.id === id)
     if (!existing) return null
     const customer = customers.find((c) => c.id === existing.customer_id) || null
-    return buildSaleDocumentData({ sale: existing, customer, products })
-  }, [isEdit, loaded, sales, id, customers, products])
+    return buildSaleDocumentData({ sale: existing, customer, products, balance: balances[id] })
+  }, [isEdit, loaded, sales, id, customers, products, balances])
 
   // "Save & Print" lands here (edit URL, replace: true) with
   // state.autoPrint set — once the just-saved record's documentData is

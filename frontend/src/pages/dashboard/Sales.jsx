@@ -8,6 +8,7 @@ import {
 import { useSales } from '../../hooks/useSales'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useProducts } from '../../hooks/useProducts'
+import { useSaleBalances } from '../../hooks/useSaleBalances'
 import { formatCurrency } from '../../lib/currency'
 import { buildSaleDocumentData } from '../../lib/saleDocument'
 import Button from '../../components/ui/Button'
@@ -21,6 +22,7 @@ export default function Sales() {
   const { sales, loading, error, deleteSale } = useSales()
   const { customers } = useCustomers()
   const { products } = useProducts()
+  const { balances } = useSaleBalances()
   const [expanded, setExpanded] = useState(null)
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState(() => new Set())
@@ -55,9 +57,10 @@ export default function Sales() {
             sale,
             customer: customers.find((c) => c.id === sale.customer_id) || null,
             products,
+            balance: balances[sale.id],
           }),
         ),
-    [selectedIds, sales, customers, products],
+    [selectedIds, sales, customers, products, balances],
   )
 
   const handlePrintSelected = () => {

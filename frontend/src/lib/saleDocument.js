@@ -2,7 +2,7 @@
 // print layout (SaleDocument.jsx) and the PDF builder (saleDocumentPdf.js)
 // draw from, so the two stay in sync from one source instead of each
 // re-deriving line items/totals independently.
-export function buildSaleDocumentData({ sale, customer, products }) {
+export function buildSaleDocumentData({ sale, customer, products, balance }) {
   const isInvoice = sale.type === 'invoice'
 
   const lineItems = (sale.sale_items || []).map((item) => {
@@ -17,6 +17,12 @@ export function buildSaleDocumentData({ sale, customer, products }) {
   })
 
   const total = lineItems.reduce((sum, li) => sum + li.subtotal, 0)
+
+  // Without real payment-allocation data, assume settled rather than
+  // flashing a false "balance due" warning while that data is still loading.
+  const amountPaid = balance ? balance.paidAmount : total
+  const balanceDue = balance ? balance.outstanding : 0
+  const isSettled = balanceDue <= 0.004
 
   return {
     isInvoice,
@@ -35,6 +41,9 @@ export function buildSaleDocumentData({ sale, customer, products }) {
     salesRep: sale.sales_reps?.name || null,
     lineItems,
     total,
+    amountPaid,
+    balanceDue,
+    isSettled,
     notes: sale.notes || '',
   }
 }
