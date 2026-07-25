@@ -32,6 +32,7 @@ export function buildSaleDocumentData({ sale, customer, products }) {
           address: customer.address || null,
         }
       : null,
+    salesRep: sale.sales_reps?.name || null,
     lineItems,
     total,
     notes: sale.notes || '',

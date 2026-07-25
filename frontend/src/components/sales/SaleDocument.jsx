@@ -29,17 +29,26 @@ export default function SaleDocument({ data }) {
         </div>
       </div>
 
-      <div className="mt-6">
-        <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Bill to</p>
-        {data.customer ? (
-          <div className="mt-1.5 text-sm text-ink-700">
-            <p className="font-medium text-ink-900">{data.customer.name}</p>
-            {data.customer.address && <p>{data.customer.address}</p>}
-            {data.customer.phone && <p>{data.customer.phone}</p>}
-            {data.customer.email && <p>{data.customer.email}</p>}
+      <div className="mt-6 flex items-start justify-between gap-6">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Bill to</p>
+          {data.customer ? (
+            <div className="mt-1.5 text-sm text-ink-700">
+              <p className="font-medium text-ink-900">{data.customer.name}</p>
+              {data.customer.address && <p>{data.customer.address}</p>}
+              {data.customer.phone && <p>{data.customer.phone}</p>}
+              {data.customer.email && <p>{data.customer.email}</p>}
+            </div>
+          ) : (
+            <p className="mt-1.5 text-sm text-ink-700">Walk-in customer</p>
+          )}
+        </div>
+
+        {data.salesRep && (
+          <div className="text-right">
+            <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Sales rep</p>
+            <p className="mt-1.5 text-sm font-medium text-ink-900">{data.salesRep}</p>
           </div>
-        ) : (
-          <p className="mt-1.5 text-sm text-ink-700">Walk-in customer</p>
         )}
       </div>
 

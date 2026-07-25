@@ -70,6 +70,8 @@ export async function buildSaleDocumentPdf(data) {
   doc.line(MARGIN, cursorY, rightX, cursorY)
   cursorY += 8
 
+  const billToStartY = cursorY
+
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(8)
   doc.setTextColor(140, 134, 120)
@@ -92,6 +94,19 @@ export async function buildSaleDocumentPdf(data) {
     doc.setTextColor(60, 57, 41)
     doc.text('Walk-in customer', MARGIN, cursorY)
     cursorY += 5
+  }
+
+  if (data.salesRep) {
+    let repY = billToStartY
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(8)
+    doc.setTextColor(140, 134, 120)
+    doc.text('SALES REP', rightX, repY, { align: 'right' })
+    repY += 5
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(30, 27, 22)
+    doc.text(data.salesRep, rightX, repY, { align: 'right' })
   }
 
   const body = data.lineItems.map((li) => [
