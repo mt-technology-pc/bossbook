@@ -13,7 +13,7 @@ export function useCompany() {
       setCompany(null)
       return
     }
-    supabase.from('companies').select('name, logo_url, brand_color').single().then(({ data }) => {
+    supabase.from('companies').select('id, name, logo_url, brand_color').single().then(({ data }) => {
       setCompany(data)
     })
   }, [user])

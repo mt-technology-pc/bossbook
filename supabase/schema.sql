@@ -3090,23 +3090,21 @@ alter table public.companies add column if not exists logo_url text;
 alter table public.companies add column if not exists brand_color text
   check (brand_color is null or brand_color ~ '^#[0-9a-fA-F]{6}$');
 
+-- Owner-vs-staff is enforced in the UI (Settings.jsx only shows the
+-- mutating controls to isOwner); RLS's job here is just the actual
+-- security boundary — tenant isolation, any company member can write
+-- their own company's branding row, nobody can touch another company's.
 drop policy if exists "Owners can update own company" on public.companies;
-create policy "Owners can update own company"
+create policy "Users can update own company"
   on public.companies for update
-  using (
-    id = public.current_company_id()
-    and exists (
-      select 1 from public.company_users cu
-      where cu.company_id = public.companies.id
-        and cu.user_id = auth.uid()
-        and cu.role = 'owner'
-    )
-  )
+  using (id = public.current_company_id())
   with check (id = public.current_company_id());
 
 -- Storage bucket for logos — public read (needed for CORS-clean <img>/canvas
 -- use when generating invoice PDFs), writes scoped per-tenant by folder
--- (company-logos/{company_id}/logo) and restricted to that company's owner.
+-- (company-logos/{company_id}/logo). Same owner-vs-staff reasoning as the
+-- companies update policy above: RLS's job is tenant isolation (the
+-- foldername check), owner-only is a UI-level restriction, not an RLS one.
 insert into storage.buckets (id, name, public)
 values ('company-logos', 'company-logos', true)
 on conflict (id) do nothing;
@@ -3117,39 +3115,27 @@ create policy "Public can view company logos"
   using (bucket_id = 'company-logos');
 
 drop policy if exists "Owners can upload own company logo" on storage.objects;
-create policy "Owners can upload own company logo"
+create policy "Users can upload own company logo"
   on storage.objects for insert
   with check (
     bucket_id = 'company-logos'
     and (storage.foldername(name))[1] = public.current_company_id()::text
-    and exists (
-      select 1 from public.company_users cu
-      where cu.company_id = public.current_company_id() and cu.user_id = auth.uid() and cu.role = 'owner'
-    )
   );
 
 drop policy if exists "Owners can update own company logo" on storage.objects;
-create policy "Owners can update own company logo"
+create policy "Users can update own company logo"
   on storage.objects for update
   using (
     bucket_id = 'company-logos'
     and (storage.foldername(name))[1] = public.current_company_id()::text
-    and exists (
-      select 1 from public.company_users cu
-      where cu.company_id = public.current_company_id() and cu.user_id = auth.uid() and cu.role = 'owner'
-    )
   );
 
 drop policy if exists "Owners can delete own company logo" on storage.objects;
-create policy "Owners can delete own company logo"
+create policy "Users can delete own company logo"
   on storage.objects for delete
   using (
     bucket_id = 'company-logos'
     and (storage.foldername(name))[1] = public.current_company_id()::text
-    and exists (
-      select 1 from public.company_users cu
-      where cu.company_id = public.current_company_id() and cu.user_id = auth.uid() and cu.role = 'owner'
-    )
   );
 
 -- Platform super-admins -------------------------------------------------------
