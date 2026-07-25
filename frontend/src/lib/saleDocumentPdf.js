@@ -148,36 +148,12 @@ export async function buildSaleDocumentPdf(data) {
   doc.text(formatCurrency(data.total), rightX, afterTableY, { align: 'right' })
   afterTableY += 10
 
-  if (!data.isSettled) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(10)
-    doc.setTextColor(60, 57, 41)
-    doc.text('Amount Paid', rightX - 70, afterTableY)
-    doc.text(formatCurrency(data.amountPaid), rightX, afterTableY, { align: 'right' })
-    afterTableY += 6
-
-    doc.setFont('helvetica', 'bold')
-    doc.setTextColor(200, 40, 40)
-    doc.text('Balance Due', rightX - 70, afterTableY)
-    doc.text(formatCurrency(data.balanceDue), rightX, afterTableY, { align: 'right' })
-    afterTableY += 8
-
-    const noticeText = `Balance not fully settled — ${formatCurrency(data.balanceDue)} due${
-      data.isInvoice && data.dueDate ? ` by ${formatDate(data.dueDate)}` : ''
-    }.`
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
-    const noticeWidth = 82
-    const noticeLines = doc.splitTextToSize(noticeText, noticeWidth - 6)
-    const lineHeight = 4
-    const noticeHeight = noticeLines.length * lineHeight + 4
-
-    doc.setDrawColor(200, 40, 40)
-    doc.setLineWidth(0.3)
-    doc.rect(rightX - noticeWidth, afterTableY, noticeWidth, noticeHeight)
-    doc.text(noticeLines, rightX - noticeWidth / 2, afterTableY + 4.5, { align: 'center' })
-    afterTableY += noticeHeight + 6
-  }
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  doc.setTextColor(60, 57, 41)
+  doc.text('Amount Paid', rightX - 70, afterTableY)
+  doc.text(formatCurrency(data.amountPaid), rightX, afterTableY, { align: 'right' })
+  afterTableY += 10
 
   if (data.isInvoice && data.dueDate) {
     doc.setFont('helvetica', 'normal')
