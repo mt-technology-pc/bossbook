@@ -9,6 +9,7 @@ import { useSuppliers } from '../../hooks/useSuppliers'
 import { formatCurrency } from '../../lib/currency'
 import { exportToCsv } from '../../lib/exportTable'
 import { VALUATION_METHODS } from '../../lib/inventoryValuation'
+import PrintFrame from '../../components/print/PrintFrame'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -137,10 +138,10 @@ export default function InventoryValuationReport() {
         </div>
       </div>
 
-      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
+      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl print:hidden">
         Inventory Valuation Summary
       </h1>
-      <p className="mt-1 text-sm text-ink-500">
+      <p className="mt-1 text-sm text-ink-500 print:hidden">
         As of {new Date(asOfDate).toLocaleDateString('en-LK', { dateStyle: 'long' })} · {methodLabel}
       </p>
 
@@ -234,6 +235,10 @@ export default function InventoryValuationReport() {
           </div>
         )}
 
+        <PrintFrame
+          title="Inventory Valuation Summary"
+          subtitle={`As of ${new Date(asOfDate).toLocaleDateString('en-LK', { dateStyle: 'long' })} · ${methodLabel}`}
+        >
         {loading ? (
           <div className="flex justify-center py-16">
             <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
@@ -284,7 +289,7 @@ export default function InventoryValuationReport() {
                         onClick={() =>
                           navigate(`/dashboard/reports/inventory-valuation/${r.productId}?asOf=${asOfDate}&method=${method}`)
                         }
-                        className="cursor-pointer border-b border-ink-400/5 last:border-0 hover:bg-cream-100"
+                        className="break-inside-avoid cursor-pointer border-b border-ink-400/5 last:border-0 hover:bg-cream-100"
                       >
                         <td className="py-2.5 pr-3 font-mono text-xs text-ink-600">{r.itemCode}</td>
                         <td className="py-2.5 pr-3 font-medium text-ink-900">{r.itemName}</td>
@@ -295,7 +300,7 @@ export default function InventoryValuationReport() {
                         <td className="py-2.5 text-xs text-ink-400">{methodLabel}</td>
                       </motion.tr>
                     ))}
-                    <tr key={`${group.category}-subtotal`} className="border-b border-ink-400/10 bg-cream-200/50 text-xs font-semibold">
+                    <tr key={`${group.category}-subtotal`} className="break-inside-avoid border-b border-ink-400/10 bg-cream-200/50 text-xs font-semibold">
                       <td className="py-2 pr-3" colSpan={3}>
                         Subtotal · {group.category}
                       </td>
@@ -319,6 +324,7 @@ export default function InventoryValuationReport() {
             </table>
           </div>
         )}
+        </PrintFrame>
       </div>
     </div>
   )

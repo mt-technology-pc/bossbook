@@ -9,6 +9,7 @@ import { formatCurrency } from '../../lib/currency'
 import { exportToCsv } from '../../lib/exportTable'
 import { periodRange } from '../../lib/dateBuckets'
 import { VALUATION_METHODS } from '../../lib/inventoryValuation'
+import PrintFrame from '../../components/print/PrintFrame'
 
 const PERIOD_PRESETS = [
   { value: 'month', label: 'This month' },
@@ -143,10 +144,10 @@ export default function GainLossReport() {
         </div>
       </div>
 
-      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
+      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl print:hidden">
         Gain and Loss Report
       </h1>
-      <p className="mt-1 text-sm text-ink-500">
+      <p className="mt-1 text-sm text-ink-500 print:hidden">
         {startDate ? new Date(startDate).toLocaleDateString('en-LK', { dateStyle: 'medium' }) : 'All time'}
         {endDate ? ` – ${new Date(endDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })}` : ''} · {methodLabel}
       </p>
@@ -252,6 +253,10 @@ export default function GainLossReport() {
           </div>
         )}
 
+        <PrintFrame
+          title="Gain and Loss Report"
+          subtitle={`${startDate ? new Date(startDate).toLocaleDateString('en-LK', { dateStyle: 'medium' }) : 'All time'}${endDate ? ` – ${new Date(endDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })}` : ''} · ${methodLabel}`}
+        >
         {loading ? (
           <div className="flex justify-center py-16">
             <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
@@ -289,7 +294,7 @@ export default function GainLossReport() {
                         initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.25, delay: Math.min(i * 0.02, 0.3) }}
-                        className="border-b border-ink-400/5 last:border-0 hover:bg-cream-100"
+                        className="break-inside-avoid border-b border-ink-400/5 last:border-0 hover:bg-cream-100"
                       >
                         <td className="py-2.5 pr-3 text-ink-500">{r.category}</td>
                         <td className="py-2.5 pr-3 font-mono text-xs text-ink-600">{r.itemNo}</td>
@@ -305,7 +310,7 @@ export default function GainLossReport() {
                         <td className="py-2.5 text-right text-ink-500">{formatPercent(shareOfTotal(r.gainLoss))}</td>
                       </motion.tr>
                     ))}
-                    <tr className="border-b border-ink-400/10 bg-cream-200/50 text-xs font-semibold">
+                    <tr className="break-inside-avoid border-b border-ink-400/10 bg-cream-200/50 text-xs font-semibold">
                       <td className="py-2 pr-3" colSpan={6}>
                         Total Gain/Loss for {group.category}
                       </td>
@@ -333,6 +338,7 @@ export default function GainLossReport() {
             </table>
           </div>
         )}
+        </PrintFrame>
       </div>
     </div>
   )

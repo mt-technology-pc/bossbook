@@ -2,9 +2,11 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   AlertCircle, ChevronRight, Landmark, Scale, PiggyBank, TrendingUp, Receipt,
+  ArrowLeft, Printer,
 } from 'lucide-react'
 import { useChartOfAccounts } from '../../hooks/useChartOfAccounts'
 import { formatCurrency } from '../../lib/currency'
+import PrintFrame from '../../components/print/PrintFrame'
 
 const TYPE_META = {
   asset: { label: 'Assets', icon: Landmark },
@@ -20,10 +22,25 @@ export default function ChartOfAccounts() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
+      <div className="flex items-center justify-between gap-3 print:hidden">
+        <button
+          onClick={() => navigate('/dashboard/reports')}
+          className="flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600"
+        >
+          <ArrowLeft size={15} /> Reports
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600"
+        >
+          <Printer size={13} /> Print / PDF
+        </button>
+      </div>
+
+      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl print:hidden">
         Chart of Accounts
       </h1>
-      <p className="mt-1 text-sm text-ink-500">
+      <p className="mt-1 text-sm text-ink-500 print:hidden">
         Every account your books post to, grouped by type, with its current balance.
       </p>
 
@@ -47,6 +64,7 @@ export default function ChartOfAccounts() {
           </p>
         </div>
       ) : (
+        <PrintFrame title="Chart of Accounts">
         <div className="mt-6 space-y-6">
           {byType.map((group, gi) => {
             const meta = TYPE_META[group.type]
@@ -71,7 +89,7 @@ export default function ChartOfAccounts() {
                     <li
                       key={a.coa_id}
                       onClick={() => navigate(`/dashboard/reports/general-ledger/${a.coa_id}`)}
-                      className="flex cursor-pointer items-center justify-between gap-3 py-3 hover:bg-cream-100"
+                      className="flex cursor-pointer items-center justify-between gap-3 py-3 break-inside-avoid hover:bg-cream-100"
                     >
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-sm font-medium text-ink-900">
@@ -85,7 +103,7 @@ export default function ChartOfAccounts() {
                         <span className="text-sm font-semibold text-ink-700">
                           {formatCurrency(a.balance)}
                         </span>
-                        <ChevronRight size={14} className="text-ink-300" />
+                        <ChevronRight size={14} className="text-ink-300 print:hidden" />
                       </div>
                     </li>
                   ))}
@@ -94,6 +112,7 @@ export default function ChartOfAccounts() {
             )
           })}
         </div>
+        </PrintFrame>
       )}
     </div>
   )

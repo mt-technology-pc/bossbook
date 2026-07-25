@@ -1,9 +1,11 @@
 import { Fragment, useState } from 'react'
-import { AlertCircle, RefreshCw, Info } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { AlertCircle, RefreshCw, Info, ArrowLeft, Printer } from 'lucide-react'
 import { useTrialBalance } from '../../hooks/useTrialBalance'
 import { formatCurrency } from '../../lib/currency'
 import { supabase } from '../../lib/supabase'
 import Button from '../../components/ui/Button'
+import PrintFrame from '../../components/print/PrintFrame'
 
 const TYPE_LABELS = {
   asset: 'Assets',
@@ -18,6 +20,7 @@ function todayISO() {
 }
 
 export default function TrialBalance() {
+  const navigate = useNavigate()
   const [asOfDate, setAsOfDate] = useState(todayISO())
   const [backfilling, setBackfilling] = useState(false)
   const [backfillMessage, setBackfillMessage] = useState(null)
@@ -49,16 +52,31 @@ export default function TrialBalance() {
 
   return (
     <div>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex items-center justify-between gap-3 print:hidden">
+        <button
+          onClick={() => navigate('/dashboard/reports')}
+          className="flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600"
+        >
+          <ArrowLeft size={15} /> Reports
+        </button>
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600"
+        >
+          <Printer size={13} /> Print / PDF
+        </button>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
+          <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl print:hidden">
             Trial Balance
           </h1>
-          <p className="mt-1 text-sm text-ink-500">
+          <p className="mt-1 text-sm text-ink-500 print:hidden">
             Every account's balance as of a date, in its normal Debit or Credit column.
           </p>
         </div>
-        <Button onClick={runBackfill} variant="outline" disabled={backfilling}>
+        <Button onClick={runBackfill} variant="outline" disabled={backfilling} className="print:hidden">
           <RefreshCw size={15} className={backfilling ? 'animate-spin' : ''} />
           {backfilling ? 'Backfilling…' : 'Backfill existing data'}
         </Button>
@@ -66,7 +84,7 @@ export default function TrialBalance() {
 
       {backfillMessage && (
         <div
-          className={`mt-4 flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-sm ${
+          className={`mt-4 flex items-start gap-2 rounded-xl border px-3.5 py-2.5 text-sm print:hidden ${
             backfillMessage.type === 'error'
               ? 'border-red-500/20 bg-red-500/10 text-red-600'
               : 'border-clay-500/20 bg-clay-500/10 text-clay-700'
@@ -77,14 +95,14 @@ export default function TrialBalance() {
         </div>
       )}
 
-      <div className="mt-6 flex items-start gap-2 rounded-xl border border-ink-400/15 bg-cream-100 px-3.5 py-2.5 text-xs text-ink-500">
+      <div className="mt-6 flex items-start gap-2 rounded-xl border border-ink-400/15 bg-cream-100 px-3.5 py-2.5 text-xs text-ink-500 print:hidden">
         <Info size={14} className="mt-0.5 shrink-0" />
         Cost of Goods Sold entries use each item's cost at time of sale (standard/latest-cost
         method, the same one offered in the Inventory Valuation report). This can differ from the
         Income Statement report if it's viewed with FIFO or Weighted Average selected instead.
       </div>
 
-      <label className="mt-6 block max-w-xs">
+      <label className="mt-6 block max-w-xs print:hidden">
         <span className="text-xs font-medium text-ink-500">As of</span>
         <input
           type="date"
@@ -114,7 +132,8 @@ export default function TrialBalance() {
           </p>
         </div>
       ) : (
-        <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
+        <PrintFrame title="Trial Balance" subtitle={`As of ${new Date(asOfDate).toLocaleDateString('en-LK', { dateStyle: 'long' })}`}>
+        <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6 print:border-0 print:p-0">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px] text-left text-sm">
               <thead>
@@ -133,7 +152,7 @@ export default function TrialBalance() {
                       </td>
                     </tr>
                     {group.rows.map((row) => (
-                      <tr key={row.id} className="border-b border-ink-400/10 last:border-0">
+                      <tr key={row.id} className="break-inside-avoid border-b border-ink-400/10 last:border-0">
                         <td className="py-2 pr-3 text-ink-900">{row.name}</td>
                         <td className="py-2 pr-3 text-right text-ink-700">
                           {row.debitColumn ? formatCurrency(row.debitColumn) : '—'}
@@ -160,6 +179,7 @@ export default function TrialBalance() {
             {balanced ? 'Books balance — total debits equal total credits.' : 'Books do not balance. This should never happen — please report it.'}
           </p>
         </div>
+        </PrintFrame>
       )}
     </div>
   )

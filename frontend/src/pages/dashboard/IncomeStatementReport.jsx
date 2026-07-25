@@ -8,6 +8,7 @@ import { useIncomeStatement } from '../../hooks/useIncomeStatement'
 import { formatCurrency } from '../../lib/currency'
 import { exportToCsv } from '../../lib/exportTable'
 import { VALUATION_METHODS } from '../../lib/inventoryValuation'
+import PrintFrame from '../../components/print/PrintFrame'
 
 function firstOfMonthISO() {
   const d = new Date()
@@ -90,10 +91,10 @@ export default function IncomeStatementReport() {
         </div>
       </div>
 
-      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
+      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl print:hidden">
         Income Statement
       </h1>
-      <p className="mt-1 text-sm text-ink-500">
+      <p className="mt-1 text-sm text-ink-500 print:hidden">
         {new Date(startDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })} – {new Date(endDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })} · {methodLabel} · Accrual basis
       </p>
 
@@ -172,7 +173,10 @@ export default function IncomeStatementReport() {
           </p>
         </div>
       ) : (
-        <>
+        <PrintFrame
+          title="Income Statement"
+          subtitle={`${new Date(startDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })} – ${new Date(endDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })} · ${methodLabel} · Accrual basis`}
+        >
           <div className="mt-6 max-w-lg rounded-2xl border border-ink-400/15 bg-cream-50 p-6">
             <div className="flex items-center justify-between py-2">
               <span className="text-sm font-medium text-ink-600">Revenue</span>
@@ -238,7 +242,7 @@ export default function IncomeStatementReport() {
                         initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.25, delay: Math.min(i * 0.04, 0.3) }}
-                        className="border-b border-ink-400/5 last:border-0"
+                        className="break-inside-avoid border-b border-ink-400/5 last:border-0"
                       >
                         <td className="py-2.5 pr-3 font-medium text-ink-900">{c.category}</td>
                         <td className="py-2.5 pr-3 text-right text-ink-700">{formatCurrency(c.revenue)}</td>
@@ -281,7 +285,7 @@ export default function IncomeStatementReport() {
                         initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.25, delay: Math.min(i * 0.04, 0.3) }}
-                        className="border-b border-ink-400/5 last:border-0"
+                        className="break-inside-avoid border-b border-ink-400/5 last:border-0"
                       >
                         <td className="py-2.5 font-medium text-ink-900">{e.category}</td>
                         <td className="py-2.5 text-right text-ink-700">{formatCurrency(e.amount)}</td>
@@ -301,7 +305,7 @@ export default function IncomeStatementReport() {
               </div>
             </div>
           </div>
-        </>
+        </PrintFrame>
       )}
     </div>
   )

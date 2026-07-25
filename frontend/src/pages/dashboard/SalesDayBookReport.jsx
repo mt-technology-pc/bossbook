@@ -7,6 +7,7 @@ import {
 import { useSalesDayBook } from '../../hooks/useSalesDayBook'
 import { formatCurrency } from '../../lib/currency'
 import { exportToCsv } from '../../lib/exportTable'
+import PrintFrame from '../../components/print/PrintFrame'
 
 function firstOfMonthISO() {
   const d = new Date()
@@ -135,10 +136,10 @@ export default function SalesDayBookReport() {
         </div>
       </div>
 
-      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
+      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl print:hidden">
         Sales Day Book
       </h1>
-      <p className="mt-1 text-sm text-ink-500">
+      <p className="mt-1 text-sm text-ink-500 print:hidden">
         {new Date(startDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })} – {new Date(endDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })}
       </p>
 
@@ -228,6 +229,10 @@ export default function SalesDayBookReport() {
         </div>
       )}
 
+      <PrintFrame
+        title="Sales Day Book"
+        subtitle={`${new Date(startDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })} – ${new Date(endDate).toLocaleDateString('en-LK', { dateStyle: 'medium' })}`}
+      >
       <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6 print:border-0 print:p-0">
         {loading ? (
           <div className="flex justify-center py-16">
@@ -274,7 +279,7 @@ export default function SalesDayBookReport() {
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.25, delay: Math.min(i * 0.02, 0.3) }}
-                    className="border-b border-ink-400/5 last:border-0"
+                    className="break-inside-avoid border-b border-ink-400/5 last:border-0"
                   >
                     <td className="py-2.5 pr-3 text-ink-500">{formatDate(r.date)}</td>
                     <td className="py-2.5 pr-3 font-mono text-xs text-ink-600">{r.invoiceNo}</td>
@@ -316,6 +321,7 @@ export default function SalesDayBookReport() {
           ))}
         </div>
       )}
+      </PrintFrame>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import logoSrc from '../../assets/logo.png'
 import { formatCurrency } from '../../lib/currency'
+import { PrintFooter } from '../print/PrintFrame'
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -53,7 +54,7 @@ export default function SaleDocument({ data }) {
         </thead>
         <tbody>
           {data.lineItems.map((li, i) => (
-            <tr key={i} className="border-b border-ink-900/10">
+            <tr key={i} className="break-inside-avoid border-b border-ink-900/10">
               <td className="py-2.5 pr-3">
                 <p className="font-medium text-ink-900">{li.name}</p>
                 {li.sku && <p className="font-mono text-xs text-ink-400">{li.sku}</p>}
@@ -87,6 +88,8 @@ export default function SaleDocument({ data }) {
           <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{data.notes}</p>
         </div>
       )}
+
+      <PrintFooter />
     </div>
   )
 }

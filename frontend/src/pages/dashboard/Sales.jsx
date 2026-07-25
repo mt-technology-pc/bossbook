@@ -1,13 +1,17 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Plus, FileText, Receipt, TrendingUp, AlertCircle, ChevronDown, Wallet, Landmark, HandCoins,
-  Pencil, Trash2, ListChecks, Search,
+  Pencil, Trash2, ListChecks, Search, Printer,
 } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
+import { useCustomers } from '../../hooks/useCustomers'
+import { useProducts } from '../../hooks/useProducts'
 import { formatCurrency } from '../../lib/currency'
+import { buildSaleDocumentData } from '../../lib/saleDocument'
 import Button from '../../components/ui/Button'
+import SaleDocument from '../../components/sales/SaleDocument'
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
@@ -15,8 +19,11 @@ function formatDate(dateStr) {
 
 export default function Sales() {
   const { sales, loading, error, deleteSale } = useSales()
+  const { customers } = useCustomers()
+  const { products } = useProducts()
   const [expanded, setExpanded] = useState(null)
   const [query, setQuery] = useState('')
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
   const navigate = useNavigate()
 
   const filtered = sales.filter((s) => {
@@ -25,6 +32,38 @@ export default function Sales() {
     const hay = `${s.reference ?? ''} ${s.customers?.name ?? ''} ${s.notes ?? ''}`.toLowerCase()
     return hay.includes(q)
   })
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  // Built fresh on every render from whatever's currently selected — cheap
+  // (a handful of sales at most) and avoids stale data if a sale/customer
+  // changes between selecting and printing.
+  const selectedDocuments = useMemo(
+    () =>
+      [...selectedIds]
+        .map((id) => sales.find((s) => s.id === id))
+        .filter(Boolean)
+        .map((sale) =>
+          buildSaleDocumentData({
+            sale,
+            customer: customers.find((c) => c.id === sale.customer_id) || null,
+            products,
+          }),
+        ),
+    [selectedIds, sales, customers, products],
+  )
+
+  const handlePrintSelected = () => {
+    if (selectedDocuments.length === 0) return
+    window.print()
+  }
 
   const editPathFor = (s) => (s.type === 'invoice' ? `/dashboard/sales/new-invoice/${s.id}` : `/dashboard/sales/new-receipt/${s.id}`)
 
@@ -48,6 +87,7 @@ export default function Sales() {
 
   return (
     <div>
+      <div className="print:hidden">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
@@ -58,6 +98,11 @@ export default function Sales() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {selectedIds.size > 0 && (
+            <Button onClick={handlePrintSelected} variant="outline">
+              <Printer size={16} /> Print Selected ({selectedIds.size})
+            </Button>
+          )}
           <Button onClick={() => navigate('/dashboard/sales/payments-received')} variant="ghost">
             <ListChecks size={16} /> Payments received
           </Button>
@@ -151,8 +196,16 @@ export default function Sales() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
-                  className="py-3.5"
+                  className="flex items-start gap-2 py-3.5"
                 >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(s.id)}
+                    onChange={() => toggleSelected(s.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label={`Select ${s.reference || 'this sale'} for bulk print`}
+                    className="mt-4 h-4 w-4 shrink-0 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
+                  />
                   <button
                     onClick={() => setExpanded(isOpen ? null : s.id)}
                     className="flex w-full items-center justify-between gap-3 text-left"
@@ -252,6 +305,17 @@ export default function Sales() {
           </ul>
         )}
       </div>
+      </div>
+
+      {selectedDocuments.length > 0 && (
+        <div className="hidden print:block">
+          {selectedDocuments.map((doc, i) => (
+            <div key={i} className={i < selectedDocuments.length - 1 ? 'break-after-page' : ''}>
+              <SaleDocument data={doc} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

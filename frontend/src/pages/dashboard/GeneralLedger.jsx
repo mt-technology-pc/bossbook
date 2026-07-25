@@ -1,9 +1,10 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { AlertCircle, BookOpen } from 'lucide-react'
+import { AlertCircle, BookOpen, ArrowLeft, Printer } from 'lucide-react'
 import { useChartOfAccounts } from '../../hooks/useChartOfAccounts'
 import { useGeneralLedger } from '../../hooks/useGeneralLedger'
 import { formatCurrency } from '../../lib/currency'
 import SearchSelect from '../../components/ui/SearchSelect'
+import PrintFrame from '../../components/print/PrintFrame'
 
 const SOURCE_LABELS = {
   sales: 'Sale',
@@ -34,14 +35,31 @@ export default function GeneralLedger() {
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
+      <div className="flex items-center justify-between gap-3 print:hidden">
+        <button
+          onClick={() => navigate('/dashboard/reports')}
+          className="flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600"
+        >
+          <ArrowLeft size={15} /> Reports
+        </button>
+        {coaId && (
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600"
+          >
+            <Printer size={13} /> Print / PDF
+          </button>
+        )}
+      </div>
+
+      <h1 className="mt-4 font-heading text-2xl font-semibold text-ink-900 sm:text-3xl print:hidden">
         General Ledger
       </h1>
-      <p className="mt-1 text-sm text-ink-500">
+      <p className="mt-1 text-sm text-ink-500 print:hidden">
         The real T-account for any account — every journal entry line, with a running balance.
       </p>
 
-      <div className="mt-6 max-w-sm">
+      <div className="mt-6 max-w-sm print:hidden">
         <SearchSelect
           value={coaId ?? ''}
           onChange={(val) => navigate(`/dashboard/reports/general-ledger/${val}`)}
@@ -71,7 +89,8 @@ export default function GeneralLedger() {
           <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
         </div>
       ) : (
-        <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
+        <PrintFrame title="General Ledger" subtitle={account?.name}>
+        <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6 print:border-0 print:p-0">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="font-heading text-lg font-semibold text-ink-900">
@@ -108,7 +127,7 @@ export default function GeneralLedger() {
                 </thead>
                 <tbody>
                   {lines.map((l) => (
-                    <tr key={l.id} className="border-b border-ink-400/10 last:border-0">
+                    <tr key={l.id} className="break-inside-avoid border-b border-ink-400/10 last:border-0">
                       <td className="py-2.5 pr-3 text-ink-500">
                         {formatDate(l.journal_entries?.entry_date)}
                       </td>
@@ -146,6 +165,7 @@ export default function GeneralLedger() {
             </div>
           )}
         </div>
+        </PrintFrame>
       )}
     </div>
   )
