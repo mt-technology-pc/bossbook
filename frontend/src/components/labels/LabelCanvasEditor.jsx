@@ -7,6 +7,7 @@ import {
 import BarcodeImageNode from './nodes/BarcodeImageNode'
 import QrImageNode from './nodes/QrImageNode'
 import { validateBarcode } from '../../lib/barcodeValidation'
+import { fit } from '../../lib/labelPdf'
 
 const clamp = (v, min, max) => Math.min(Math.max(v, min), max)
 const SNAP_PX = 5
@@ -51,7 +52,18 @@ function fieldValue(el, sample) {
 function ImageElementNode({ el, ...groupProps }) {
   const [img] = useImage(el.src || '')
   if (!img) return null
-  return <KonvaImage image={img} width={groupProps.width} height={groupProps.height} {...groupProps} />
+  const { width, height, ...rest } = groupProps
+  const fitted = fit(el.naturalW || width, el.naturalH || height, width, height)
+  return (
+    <KonvaImage
+      image={img}
+      width={fitted.w}
+      height={fitted.h}
+      x={(width - fitted.w) / 2}
+      y={(height - fitted.h) / 2}
+      {...rest}
+    />
+  )
 }
 
 // Konva-based free-positioning label canvas: drag to move, drag a corner to

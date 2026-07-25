@@ -26,7 +26,11 @@ export const SHEET_PRESETS = [
   { id: 'round-24up', label: 'Round labels — 24/sheet (⌀38.1mm)', width: 38.1, height: 38.1, cols: 4, rows: 6, marginX: 12, marginY: 13, gapX: 3, gapY: 3 },
 ]
 
-function fit(srcW, srcH, maxW, maxH) {
+// Exported so the on-screen editor (BarcodeImageNode/QrImageNode) can use
+// the exact same aspect-ratio-preserving math as PDF export — otherwise
+// the editor stretches an image to fill its box exactly while the PDF
+// letterboxes it, and the live preview visibly disagrees with the print.
+export function fit(srcW, srcH, maxW, maxH) {
   const ratio = Math.min(maxW / srcW, maxH / srcH)
   return { w: srcW * ratio, h: srcH * ratio }
 }
