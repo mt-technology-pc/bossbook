@@ -17,6 +17,8 @@ function formatDate(dateStr) {
 function estimateHeight(data, companyName) {
   let h = MARGIN * 2
   if (companyName) h += 5
+  const companyLines = [data.companyAddress, data.companyPhone, data.companyEmail].filter(Boolean)
+  h += companyLines.length * 3.5
   h += 4 + 3.5 + 3 // doc type + reference + date lines
   h += 4 // divider
 
@@ -67,6 +69,16 @@ export async function buildSaleDocumentPosPdf(data, companyName) {
     doc.setFontSize(11)
     doc.text(companyName, centerX, y, { align: 'center' })
     y += 5
+  }
+
+  const companyLines = [data.companyAddress, data.companyPhone, data.companyEmail].filter(Boolean)
+  if (companyLines.length > 0) {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    for (const line of companyLines) {
+      doc.text(line, centerX, y, { align: 'center' })
+      y += 3.5
+    }
   }
 
   doc.setFont('helvetica', 'bold')

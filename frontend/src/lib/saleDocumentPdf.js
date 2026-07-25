@@ -56,6 +56,18 @@ export async function buildSaleDocumentPdf(data) {
   const logoWidth = 32
   doc.addImage(logo.dataUrl, 'PNG', MARGIN, MARGIN, logoWidth, logoWidth * logo.ratio)
 
+  const companyLines = [data.companyAddress, data.companyPhone, data.companyEmail].filter(Boolean)
+  if (companyLines.length > 0) {
+    let companyY = MARGIN + logoWidth * logo.ratio + 4
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(110, 105, 95)
+    for (const line of companyLines) {
+      doc.text(line, MARGIN, companyY)
+      companyY += 3.8
+    }
+  }
+
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(18)
   doc.text(data.docTypeLabel.toUpperCase(), rightX, MARGIN + 6, { align: 'right' })

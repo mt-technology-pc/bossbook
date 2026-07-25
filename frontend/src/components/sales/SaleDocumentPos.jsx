@@ -18,6 +18,9 @@ export default function SaleDocumentPos({ data, companyName }) {
     <div className="w-full bg-white p-2 text-[11px] leading-snug text-black">
       <div className="text-center">
         {companyName && <p className="text-sm font-bold">{companyName}</p>}
+        {data.companyAddress && <p className="text-[10px]">{data.companyAddress}</p>}
+        {data.companyPhone && <p className="text-[10px]">{data.companyPhone}</p>}
+        {data.companyEmail && <p className="text-[10px]">{data.companyEmail}</p>}
         <p className="mt-0.5 font-semibold uppercase">{data.docTypeLabel}</p>
         <p className="text-[10px]">No. {data.reference}</p>
         <p className="text-[10px]">{formatDate(data.date)}</p>

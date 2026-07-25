@@ -49,6 +49,10 @@ export function buildSaleDocumentData({ sale, customer, products, balance, custo
     // there's no customer or the caller didn't pass one in.
     customerBalance: customer && customerBalance != null ? Number(customerBalance) : null,
     companyLogoUrl: company?.logo_url || null,
+    companyName: company?.name || null,
+    companyAddress: company?.address || null,
+    companyEmail: company?.email || null,
+    companyPhone: company?.phone || null,
     notes: sale.notes || '',
   }
 }
