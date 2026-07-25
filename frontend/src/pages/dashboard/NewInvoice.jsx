@@ -4,6 +4,7 @@ import { X, Plus, AlertCircle, FileText, ShoppingBag, Download, Printer } from '
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
+import { useCustomerBalances } from '../../hooks/useCustomerBalances'
 import { useSalesReps } from '../../hooks/useSalesReps'
 import { useAvailableUnits } from '../../hooks/useAvailableUnits'
 import { useSaleBalances } from '../../hooks/useSaleBalances'
@@ -36,6 +37,7 @@ export default function NewInvoice() {
   const { sales, createSale, updateSale } = useSales()
   const { products, loading: productsLoading, refetch: refetchProducts } = useProducts()
   const { customers, addCustomer } = useCustomers()
+  const { balanceFor: customerBalanceFor } = useCustomerBalances()
   const { salesReps, addSalesRep } = useSalesReps()
   const availableUnits = useAvailableUnits()
   const { balances, refetch: refetchBalances } = useSaleBalances()
@@ -150,6 +152,16 @@ export default function NewInvoice() {
   }
 
   const total = saleLineTotal(lines)
+
+  // What this customer will owe in total once this invoice is posted —
+  // their existing balance, plus this invoice's total. In edit mode their
+  // current balance already includes the original (pre-edit) charge, so
+  // that gets backed out first to avoid double-counting it.
+  const selectedCustomer = customers.find((c) => c.id === customerId) || null
+  const originalInvoiceTotal = isEdit ? Number(sales.find((s) => s.id === id)?.total_amount || 0) : 0
+  const projectedCustomerBalance = customerId
+    ? customerBalanceFor(customerId) - originalInvoiceTotal + total
+    : 0
 
   const [downloadingPdf, setDownloadingPdf] = useState(false)
 
@@ -402,6 +414,13 @@ export default function NewInvoice() {
                     </span>
                   </p>
                 </div>
+                {selectedCustomer && total > 0 && (
+                  <div className="mt-1 flex justify-end">
+                    <p className="text-xs text-ink-400">
+                      {selectedCustomer.name} will owe {formatCurrency(projectedCustomerBalance)} in total after taking these goods
+                    </p>
+                  </div>
+                )}
               </div>
 
               <label className="mt-8 block max-w-xl">
