@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
-import { groq, GROQ_MODEL } from '../lib/groqClient.js'
+import { ai, AI_MODEL } from '../lib/aiClient.js'
 import { toolDeclarations, executeTool } from '../lib/assistantTools.js'
 import { loadKnowledgeBase } from '../lib/knowledgeBase.js'
 
@@ -50,16 +50,16 @@ const tools = toolDeclarations.map((decl) => ({
   },
 }))
 
-// Llama models on Groq occasionally emit a tool call that doesn't parse
-// cleanly against the schema (Groq returns a 400 with a `failed_generation`
-// field) — usually a one-off generation glitch that succeeds if you just
-// ask again with the exact same input, so retry once before giving up.
+// Some models occasionally emit a tool call that doesn't parse cleanly
+// against the schema (a 400 with a `failed_generation`-style field) —
+// usually a one-off generation glitch that succeeds if you just ask again
+// with the exact same input, so retry once before giving up.
 async function completeWithRetry(params) {
   try {
-    return await groq.chat.completions.create(params)
+    return await ai.chat.completions.create(params)
   } catch (err) {
     if (err.status === 400 && err.code !== 'context_length_exceeded') {
-      return await groq.chat.completions.create(params)
+      return await ai.chat.completions.create(params)
     }
     throw err
   }
@@ -87,7 +87,7 @@ router.post('/chat', requireAuth, async (req, res) => {
   const actions = []
 
   try {
-    let completion = await completeWithRetry({ model: GROQ_MODEL, messages: chatMessages, tools })
+    let completion = await completeWithRetry({ model: AI_MODEL, messages: chatMessages, tools })
     let choice = completion.choices[0]
 
     let rounds = 0
@@ -111,7 +111,7 @@ router.post('/chat', requireAuth, async (req, res) => {
         })
       }
 
-      completion = await completeWithRetry({ model: GROQ_MODEL, messages: chatMessages, tools })
+      completion = await completeWithRetry({ model: AI_MODEL, messages: chatMessages, tools })
       choice = completion.choices[0]
     }
 
