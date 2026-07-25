@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
-import { ai, AI_MODEL } from '../lib/aiClient.js'
+import { ai, AI_MODEL, AI_MODEL_FALLBACKS } from '../lib/aiClient.js'
 import { toolDeclarations, executeTool } from '../lib/assistantTools.js'
 import { loadKnowledgeBase } from '../lib/knowledgeBase.js'
 
@@ -52,12 +52,12 @@ const tools = toolDeclarations.map((decl) => ({
 
 // OpenRouter sometimes hands back HTTP 200 with an error body instead of
 // an error status — seen when a free model's upstream provider times out
-// ({"error":{"message":"The operation was aborted","code":504}}). The SDK
-// only throws on non-2xx, so without this the response has no `choices`
-// and the caller crashes on completion.choices[0]. Normalize it into a
-// thrown error so it's handled the same way as any other failure.
-async function completeOnce(params) {
-  const completion = await ai.chat.completions.create(params)
+// or errors ({"error":{"message":"...","code":504}}). The SDK only throws
+// on non-2xx, so without this the response has no `choices` and the
+// caller crashes on completion.choices[0]. Normalize it into a thrown
+// error so it's handled the same way as any other failure.
+async function completeOnce(model, params) {
+  const completion = await ai.chat.completions.create({ ...params, model })
   if (completion.error) {
     const err = new Error(completion.error.message || 'Upstream model error')
     err.status = completion.error.code
@@ -66,21 +66,36 @@ async function completeOnce(params) {
   return completion
 }
 
-// Some models occasionally emit a tool call that doesn't parse cleanly
-// against the schema (a 400), or the upstream provider times out (502/503/
-// 504, including the 200-wrapped case above) — both are usually one-off
-// and succeed if you just ask again, so retry once before giving up.
+function isRetryable(err) {
+  return (err.status === 400 && err.code !== 'context_length_exceeded')
+    || [429, 500, 502, 503, 504].includes(err.status)
+}
+
+// Free-tier models each have transient bad moments (500s, timeouts, a
+// malformed tool call) — retrying the *same* model once covers a one-off
+// glitch, but if it's genuinely struggling right now, falling through to
+// the next model in AI_MODEL_FALLBACKS is far more reliable than hammering
+// the same flaky one. Only throws once every candidate has failed twice.
 async function completeWithRetry(params) {
-  try {
-    return await completeOnce(params)
-  } catch (err) {
-    const retryable = (err.status === 400 && err.code !== 'context_length_exceeded')
-      || [502, 503, 504].includes(err.status)
-    if (retryable) {
-      return await completeOnce(params)
+  const models = [AI_MODEL, ...AI_MODEL_FALLBACKS]
+  let lastErr
+
+  for (const model of models) {
+    try {
+      return await completeOnce(model, params)
+    } catch (err) {
+      lastErr = err
+      if (!isRetryable(err)) throw err
+      try {
+        return await completeOnce(model, params)
+      } catch (retryErr) {
+        lastErr = retryErr
+        if (!isRetryable(retryErr)) throw retryErr
+      }
     }
-    throw err
   }
+
+  throw lastErr
 }
 
 router.post('/chat', requireAuth, async (req, res) => {
@@ -105,7 +120,7 @@ router.post('/chat', requireAuth, async (req, res) => {
   const actions = []
 
   try {
-    let completion = await completeWithRetry({ model: AI_MODEL, messages: chatMessages, tools })
+    let completion = await completeWithRetry({ messages: chatMessages, tools })
     let choice = completion.choices[0]
 
     let rounds = 0
@@ -129,7 +144,7 @@ router.post('/chat', requireAuth, async (req, res) => {
         })
       }
 
-      completion = await completeWithRetry({ model: AI_MODEL, messages: chatMessages, tools })
+      completion = await completeWithRetry({ messages: chatMessages, tools })
       choice = completion.choices[0]
     }
 
@@ -151,9 +166,9 @@ router.post('/chat', requireAuth, async (req, res) => {
       })
     }
 
-    if ([502, 503, 504].includes(err.status)) {
+    if ([500, 502, 503, 504].includes(err.status)) {
       return res.json({
-        reply: "The AI model timed out on that one — this happens occasionally on the free tier under load. Please try again.",
+        reply: "The AI models I have access to are all struggling right now — this happens occasionally on the free tier under load. Please try again in a moment.",
         actions: [],
       })
     }
