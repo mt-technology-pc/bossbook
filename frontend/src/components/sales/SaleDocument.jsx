@@ -1,6 +1,7 @@
 import logoSrc from '../../assets/logo.png'
 import { formatCurrency } from '../../lib/currency'
 import { PrintFooter } from '../print/PrintFrame'
+import DocumentBarcode from './DocumentBarcode'
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -114,6 +115,12 @@ export default function SaleDocument({ data }) {
         <div className="mt-6 border-t border-ink-900/10 pt-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Notes</p>
           <p className="mt-1 whitespace-pre-wrap text-sm text-ink-700">{data.notes}</p>
+        </div>
+      )}
+
+      {data.reference !== '—' && (
+        <div className="mt-8 flex justify-center">
+          <DocumentBarcode code={data.reference} className="h-12" />
         </div>
       )}
 

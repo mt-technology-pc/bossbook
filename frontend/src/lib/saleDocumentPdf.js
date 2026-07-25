@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import logoSrc from '../assets/logo.png'
 import { formatCurrency } from './currency'
+import { barcodeImage } from './labelCodes'
 
 const MARGIN = 14
 const PAGE_HEIGHT = 297 // A4 portrait, mm
@@ -212,6 +213,27 @@ export async function buildSaleDocumentPdf(data) {
     doc.setTextColor(60, 57, 41)
     const wrapped = doc.splitTextToSize(data.notes, pageWidth - MARGIN * 2)
     doc.text(wrapped, MARGIN, afterTableY)
+    afterTableY += wrapped.length * 4.2
+  }
+
+  // Barcode is anchored to the true bottom of the last page (not just
+  // "wherever content happens to end"), pushing to a fresh page if
+  // whatever's above would otherwise run into its reserved space.
+  if (data.reference && data.reference !== '—') {
+    const BARCODE_RESERVE = 24
+    if (afterTableY > PAGE_HEIGHT - BARCODE_RESERVE) {
+      doc.addPage()
+    }
+    const barcode = barcodeImage(data.reference)
+    const barcodeHeight = 10
+    const barcodeWidth = (barcode.width / barcode.height) * barcodeHeight
+    const barcodeX = pageWidth / 2 - barcodeWidth / 2
+    const barcodeY = PAGE_HEIGHT - 18
+    doc.addImage(barcode.dataUrl, 'PNG', barcodeX, barcodeY, barcodeWidth, barcodeHeight)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(30, 27, 22)
+    doc.text(data.reference, pageWidth / 2, barcodeY + barcodeHeight + 3.5, { align: 'center' })
   }
 
   return doc

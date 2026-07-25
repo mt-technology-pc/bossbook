@@ -1,4 +1,5 @@
 import { formatCurrency } from '../../lib/currency'
+import DocumentBarcode from './DocumentBarcode'
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -78,6 +79,12 @@ export default function SaleDocumentPos({ data, companyName }) {
 
       <Divider />
       <p className="text-center text-[10px]">Thank you!</p>
+
+      {data.reference !== '—' && (
+        <div className="mt-2 flex justify-center">
+          <DocumentBarcode code={data.reference} className="h-8" />
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf'
 import { formatCurrency } from './currency'
+import { barcodeImage } from './labelCodes'
 
 const WIDTH = 80 // mm — standard thermal receipt roll width
 const MARGIN = 4
@@ -42,6 +43,7 @@ function estimateHeight(data, companyName) {
   }
 
   h += 4 + 6 // final divider + "Thank you!"
+  if (data.reference && data.reference !== '—') h += 4 + 8 + 2 + 3.5 // divider + barcode + gap + code text
   return Math.max(h + 6, 60) // small safety buffer
 }
 
@@ -150,6 +152,19 @@ export async function buildSaleDocumentPosPdf(data, companyName) {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.text('Thank you!', centerX, y, { align: 'center' })
+  y += 3
+
+  if (data.reference && data.reference !== '—') {
+    divider()
+    const barcode = barcodeImage(data.reference)
+    const barcodeHeight = 8
+    const barcodeWidth = (barcode.width / barcode.height) * barcodeHeight
+    doc.addImage(barcode.dataUrl, 'PNG', centerX - barcodeWidth / 2, y, barcodeWidth, barcodeHeight)
+    y += barcodeHeight + 2
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.text(data.reference, centerX, y, { align: 'center' })
+  }
 
   return doc
 }
