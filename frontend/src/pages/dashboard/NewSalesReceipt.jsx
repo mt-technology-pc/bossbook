@@ -177,8 +177,8 @@ export default function NewSalesReceipt() {
     if (!existing) return null
     const customer = customers.find((c) => c.id === existing.customer_id) || null
     const customerBalance = customer ? customerBalanceFor(customer.id) : null
-    return buildSaleDocumentData({ sale: existing, customer, products, customerBalance })
-  }, [isEdit, loaded, sales, id, customers, products, customerBalanceFor])
+    return buildSaleDocumentData({ sale: existing, customer, products, customerBalance, company })
+  }, [isEdit, loaded, sales, id, customers, products, customerBalanceFor, company])
 
   // "Save & Print" lands here (edit URL, replace: true) with
   // state.autoPrint set — once the just-saved record's documentData is

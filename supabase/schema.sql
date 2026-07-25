@@ -2639,10 +2639,11 @@ create table if not exists public.sequence_counters (
 
 alter table public.sequence_counters enable row level security;
 
-drop policy if exists "Users can view own sequence counters" on public.sequence_counters;
-create policy "Users can view own sequence counters"
-  on public.sequence_counters for select
-  using (auth.uid() = owner_id);
+-- No select policy defined here: unlike every other table, this one's
+-- owner_id column gets fully dropped (not just RLS-repointed) once the
+-- company_id re-key below runs, which permanently defines the real policy.
+-- An owner_id-based policy created here would work on a first run but
+-- fail every run after, since by then the column no longer exists.
 
 -- Atomically returns the next integer for (owner_id, key), starting at 1.
 -- Safe under concurrent calls: the ON CONFLICT DO UPDATE takes a row lock,
@@ -3070,6 +3071,78 @@ drop policy if exists "Users can view own company membership" on public.company_
 create policy "Users can view own company membership"
   on public.company_users for select
   using (user_id = auth.uid() or company_id = public.current_company_id());
+
+-- Branding customization ------------------------------------------------------
+-- Per-company logo + primary color, self-service from Settings. Both default
+-- null ("use the platform default") rather than baking in today's default
+-- hex/logo, so "reset to default" is just clearing the pointer and there's
+-- nothing here to fall out of sync with the frontend's own default styling.
+
+alter table public.companies add column if not exists logo_url text;
+alter table public.companies add column if not exists brand_color text
+  check (brand_color is null or brand_color ~ '^#[0-9a-fA-F]{6}$');
+
+drop policy if exists "Owners can update own company" on public.companies;
+create policy "Owners can update own company"
+  on public.companies for update
+  using (
+    id = public.current_company_id()
+    and exists (
+      select 1 from public.company_users cu
+      where cu.company_id = public.companies.id
+        and cu.user_id = auth.uid()
+        and cu.role = 'owner'
+    )
+  )
+  with check (id = public.current_company_id());
+
+-- Storage bucket for logos — public read (needed for CORS-clean <img>/canvas
+-- use when generating invoice PDFs), writes scoped per-tenant by folder
+-- (company-logos/{company_id}/logo) and restricted to that company's owner.
+insert into storage.buckets (id, name, public)
+values ('company-logos', 'company-logos', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Public can view company logos" on storage.objects;
+create policy "Public can view company logos"
+  on storage.objects for select
+  using (bucket_id = 'company-logos');
+
+drop policy if exists "Owners can upload own company logo" on storage.objects;
+create policy "Owners can upload own company logo"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'company-logos'
+    and (storage.foldername(name))[1] = public.current_company_id()::text
+    and exists (
+      select 1 from public.company_users cu
+      where cu.company_id = public.current_company_id() and cu.user_id = auth.uid() and cu.role = 'owner'
+    )
+  );
+
+drop policy if exists "Owners can update own company logo" on storage.objects;
+create policy "Owners can update own company logo"
+  on storage.objects for update
+  using (
+    bucket_id = 'company-logos'
+    and (storage.foldername(name))[1] = public.current_company_id()::text
+    and exists (
+      select 1 from public.company_users cu
+      where cu.company_id = public.current_company_id() and cu.user_id = auth.uid() and cu.role = 'owner'
+    )
+  );
+
+drop policy if exists "Owners can delete own company logo" on storage.objects;
+create policy "Owners can delete own company logo"
+  on storage.objects for delete
+  using (
+    bucket_id = 'company-logos'
+    and (storage.foldername(name))[1] = public.current_company_id()::text
+    and exists (
+      select 1 from public.company_users cu
+      where cu.company_id = public.current_company_id() and cu.user_id = auth.uid() and cu.role = 'owner'
+    )
+  );
 
 -- Platform super-admins -------------------------------------------------------
 -- A platform admin is not a member of any company at all — a separate

@@ -6,29 +6,36 @@ import { formatCurrency } from './currency'
 const MARGIN = 14
 const PAGE_HEIGHT = 297 // A4 portrait, mm
 
-let cachedLogo = null
-
 // jsPDF's addImage needs actual pixel data (data URL / canvas), not a bare
-// asset URL — draw the already-bundled logo onto a canvas once and cache
-// the result for the life of the page (this fires once per PDF, not once
-// per line item).
-function loadLogoDataUrl() {
-  if (cachedLogo) return Promise.resolve(cachedLogo)
+// asset URL — draw the logo onto a canvas once and cache the result. Keyed
+// by URL (not a single variable) since different companies now have
+// different logos in the same browser session; a bare per-page variable
+// would leak the first company's logo onto every later PDF.
+const logoCache = new Map()
+
+function loadLogoDataUrl(url) {
+  const key = url || 'default'
+  if (logoCache.has(key)) return Promise.resolve(logoCache.get(key))
   return new Promise((resolve, reject) => {
     const img = new Image()
+    // Needed for cross-origin company logos (Supabase Storage) so the
+    // canvas isn't "tainted" and toDataURL() doesn't throw; a harmless
+    // no-op for the same-origin bundled default.
+    img.crossOrigin = 'anonymous'
     img.onload = () => {
       const canvas = document.createElement('canvas')
       canvas.width = img.naturalWidth
       canvas.height = img.naturalHeight
       canvas.getContext('2d').drawImage(img, 0, 0)
-      cachedLogo = {
+      const result = {
         dataUrl: canvas.toDataURL('image/png'),
         ratio: img.naturalHeight / img.naturalWidth,
       }
-      resolve(cachedLogo)
+      logoCache.set(key, result)
+      resolve(result)
     }
     img.onerror = reject
-    img.src = logoSrc
+    img.src = url || logoSrc
   })
 }
 
@@ -45,7 +52,7 @@ export async function buildSaleDocumentPdf(data) {
   const pageWidth = doc.internal.pageSize.getWidth()
   const rightX = pageWidth - MARGIN
 
-  const logo = await loadLogoDataUrl()
+  const logo = await loadLogoDataUrl(data.companyLogoUrl)
   const logoWidth = 32
   doc.addImage(logo.dataUrl, 'PNG', MARGIN, MARGIN, logoWidth, logoWidth * logo.ratio)
 

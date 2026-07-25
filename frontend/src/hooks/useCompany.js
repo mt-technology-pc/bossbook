@@ -1,23 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
 // RLS on companies scopes select to the caller's own company (id =
-// current_company_id()), so this is always exactly one row — the print
-// header/footer's only real use for it so far.
+// current_company_id()), so this is always exactly one row.
 export function useCompany() {
   const { user } = useAuth()
   const [company, setCompany] = useState(null)
 
-  useEffect(() => {
+  const fetchCompany = useCallback(() => {
     if (!user) {
       setCompany(null)
       return
     }
-    supabase.from('companies').select('name').single().then(({ data }) => {
+    supabase.from('companies').select('name, logo_url, brand_color').single().then(({ data }) => {
       setCompany(data)
     })
   }, [user])
 
-  return { company }
+  useEffect(() => {
+    fetchCompany()
+  }, [fetchCompany])
+
+  return { company, refetch: fetchCompany }
 }

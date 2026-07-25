@@ -16,7 +16,7 @@ export default function SaleDocument({ data }) {
   return (
     <div className="bg-white p-10 text-ink-900">
       <div className="flex items-start justify-between border-b border-ink-900/15 pb-6">
-        <img src={logoSrc} alt="BossBooks" className="h-12 w-auto object-contain" />
+        <img src={data.companyLogoUrl || logoSrc} alt="BossBooks" className="h-12 w-auto object-contain" />
         <div className="text-right">
           <p className="font-heading text-2xl font-semibold uppercase tracking-wide text-ink-900">
             {data.docTypeLabel}

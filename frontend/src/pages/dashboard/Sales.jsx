@@ -68,9 +68,10 @@ export default function Sales() {
             products,
             balance: balances[sale.id],
             customerBalance: customer ? customerBalanceFor(customer.id) : null,
+            company,
           })
         }),
-    [selectedIds, sales, customers, products, balances, customerBalanceFor],
+    [selectedIds, sales, customers, products, balances, customerBalanceFor, company],
   )
 
   const handlePrintSelected = () => {

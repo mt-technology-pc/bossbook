@@ -2,7 +2,7 @@
 // print layout (SaleDocument.jsx) and the PDF builder (saleDocumentPdf.js)
 // draw from, so the two stay in sync from one source instead of each
 // re-deriving line items/totals independently.
-export function buildSaleDocumentData({ sale, customer, products, balance, customerBalance }) {
+export function buildSaleDocumentData({ sale, customer, products, balance, customerBalance, company }) {
   const isInvoice = sale.type === 'invoice'
 
   const lineItems = (sale.sale_items || []).map((item) => {
@@ -48,6 +48,7 @@ export function buildSaleDocumentData({ sale, customer, products, balance, custo
     // already inclusive of this sale (since it's saved) — null when
     // there's no customer or the caller didn't pass one in.
     customerBalance: customer && customerBalance != null ? Number(customerBalance) : null,
+    companyLogoUrl: company?.logo_url || null,
     notes: sale.notes || '',
   }
 }

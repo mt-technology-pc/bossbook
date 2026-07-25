@@ -36,6 +36,7 @@ import TrialBalance from './pages/dashboard/TrialBalance'
 import Expenses from './pages/dashboard/Expenses'
 import SerialTracking from './pages/dashboard/SerialTracking'
 import Backup from './pages/dashboard/Backup'
+import Settings from './pages/dashboard/Settings'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import AdminRoute from './components/auth/AdminRoute'
@@ -188,7 +189,7 @@ function App() {
           <Route path="reports/general-ledger/:coaId" element={<GeneralLedger />} />
           <Route path="reports/trial-balance" element={<TrialBalance />} />
           <Route path="team" element={<ComingSoon title="Team" />} />
-          <Route path="settings" element={<ComingSoon title="Settings" />} />
+          <Route path="settings" element={<Settings />} />
           <Route path="backup" element={<Backup />} />
           <Route path="*" element={<ComingSoon />} />
         </Route>

@@ -11,6 +11,8 @@ import CreateMenu from '../components/dashboard/CreateMenu'
 import AssistantPanel from '../components/dashboard/AssistantPanel'
 import AccountStatusCard from '../components/dashboard/AccountStatusCard'
 import { useAuth } from '../context/AuthContext'
+import { useCompany } from '../hooks/useCompany'
+import { useBrandTheme, resetBrandTheme } from '../hooks/useBrandTheme'
 
 const nav = [
   { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, end: true },
@@ -33,8 +35,11 @@ export default function DashboardLayout() {
   const [open, setOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const { user, fullName, signOut } = useAuth()
+  const { company } = useCompany()
   const navigate = useNavigate()
   const location = useLocation()
+
+  useBrandTheme(company?.brand_color)
 
   useEffect(() => setOpen(false), [location.pathname])
 
@@ -42,6 +47,7 @@ export default function DashboardLayout() {
   const initial = displayName.charAt(0).toUpperCase()
 
   const handleSignOut = async () => {
+    resetBrandTheme()
     await signOut()
     navigate('/login', { replace: true })
   }
@@ -50,7 +56,7 @@ export default function DashboardLayout() {
     <div className="flex min-h-screen bg-cream-100">
       <aside className="hidden w-64 shrink-0 flex-col border-r border-ink-400/10 bg-cream-50 lg:flex print:hidden">
         <div className="flex h-16 items-center px-6">
-          <Logo />
+          <Logo logoUrl={company?.logo_url} />
         </div>
         <div className="px-3">
           <CreateMenu />
@@ -106,7 +112,7 @@ export default function DashboardLayout() {
                 <span className="h-1.5 w-10 rounded-full bg-ink-400/25" />
               </div>
               <div className="flex items-center justify-between px-6 pb-1 pt-2">
-                <Logo />
+                <Logo logoUrl={company?.logo_url} />
                 <button onClick={() => setOpen(false)} className="text-ink-500">
                   <X size={20} />
                 </button>
