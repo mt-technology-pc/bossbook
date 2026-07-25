@@ -50,16 +50,34 @@ const tools = toolDeclarations.map((decl) => ({
   },
 }))
 
+// OpenRouter sometimes hands back HTTP 200 with an error body instead of
+// an error status — seen when a free model's upstream provider times out
+// ({"error":{"message":"The operation was aborted","code":504}}). The SDK
+// only throws on non-2xx, so without this the response has no `choices`
+// and the caller crashes on completion.choices[0]. Normalize it into a
+// thrown error so it's handled the same way as any other failure.
+async function completeOnce(params) {
+  const completion = await ai.chat.completions.create(params)
+  if (completion.error) {
+    const err = new Error(completion.error.message || 'Upstream model error')
+    err.status = completion.error.code
+    throw err
+  }
+  return completion
+}
+
 // Some models occasionally emit a tool call that doesn't parse cleanly
-// against the schema (a 400 with a `failed_generation`-style field) —
-// usually a one-off generation glitch that succeeds if you just ask again
-// with the exact same input, so retry once before giving up.
+// against the schema (a 400), or the upstream provider times out (502/503/
+// 504, including the 200-wrapped case above) — both are usually one-off
+// and succeed if you just ask again, so retry once before giving up.
 async function completeWithRetry(params) {
   try {
-    return await ai.chat.completions.create(params)
+    return await completeOnce(params)
   } catch (err) {
-    if (err.status === 400 && err.code !== 'context_length_exceeded') {
-      return await ai.chat.completions.create(params)
+    const retryable = (err.status === 400 && err.code !== 'context_length_exceeded')
+      || [502, 503, 504].includes(err.status)
+    if (retryable) {
+      return await completeOnce(params)
     }
     throw err
   }
@@ -129,6 +147,13 @@ router.post('/chat', requireAuth, async (req, res) => {
     if (err.status === 400) {
       return res.json({
         reply: "Sorry, I couldn't quite parse that one — could you try rephrasing it more simply? For example: \"create an invoice for <customer>, 2 <product> at Rs. 4500 each\".",
+        actions: [],
+      })
+    }
+
+    if ([502, 503, 504].includes(err.status)) {
+      return res.json({
+        reply: "The AI model timed out on that one — this happens occasionally on the free tier under load. Please try again.",
         actions: [],
       })
     }
