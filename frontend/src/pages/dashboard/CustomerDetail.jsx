@@ -24,7 +24,7 @@ export default function CustomerDetail() {
   const [notFound, setNotFound] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
 
-  const { transactions, balance, loading, error, addTransaction } = useCustomerTransactions(id)
+  const { transactions, balance, totalCharged, totalPaid, loading, error, addTransaction } = useCustomerTransactions(id)
 
   useEffect(() => {
     let cancelled = false
@@ -142,6 +142,11 @@ export default function CustomerDetail() {
                   ? `${formatCurrency(Math.abs(balance))} credit`
                   : 'Settled'}
             </p>
+            {totalCharged > 0 && (
+              <p className="mt-0.5 text-xs text-ink-400">
+                {formatCurrency(totalCharged)} billed · {formatCurrency(totalPaid)} paid
+              </p>
+            )}
           </div>
           <Button onClick={() => setModalOpen(true)} variant="primary">
             <HandCoins size={16} /> Add transaction

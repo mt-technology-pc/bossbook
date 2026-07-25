@@ -10,7 +10,7 @@ import AddCustomerModal from '../../components/customers/AddCustomerModal'
 
 export default function Customers() {
   const { customers, loading, error, addCustomer, deleteCustomer } = useCustomers()
-  const { balances, balanceFor, refetch: refetchBalances } = useCustomerBalances()
+  const { balances, refetch: refetchBalances } = useCustomerBalances()
   const [modalOpen, setModalOpen] = useState(false)
   const [query, setQuery] = useState('')
   const navigate = useNavigate()
@@ -143,7 +143,9 @@ export default function Customers() {
               </thead>
               <tbody>
                 {filtered.map((c, i) => {
-                  const balance = balanceFor(c.id)
+                  const balanceRow = balances.find((b) => b.customer_id === c.id)
+                  const balance = Number(balanceRow?.balance ?? 0)
+                  const totalCharged = Number(balanceRow?.total_charged ?? 0)
                   return (
                     <motion.tr
                       key={c.id}
@@ -172,9 +174,14 @@ export default function Customers() {
                       </td>
                       <td className="py-3.5 pr-3">
                         {balance > 0 ? (
-                          <span className="font-medium text-clay-600">
-                            {formatCurrency(balance)} owed
-                          </span>
+                          <div>
+                            <p className="font-medium text-clay-600">
+                              {formatCurrency(balance)} owed
+                            </p>
+                            <p className="text-xs text-ink-400">
+                              of {formatCurrency(totalCharged)} billed
+                            </p>
+                          </div>
                         ) : balance < 0 ? (
                           <span className="font-medium text-ink-500">
                             {formatCurrency(Math.abs(balance))} credit
