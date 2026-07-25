@@ -10,10 +10,14 @@ import { useCustomers } from '../../hooks/useCustomers'
 import { useProducts } from '../../hooks/useProducts'
 import { useSaleBalances } from '../../hooks/useSaleBalances'
 import { useCustomerBalances } from '../../hooks/useCustomerBalances'
+import { useCompany } from '../../hooks/useCompany'
+import { usePrintFormat } from '../../hooks/usePrintFormat'
 import { formatCurrency } from '../../lib/currency'
 import { buildSaleDocumentData } from '../../lib/saleDocument'
 import Button from '../../components/ui/Button'
 import SaleDocument from '../../components/sales/SaleDocument'
+import SaleDocumentPos from '../../components/sales/SaleDocumentPos'
+import PrintFormatToggle from '../../components/sales/PrintFormatToggle'
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
@@ -25,6 +29,8 @@ export default function Sales() {
   const { products } = useProducts()
   const { balances } = useSaleBalances()
   const { balanceFor: customerBalanceFor } = useCustomerBalances()
+  const { company } = useCompany()
+  const [printFormat, setPrintFormat] = usePrintFormat()
   const [expanded, setExpanded] = useState(null)
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState(() => new Set())
@@ -106,9 +112,12 @@ export default function Sales() {
         </div>
         <div className="flex flex-wrap gap-2">
           {selectedIds.size > 0 && (
-            <Button onClick={handlePrintSelected} variant="outline">
-              <Printer size={16} /> Print Selected ({selectedIds.size})
-            </Button>
+            <>
+              <PrintFormatToggle value={printFormat} onChange={setPrintFormat} />
+              <Button onClick={handlePrintSelected} variant="outline">
+                <Printer size={16} /> Print Selected ({selectedIds.size})
+              </Button>
+            </>
           )}
           <Button onClick={() => navigate('/dashboard/sales/payments-received')} variant="ghost">
             <ListChecks size={16} /> Payments received
@@ -315,13 +324,18 @@ export default function Sales() {
       </div>
 
       {selectedDocuments.length > 0 && (
-        <div className="hidden print:block">
-          {selectedDocuments.map((doc, i) => (
-            <div key={i} className={i < selectedDocuments.length - 1 ? 'break-after-page' : ''}>
-              <SaleDocument data={doc} />
-            </div>
-          ))}
-        </div>
+        <>
+          {printFormat === 'pos' && <style>{'@page { size: 80mm auto; margin: 3mm; }'}</style>}
+          <div className="hidden print:block">
+            {selectedDocuments.map((doc, i) => (
+              <div key={i} className={i < selectedDocuments.length - 1 ? 'break-after-page' : ''}>
+                {printFormat === 'pos'
+                  ? <SaleDocumentPos data={doc} companyName={company?.name} />
+                  : <SaleDocument data={doc} />}
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )

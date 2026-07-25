@@ -8,15 +8,20 @@ import { useCustomerBalances } from '../../hooks/useCustomerBalances'
 import { useSalesReps } from '../../hooks/useSalesReps'
 import { useAvailableUnits } from '../../hooks/useAvailableUnits'
 import { useSaleBalances } from '../../hooks/useSaleBalances'
+import { useCompany } from '../../hooks/useCompany'
+import { usePrintFormat } from '../../hooks/usePrintFormat'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import { newSaleLine, saleLineTotal, validateSaleLines, buildSaleItems } from '../../lib/saleLines'
 import { buildSaleDocumentData, saleDocumentFilename } from '../../lib/saleDocument'
 import { buildSaleDocumentPdf } from '../../lib/saleDocumentPdf'
+import { buildSaleDocumentPosPdf } from '../../lib/saleDocumentPosPdf'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
 import SaleLineItemsEditor from '../../components/sales/SaleLineItemsEditor'
 import SaleDocument from '../../components/sales/SaleDocument'
+import SaleDocumentPos from '../../components/sales/SaleDocumentPos'
+import PrintFormatToggle from '../../components/sales/PrintFormatToggle'
 import FormSkeleton from '../../components/ui/FormSkeleton'
 
 function todayISO() {
@@ -41,6 +46,8 @@ export default function NewInvoice() {
   const { salesReps, addSalesRep } = useSalesReps()
   const availableUnits = useAvailableUnits()
   const { balances, refetch: refetchBalances } = useSaleBalances()
+  const { company } = useCompany()
+  const [printFormat, setPrintFormat] = usePrintFormat()
 
   const [customerId, setCustomerId] = useState('')
   const [salesRepId, setSalesRepId] = useState('')
@@ -190,7 +197,9 @@ export default function NewInvoice() {
     if (!documentData) return
     setDownloadingPdf(true)
     try {
-      const doc = await buildSaleDocumentPdf(documentData)
+      const doc = printFormat === 'pos'
+        ? await buildSaleDocumentPosPdf(documentData, company?.name)
+        : await buildSaleDocumentPdf(documentData)
       doc.save(saleDocumentFilename(documentData))
     } catch (err) {
       setError(err.message || 'Could not generate the PDF.')
@@ -266,12 +275,13 @@ export default function NewInvoice() {
         <div className="flex items-center gap-1">
           {documentData && (
             <>
+              <PrintFormatToggle value={printFormat} onChange={setPrintFormat} />
               <button
                 onClick={handleDownloadPdf}
                 disabled={downloadingPdf}
                 title="Download PDF"
                 aria-label="Download PDF"
-                className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 disabled:opacity-50"
+                className="ml-1 rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 disabled:opacity-50"
               >
                 <Download size={18} />
               </button>
@@ -461,9 +471,14 @@ export default function NewInvoice() {
       )}
 
       {documentData && (
-        <div className="hidden print:block">
-          <SaleDocument data={documentData} />
-        </div>
+        <>
+          {printFormat === 'pos' && <style>{'@page { size: 80mm auto; margin: 3mm; }'}</style>}
+          <div className="hidden print:block">
+            {printFormat === 'pos'
+              ? <SaleDocumentPos data={documentData} companyName={company?.name} />
+              : <SaleDocument data={documentData} />}
+          </div>
+        </>
       )}
     </div>
   )
