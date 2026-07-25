@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
-  Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft, AlertCircle,
-  Smartphone, Receipt, BarChart3, Building2,
+  Mail, Lock, Eye, EyeOff, ArrowRight, ArrowLeft, AlertCircle,
+  Smartphone, Receipt, BarChart3,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import Button from '../components/ui/Button'
@@ -15,50 +15,33 @@ const perks = [
   { icon: BarChart3, text: 'Live profit & stock reports' },
 ]
 
+// Public self-signup is intentionally removed — accounts are provisioned
+// by an admin, not created by anyone who lands on this page.
 export default function Login() {
-  const [mode, setMode] = useState('login')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [notice, setNotice] = useState(null)
-  const isLogin = mode === 'login'
 
-  const { signIn, signUp } = useAuth()
+  const { signIn } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const redirectTo = location.state?.from ?? '/dashboard'
 
-  const switchMode = (m) => {
-    setMode(m)
-    setError(null)
-    setNotice(null)
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
-    setNotice(null)
     setLoading(true)
 
     const formData = new FormData(e.currentTarget)
     const email = formData.get('email')
     const password = formData.get('password')
-    const fullName = formData.get('fullName')
-    const companyName = formData.get('companyName')
 
-    const { data, error: authError } = isLogin
-      ? await signIn({ email, password })
-      : await signUp({ email, password, fullName, companyName })
+    const { error: authError } = await signIn({ email, password })
 
     setLoading(false)
 
     if (authError) {
       setError(authError.message)
-      return
-    }
-
-    if (!isLogin && data?.user && !data?.session) {
-      setNotice('Check your inbox to confirm your email before logging in.')
       return
     }
 
@@ -112,18 +95,6 @@ export default function Login() {
               </motion.div>
             ))}
           </div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
-            className="mt-12 rounded-2xl border border-ink-400/15 bg-cream-100 p-5 backdrop-blur-sm"
-          >
-            <p className="text-sm leading-relaxed text-ink-600">
-              We&apos;re early — sign up now and help shape what BossBooks
-              becomes.
-            </p>
-          </motion.div>
         </div>
 
         <p className="relative z-10 text-xs text-ink-400">
@@ -149,153 +120,65 @@ export default function Login() {
             <Logo />
           </div>
 
-          <div className="mb-8 flex rounded-full border border-ink-400/20 bg-cream-200 p-1">
-            {['login', 'signup'].map((m) => (
+          <h1 className="font-heading text-2xl font-semibold text-ink-900">Welcome back</h1>
+          <p className="mt-1.5 text-sm text-ink-500">Log in to manage your shop, stock and sales.</p>
+
+          {error && (
+            <div className="mt-5 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+            <Field icon={Mail} name="email" type="email" placeholder="Email address" autoComplete="email" required />
+            <div className="relative">
+              <Field
+                icon={Lock}
+                name="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                autoComplete="current-password"
+                minLength={6}
+                required
+              />
               <button
-                key={m}
                 type="button"
-                onClick={() => switchMode(m)}
-                className="relative flex-1 rounded-full py-2 text-sm font-medium transition-colors"
+                onClick={() => setShowPassword((s) => !s)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600"
+                tabIndex={-1}
               >
-                {mode === m && (
-                  <motion.span
-                    layoutId="mode-pill"
-                    className="absolute inset-0 rounded-full bg-cream-50 shadow-sm"
-                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-                  />
-                )}
-                <span
-                  className={`relative z-10 ${
-                    mode === m
-                      ? 'text-ink-900'
-                      : 'text-ink-400'
-                  }`}
-                >
-                  {m === 'login' ? 'Log in' : 'Sign up'}
-                </span>
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
-            ))}
-          </div>
+            </div>
 
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={mode}
-              initial={{ opacity: 0, x: isLogin ? -16 : 16 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: isLogin ? 16 : -16 }}
-              transition={{ duration: 0.25 }}
-            >
-              <h1 className="font-heading text-2xl font-semibold text-ink-900">
-                {isLogin ? 'Welcome back' : 'Create your account'}
-              </h1>
-              <p className="mt-1.5 text-sm text-ink-500">
-                {isLogin
-                  ? 'Log in to manage your shop, stock and sales.'
-                  : 'Start your free 14-day trial — no card required.'}
-              </p>
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center gap-2 text-ink-500">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
+                />
+                Remember me
+              </label>
+              <a href="#" className="font-medium text-clay-600 hover:text-clay-700">
+                Forgot password?
+              </a>
+            </div>
 
-              {error && (
-                <div className="mt-5 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
-                  <AlertCircle size={16} className="mt-0.5 shrink-0" />
-                  {error}
-                </div>
+            <Button type="submit" variant="primary" size="lg" className="w-full" disabled={loading}>
+              {loading ? (
+                <motion.span
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                  className="h-4 w-4 rounded-full border-2 border-cream-50/40 border-t-cream-50"
+                />
+              ) : (
+                <>
+                  Log in <ArrowRight size={16} />
+                </>
               )}
-              {notice && (
-                <div className="mt-5 rounded-xl border border-clay-500/20 bg-clay-500/10 px-3.5 py-2.5 text-sm text-clay-700">
-                  {notice}
-                </div>
-              )}
-
-              <form onSubmit={handleSubmit} className="mt-7 space-y-4">
-                {!isLogin && (
-                  <>
-                    <Field icon={User} name="fullName" type="text" placeholder="Full name" autoComplete="name" required />
-                    <Field icon={Building2} name="companyName" type="text" placeholder="Business name" autoComplete="organization" required />
-                  </>
-                )}
-                <Field icon={Mail} name="email" type="email" placeholder="Email address" autoComplete="email" required />
-                <div className="relative">
-                  <Field
-                    icon={Lock}
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Password"
-                    autoComplete={isLogin ? 'current-password' : 'new-password'}
-                    minLength={6}
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((s) => !s)}
-                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600"
-                    tabIndex={-1}
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-
-                {isLogin && (
-                  <div className="flex items-center justify-between text-sm">
-                    <label className="flex items-center gap-2 text-ink-500">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
-                      />
-                      Remember me
-                    </label>
-                    <a href="#" className="font-medium text-clay-600 hover:text-clay-700">
-                      Forgot password?
-                    </a>
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="lg"
-                  className="w-full"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <motion.span
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                      className="h-4 w-4 rounded-full border-2 border-cream-50/40 border-t-cream-50"
-                    />
-                  ) : (
-                    <>
-                      {isLogin ? 'Log in' : 'Create account'} <ArrowRight size={16} />
-                    </>
-                  )}
-                </Button>
-              </form>
-
-              <div className="my-6 flex items-center gap-3">
-                <span className="h-px flex-1 bg-ink-400/15" />
-                <span className="text-xs text-ink-400">or continue with</span>
-                <span className="h-px flex-1 bg-ink-400/15" />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="justify-center">
-                  Google
-                </Button>
-                <Button variant="outline" className="justify-center">
-                  Apple
-                </Button>
-              </div>
-
-              <p className="mt-8 text-center text-sm text-ink-500">
-                {isLogin ? "Don't have an account? " : 'Already have an account? '}
-                <button
-                  onClick={() => setMode(isLogin ? 'signup' : 'login')}
-                  className="font-medium text-clay-600 hover:text-clay-700"
-                >
-                  {isLogin ? 'Sign up' : 'Log in'}
-                </button>
-              </p>
-            </motion.div>
-          </AnimatePresence>
+            </Button>
+          </form>
         </motion.div>
       </div>
     </div>

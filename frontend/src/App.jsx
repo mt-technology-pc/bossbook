@@ -40,9 +40,11 @@ import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
 import AdminRoute from './components/auth/AdminRoute'
 import DashboardLayout from './layouts/DashboardLayout'
+import AdminLayout from './layouts/AdminLayout'
 import UtilityWidgets from './components/widgets/UtilityWidgets'
 import AdminLogin from './pages/admin/AdminLogin'
-import AdminDashboard from './pages/admin/AdminDashboard'
+import AdminCompanies from './pages/admin/AdminCompanies'
+import AdminCompanyDetail from './pages/admin/AdminCompanyDetail'
 import { useAuth } from './context/AuthContext'
 
 function App() {
@@ -59,10 +61,13 @@ function App() {
           path="/admin"
           element={
             <AdminRoute>
-              <AdminDashboard />
+              <AdminLayout />
             </AdminRoute>
           }
-        />
+        >
+          <Route index element={<AdminCompanies />} />
+          <Route path="companies/:id" element={<AdminCompanyDetail />} />
+        </Route>
 
         <Route
           path="/dashboard/purchases/new"
