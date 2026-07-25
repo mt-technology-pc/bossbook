@@ -86,6 +86,12 @@ export default function SaleDocument({ data }) {
             <span>Amount Paid</span>
             <span>{formatCurrency(data.amountPaid)}</span>
           </div>
+          {data.customerBalance != null && data.customerBalance > 0 && (
+            <div className="mt-2 flex items-center justify-between border-t border-ink-900/10 pt-2 text-sm font-medium text-ink-700">
+              <span>Total Owed by Customer</span>
+              <span>{formatCurrency(data.customerBalance)}</span>
+            </div>
+          )}
         </div>
       </div>
 

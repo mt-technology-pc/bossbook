@@ -37,7 +37,7 @@ export default function NewInvoice() {
   const { sales, createSale, updateSale } = useSales()
   const { products, loading: productsLoading, refetch: refetchProducts } = useProducts()
   const { customers, addCustomer } = useCustomers()
-  const { balanceFor: customerBalanceFor } = useCustomerBalances()
+  const { balanceFor: customerBalanceFor, refetch: refetchCustomerBalances } = useCustomerBalances()
   const { salesReps, addSalesRep } = useSalesReps()
   const availableUnits = useAvailableUnits()
   const { balances, refetch: refetchBalances } = useSaleBalances()
@@ -170,8 +170,9 @@ export default function NewInvoice() {
     const existing = sales.find((s) => s.id === id)
     if (!existing) return null
     const customer = customers.find((c) => c.id === existing.customer_id) || null
-    return buildSaleDocumentData({ sale: existing, customer, products, balance: balances[id] })
-  }, [isEdit, loaded, sales, id, customers, products, balances])
+    const customerBalance = customer ? customerBalanceFor(customer.id) : null
+    return buildSaleDocumentData({ sale: existing, customer, products, balance: balances[id], customerBalance })
+  }, [isEdit, loaded, sales, id, customers, products, balances, customerBalanceFor])
 
   // "Save & Print" lands here (edit URL, replace: true) with
   // state.autoPrint set — once the just-saved record's documentData is
@@ -235,11 +236,11 @@ export default function NewInvoice() {
 
     refetchProducts()
     availableUnits.refetch()
-    // Awaited (unlike the two refetches above) so the balance for a
-    // brand-new invoice is already in state before we navigate into the
-    // auto-print view — otherwise the print fires on the first render,
-    // before this resolves, showing a false "fully settled" balance.
-    await refetchBalances()
+    // Awaited (unlike the two refetches above) so the sale/customer balance
+    // for a brand-new invoice is already in state before we navigate into
+    // the auto-print view — otherwise the print fires on the first render,
+    // before this resolves, showing stale/false balance figures.
+    await Promise.all([refetchBalances(), refetchCustomerBalances()])
 
     if (andPrint) {
       const savedId = isEdit ? id : data

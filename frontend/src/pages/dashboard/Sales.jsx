@@ -9,6 +9,7 @@ import { useSales } from '../../hooks/useSales'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useProducts } from '../../hooks/useProducts'
 import { useSaleBalances } from '../../hooks/useSaleBalances'
+import { useCustomerBalances } from '../../hooks/useCustomerBalances'
 import { formatCurrency } from '../../lib/currency'
 import { buildSaleDocumentData } from '../../lib/saleDocument'
 import Button from '../../components/ui/Button'
@@ -23,6 +24,7 @@ export default function Sales() {
   const { customers } = useCustomers()
   const { products } = useProducts()
   const { balances } = useSaleBalances()
+  const { balanceFor: customerBalanceFor } = useCustomerBalances()
   const [expanded, setExpanded] = useState(null)
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState(() => new Set())
@@ -52,15 +54,17 @@ export default function Sales() {
       [...selectedIds]
         .map((id) => sales.find((s) => s.id === id))
         .filter(Boolean)
-        .map((sale) =>
-          buildSaleDocumentData({
+        .map((sale) => {
+          const customer = customers.find((c) => c.id === sale.customer_id) || null
+          return buildSaleDocumentData({
             sale,
-            customer: customers.find((c) => c.id === sale.customer_id) || null,
+            customer,
             products,
             balance: balances[sale.id],
-          }),
-        ),
-    [selectedIds, sales, customers, products, balances],
+            customerBalance: customer ? customerBalanceFor(customer.id) : null,
+          })
+        }),
+    [selectedIds, sales, customers, products, balances, customerBalanceFor],
   )
 
   const handlePrintSelected = () => {

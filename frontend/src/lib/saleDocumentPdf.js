@@ -153,7 +153,22 @@ export async function buildSaleDocumentPdf(data) {
   doc.setTextColor(60, 57, 41)
   doc.text('Amount Paid', rightX - 70, afterTableY)
   doc.text(formatCurrency(data.amountPaid), rightX, afterTableY, { align: 'right' })
-  afterTableY += 10
+  afterTableY += 8
+
+  if (data.customerBalance != null && data.customerBalance > 0) {
+    doc.setDrawColor(220, 216, 206)
+    doc.setLineWidth(0.3)
+    doc.line(rightX - 90, afterTableY, rightX, afterTableY)
+    afterTableY += 5
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.setTextColor(30, 27, 22)
+    doc.text('Total Owed by Customer', rightX - 90, afterTableY)
+    doc.text(formatCurrency(data.customerBalance), rightX, afterTableY, { align: 'right' })
+    afterTableY += 8
+  } else {
+    afterTableY += 2
+  }
 
   if (data.isInvoice && data.dueDate) {
     doc.setFont('helvetica', 'normal')

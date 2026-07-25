@@ -4,6 +4,7 @@ import { X, Plus, AlertCircle, Receipt, ShoppingBag, Download, Printer } from 'l
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
+import { useCustomerBalances } from '../../hooks/useCustomerBalances'
 import { useSalesReps } from '../../hooks/useSalesReps'
 import { useAccounts } from '../../hooks/useAccounts'
 import { useAvailableUnits } from '../../hooks/useAvailableUnits'
@@ -30,6 +31,7 @@ export default function NewSalesReceipt() {
   const { sales, createSale, updateSale } = useSales()
   const { products, loading: productsLoading, refetch: refetchProducts } = useProducts()
   const { customers, addCustomer } = useCustomers()
+  const { balanceFor: customerBalanceFor, refetch: refetchCustomerBalances } = useCustomerBalances()
   const { salesReps, addSalesRep } = useSalesReps()
   const { accounts, addAccount, refetch: refetchAccounts } = useAccounts()
   const availableUnits = useAvailableUnits()
@@ -167,8 +169,9 @@ export default function NewSalesReceipt() {
     const existing = sales.find((s) => s.id === id)
     if (!existing) return null
     const customer = customers.find((c) => c.id === existing.customer_id) || null
-    return buildSaleDocumentData({ sale: existing, customer, products })
-  }, [isEdit, loaded, sales, id, customers, products])
+    const customerBalance = customer ? customerBalanceFor(customer.id) : null
+    return buildSaleDocumentData({ sale: existing, customer, products, customerBalance })
+  }, [isEdit, loaded, sales, id, customers, products, customerBalanceFor])
 
   // "Save & Print" lands here (edit URL, replace: true) with
   // state.autoPrint set — once the just-saved record's documentData is
@@ -231,6 +234,9 @@ export default function NewSalesReceipt() {
     refetchProducts()
     availableUnits.refetch()
     refetchAccounts()
+    // Awaited so a brand-new receipt's customer balance is already in
+    // state before navigating into the auto-print view.
+    await refetchCustomerBalances()
 
     if (andPrint) {
       const savedId = isEdit ? id : data
