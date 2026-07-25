@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { X, Plus, AlertCircle, FileText, ShoppingBag, Download, Printer } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
@@ -29,6 +29,7 @@ function addDaysISO(days) {
 
 export default function NewInvoice() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
   const isEdit = Boolean(id)
   const { sales, createSale, updateSale } = useSales()
@@ -158,6 +159,18 @@ export default function NewInvoice() {
     return buildSaleDocumentData({ sale: existing, customer, products })
   }, [isEdit, loaded, sales, id, customers, products])
 
+  // "Save & Print" lands here (edit URL, replace: true) with
+  // state.autoPrint set — once the just-saved record's documentData is
+  // actually ready, trigger the browser's print dialog automatically.
+  // Cleared from history state immediately after so navigating back here
+  // later (e.g. via browser back) doesn't re-trigger it.
+  useEffect(() => {
+    if (!location.state?.autoPrint || !documentData) return
+    window.print()
+    navigate(location.pathname, { replace: true, state: {} })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, documentData])
+
   const handleDownloadPdf = async () => {
     if (!documentData) return
     setDownloadingPdf(true)
@@ -171,7 +184,7 @@ export default function NewInvoice() {
     }
   }
 
-  const submit = async ({ andNew }) => {
+  const submit = async ({ andNew, andPrint }) => {
     if (!customerId) {
       setError('Select a customer for this invoice.')
       return
@@ -195,7 +208,7 @@ export default function NewInvoice() {
       items: buildSaleItems(lines, getProduct),
     }
 
-    const { error: submitError } = isEdit
+    const { data, error: submitError } = isEdit
       ? await updateSale(id, payload)
       : await createSale(payload)
 
@@ -208,6 +221,12 @@ export default function NewInvoice() {
 
     refetchProducts()
     availableUnits.refetch()
+
+    if (andPrint) {
+      const savedId = isEdit ? id : data
+      navigate(`/dashboard/sales/new-invoice/${savedId}`, { replace: true, state: { autoPrint: true } })
+      return
+    }
 
     if (andNew && !isEdit) resetForm()
     else navigate('/dashboard/sales')
@@ -404,6 +423,9 @@ export default function NewInvoice() {
                 {loading ? 'Saving…' : 'Save and new'}
               </Button>
             )}
+            <Button variant="outline" disabled={loading} onClick={() => submit({ andPrint: true })}>
+              <Printer size={15} /> {loading ? 'Saving…' : 'Save & Print'}
+            </Button>
             <Button variant="primary" disabled={loading} onClick={() => submit({ andNew: false })}>
               {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Save'}
             </Button>
