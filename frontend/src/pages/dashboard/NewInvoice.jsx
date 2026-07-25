@@ -38,7 +38,7 @@ export default function NewInvoice() {
   const { customers, addCustomer } = useCustomers()
   const { salesReps, addSalesRep } = useSalesReps()
   const availableUnits = useAvailableUnits()
-  const { balances } = useSaleBalances()
+  const { balances, refetch: refetchBalances } = useSaleBalances()
 
   const [customerId, setCustomerId] = useState('')
   const [salesRepId, setSalesRepId] = useState('')
@@ -223,6 +223,11 @@ export default function NewInvoice() {
 
     refetchProducts()
     availableUnits.refetch()
+    // Awaited (unlike the two refetches above) so the balance for a
+    // brand-new invoice is already in state before we navigate into the
+    // auto-print view — otherwise the print fires on the first render,
+    // before this resolves, showing a false "fully settled" balance.
+    await refetchBalances()
 
     if (andPrint) {
       const savedId = isEdit ? id : data
