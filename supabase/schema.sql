@@ -2648,6 +2648,12 @@ alter table public.sequence_counters enable row level security;
 -- Atomically returns the next integer for (owner_id, key), starting at 1.
 -- Safe under concurrent calls: the ON CONFLICT DO UPDATE takes a row lock,
 -- serializing simultaneous requests for the same counter.
+-- Dropped first: this function's parameter gets renamed to p_company_id
+-- later in this file (the multi-tenancy migration), and Postgres refuses
+-- to rename a parameter via plain create-or-replace — without this drop,
+-- re-running the whole script a second time fails right here trying to
+-- rename it back from p_company_id to p_owner_id.
+drop function if exists public.next_sequence_number(uuid, text);
 create or replace function public.next_sequence_number(p_owner_id uuid, p_key text)
 returns integer
 language plpgsql
@@ -2671,6 +2677,8 @@ grant execute on function public.next_sequence_number(uuid, text) to authenticat
 -- Formats a sequence number as a zero-padded code, e.g. next_sequence_code(...,
 -- 'invoice', 'S') -> 'S001', 'S002', ... 'S010', ... 'S1000' (grows past 3
 -- digits naturally once past 999, never truncates).
+-- Dropped first for the same reason as next_sequence_number above.
+drop function if exists public.next_sequence_code(uuid, text, text);
 create or replace function public.next_sequence_code(p_owner_id uuid, p_key text, p_prefix text default '')
 returns text
 language plpgsql
@@ -3503,7 +3511,25 @@ create policy "Users can delete own sticky notes" on public.sticky_notes for del
 -- counter has no single meaningful "owner" once more than one person at a
 -- company can trigger it.
 alter table public.sequence_counters add column if not exists company_id uuid references public.companies(id);
-update public.sequence_counters t set company_id = cu.company_id from public.company_users cu where cu.user_id = t.owner_id and t.company_id is null;
+
+-- Backfilling from owner_id and then dropping it is a one-time transition —
+-- once a run has already dropped the column, a later re-run of this same
+-- script can no longer reference it to backfill from, so this whole step
+-- is guarded to only run while owner_id still actually exists.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'sequence_counters' and column_name = 'owner_id'
+  ) then
+    update public.sequence_counters t set company_id = cu.company_id
+    from public.company_users cu
+    where cu.user_id = t.owner_id and t.company_id is null;
+
+    alter table public.sequence_counters drop column owner_id;
+  end if;
+end $$;
+
 alter table public.sequence_counters alter column company_id set not null;
 
 drop policy if exists "Users can view own sequence counters" on public.sequence_counters;
@@ -3511,7 +3537,6 @@ create policy "Users can view own sequence counters" on public.sequence_counters
 
 alter table public.sequence_counters drop constraint if exists sequence_counters_pkey;
 alter table public.sequence_counters add primary key (company_id, key);
-alter table public.sequence_counters drop column if exists owner_id;
 
 -- next_sequence_number/next_sequence_code keep the same (uuid, text[, text])
 -- argument TYPES, but Postgres still refuses `create or replace function`
