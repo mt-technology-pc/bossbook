@@ -3089,6 +3089,9 @@ create policy "Users can view own company membership"
 alter table public.companies add column if not exists logo_url text;
 alter table public.companies add column if not exists brand_color text
   check (brand_color is null or brand_color ~ '^#[0-9a-fA-F]{6}$');
+alter table public.companies add column if not exists address text;
+alter table public.companies add column if not exists email text;
+alter table public.companies add column if not exists phone text;
 
 -- Owner-vs-staff is enforced in the UI (Settings.jsx only shows the
 -- mutating controls to isOwner); RLS's job here is just the actual

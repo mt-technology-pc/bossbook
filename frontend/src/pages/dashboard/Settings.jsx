@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Palette, ImagePlus, Trash2, RotateCcw, AlertCircle, Check, ShieldAlert,
+  Palette, ImagePlus, Trash2, RotateCcw, AlertCircle, Check, ShieldAlert, Building2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
@@ -20,6 +20,10 @@ export default function Settings() {
   const { isOwner, loading: roleLoading } = useCompanyRole()
 
   const [initialized, setInitialized] = useState(false)
+  const [companyName, setCompanyName] = useState('')
+  const [address, setAddress] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [brandColor, setBrandColor] = useState(DEFAULT_COLOR)
   const [logoFile, setLogoFile] = useState(null)
   const [logoPreviewUrl, setLogoPreviewUrl] = useState(null)
@@ -34,6 +38,10 @@ export default function Settings() {
   // can't clobber unsaved changes the user is still looking at.
   useEffect(() => {
     if (company && !initialized) {
+      setCompanyName(company.name || '')
+      setAddress(company.address || '')
+      setEmail(company.email || '')
+      setPhone(company.phone || '')
       setBrandColor(company.brand_color || DEFAULT_COLOR)
       setInitialized(true)
     }
@@ -42,7 +50,13 @@ export default function Settings() {
   const isDirty =
     logoFile !== null ||
     removeLogo ||
-    (initialized && brandColor !== (company?.brand_color || DEFAULT_COLOR))
+    (initialized && (
+      brandColor !== (company?.brand_color || DEFAULT_COLOR) ||
+      companyName !== (company?.name || '') ||
+      address !== (company?.address || '') ||
+      email !== (company?.email || '') ||
+      phone !== (company?.phone || '')
+    ))
 
   const shades = deriveShades(isValidHex(brandColor) ? brandColor : DEFAULT_COLOR)
   const contrastRatio = getContrastRatio(isValidHex(brandColor) ? brandColor : DEFAULT_COLOR, '#ffffff')
@@ -84,11 +98,19 @@ export default function Settings() {
     setLogoPreviewUrl(null)
     setRemoveLogo(false)
     setBrandColor(company?.brand_color || DEFAULT_COLOR)
+    setCompanyName(company?.name || '')
+    setAddress(company?.address || '')
+    setEmail(company?.email || '')
+    setPhone(company?.phone || '')
     setError(null)
   }
 
   const handleSave = async () => {
     if (!company) return
+    if (!companyName.trim()) {
+      setError('Company name cannot be empty.')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -108,7 +130,14 @@ export default function Settings() {
 
       const { error: updateError } = await supabase
         .from('companies')
-        .update({ logo_url: logoUrl, brand_color: isValidHex(brandColor) ? brandColor : null })
+        .update({
+          logo_url: logoUrl,
+          brand_color: isValidHex(brandColor) ? brandColor : null,
+          name: companyName.trim(),
+          address: address.trim() || null,
+          email: email.trim() || null,
+          phone: phone.trim() || null,
+        })
         .eq('id', company.id)
       if (updateError) throw updateError
 
@@ -164,13 +193,13 @@ export default function Settings() {
         Settings
       </h1>
       <p className="mt-1 text-sm text-ink-500">
-        Branding — customize your logo and color tone across the app, invoices, and receipts.
+        Company info and branding — shown across the app, invoices, and receipts.
       </p>
 
       {!isOwner && (
         <div className="mt-6 flex items-start gap-2 rounded-xl border border-ink-400/20 bg-cream-200/60 px-3.5 py-2.5 text-sm text-ink-600">
           <ShieldAlert size={16} className="mt-0.5 shrink-0" />
-          Only the account owner can change branding — ask an owner to update this.
+          Only the account owner can change these settings — ask an owner to update this.
         </div>
       )}
 
@@ -183,6 +212,50 @@ export default function Settings() {
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-6">
+          <section className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
+                <Building2 size={16} />
+              </span>
+              <h2 className="font-heading text-base font-semibold text-ink-900">Company info</h2>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <Field
+                label="Company name *"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                disabled={!isOwner}
+                placeholder="Your business name"
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="Phone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  disabled={!isOwner}
+                  placeholder="07X XXX XXXX"
+                />
+                <Field
+                  label="Email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={!isOwner}
+                  placeholder="Optional"
+                />
+              </div>
+              <Field
+                label="Address"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                disabled={!isOwner}
+                placeholder="Optional"
+              />
+            </div>
+          </section>
+
           <section className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
             <div className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
@@ -322,7 +395,7 @@ export default function Settings() {
               {currentLogoSrc ? (
                 <img src={currentLogoSrc} alt="Logo preview" className="h-8 w-auto object-contain" />
               ) : (
-                <span className="font-heading text-sm font-semibold text-ink-900">{company.name}</span>
+                <span className="font-heading text-sm font-semibold text-ink-900">{companyName || company.name}</span>
               )}
             </div>
 
@@ -353,10 +426,22 @@ export default function Settings() {
       >
         {isDirty && isOwner && (
           <div className="pointer-events-auto rounded-full border border-ink-400/15 bg-ink-900 px-4 py-2 text-xs font-medium text-cream-50 shadow-lg">
-            You have unsaved branding changes.
+            You have unsaved changes.
           </div>
         )}
       </motion.div>
     </div>
+  )
+}
+
+function Field({ label, ...props }) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-ink-500">{label}</span>
+      <input
+        {...props}
+        className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 disabled:opacity-50"
+      />
+    </label>
   )
 }
