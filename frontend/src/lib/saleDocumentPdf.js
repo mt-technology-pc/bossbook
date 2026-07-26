@@ -57,9 +57,9 @@ export async function buildSaleDocumentPdf(data) {
   const logoWidth = 32
   doc.addImage(logo.dataUrl, 'PNG', MARGIN, MARGIN, logoWidth, logoWidth * logo.ratio)
 
+  let companyY = MARGIN + logoWidth * logo.ratio + 4
   const companyLines = [data.companyAddress, data.companyPhone, data.companyEmail].filter(Boolean)
   if (companyLines.length > 0) {
-    let companyY = MARGIN + logoWidth * logo.ratio + 4
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(110, 105, 95)
@@ -85,7 +85,11 @@ export async function buildSaleDocumentPdf(data) {
     doc.text(`Due: ${formatDate(data.dueDate)}`, rightX, y, { align: 'right' })
   }
 
-  let cursorY = MARGIN + 32
+  // The divider sits below whichever column (logo + company info on the
+  // left, or doc type/reference/date on the right) actually runs deeper —
+  // a fixed offset here previously overlapped the Bill To block whenever
+  // a company's logo was tall or it had 2-3 lines of contact info.
+  let cursorY = Math.max(companyY, y) + 6
   doc.setDrawColor(220, 216, 206)
   doc.line(MARGIN, cursorY, rightX, cursorY)
   cursorY += 8
