@@ -7,13 +7,17 @@ import meRouter from './routes/me.js'
 import assistantRouter from './routes/assistant.js'
 import backupRouter from './routes/backup.js'
 import adminRouter from './routes/admin.js'
+import emailRouter from './routes/email.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
 const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
 
 app.use(cors({ origin: allowedOrigin }))
-app.use(express.json())
+// 10mb (not the default ~100kb): invoice/receipt PDFs are uploaded as
+// base64 JSON for the email-sending route, which is meaningfully bigger
+// than every other request body this API handles.
+app.use(express.json({ limit: '10mb' }))
 app.use(morgan('dev'))
 
 app.use('/api/health', healthRouter)
@@ -21,6 +25,7 @@ app.use('/api/me', meRouter)
 app.use('/api/assistant', assistantRouter)
 app.use('/api/backup', backupRouter)
 app.use('/api/admin', adminRouter)
+app.use('/api/email', emailRouter)
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' })

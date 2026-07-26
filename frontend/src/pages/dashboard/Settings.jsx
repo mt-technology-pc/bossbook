@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
-  Palette, ImagePlus, Trash2, RotateCcw, AlertCircle, Check, ShieldAlert, Building2,
+  Palette, ImagePlus, Trash2, RotateCcw, AlertCircle, Check, ShieldAlert, Building2, Mail,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import { useCompany } from '../../hooks/useCompany'
 import { useCompanyRole } from '../../hooks/useCompanyRole'
+import { useSmtpSettings } from '../../hooks/useSmtpSettings'
 import { deriveShades, isValidHex, getContrastRatio } from '../../lib/brandColor'
 import Button from '../../components/ui/Button'
 
@@ -18,6 +19,7 @@ const ALLOWED_LOGO_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml']
 export default function Settings() {
   const { company, refetch } = useCompany()
   const { isOwner, loading: roleLoading } = useCompanyRole()
+  const { settings: smtpSettings, loading: smtpLoading, saveSettings: saveSmtpSettings } = useSmtpSettings()
 
   const [initialized, setInitialized] = useState(false)
   const [companyName, setCompanyName] = useState('')
@@ -33,6 +35,17 @@ export default function Settings() {
   const [saved, setSaved] = useState(false)
   const fileInputRef = useRef(null)
 
+  const [smtpInitialized, setSmtpInitialized] = useState(false)
+  const [smtpHost, setSmtpHost] = useState('')
+  const [smtpPort, setSmtpPort] = useState('587')
+  const [smtpUsername, setSmtpUsername] = useState('')
+  const [smtpPassword, setSmtpPassword] = useState('')
+  const [smtpFromEmail, setSmtpFromEmail] = useState('')
+  const [smtpFromName, setSmtpFromName] = useState('')
+  const [smtpError, setSmtpError] = useState(null)
+  const [smtpSaving, setSmtpSaving] = useState(false)
+  const [smtpSaved, setSmtpSaved] = useState(false)
+
   // Sync the draft from the saved company exactly once, when it first
   // loads — not on every refetch, so a Save-triggered refetch mid-edit
   // can't clobber unsaved changes the user is still looking at.
@@ -46,6 +59,17 @@ export default function Settings() {
       setInitialized(true)
     }
   }, [company, initialized])
+
+  useEffect(() => {
+    if (!smtpLoading && !smtpInitialized) {
+      setSmtpHost(smtpSettings?.host || '')
+      setSmtpPort(smtpSettings?.port ? String(smtpSettings.port) : '587')
+      setSmtpUsername(smtpSettings?.username || '')
+      setSmtpFromEmail(smtpSettings?.from_email || '')
+      setSmtpFromName(smtpSettings?.from_name || '')
+      setSmtpInitialized(true)
+    }
+  }, [smtpLoading, smtpSettings, smtpInitialized])
 
   const isDirty =
     logoFile !== null ||
@@ -177,6 +201,61 @@ export default function Settings() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const isSmtpDirty = smtpInitialized && (
+    smtpHost !== (smtpSettings?.host || '') ||
+    smtpPort !== (smtpSettings?.port ? String(smtpSettings.port) : '587') ||
+    smtpUsername !== (smtpSettings?.username || '') ||
+    smtpPassword !== '' ||
+    smtpFromEmail !== (smtpSettings?.from_email || '') ||
+    smtpFromName !== (smtpSettings?.from_name || '')
+  )
+
+  const handleSmtpDiscard = () => {
+    setSmtpHost(smtpSettings?.host || '')
+    setSmtpPort(smtpSettings?.port ? String(smtpSettings.port) : '587')
+    setSmtpUsername(smtpSettings?.username || '')
+    setSmtpPassword('')
+    setSmtpFromEmail(smtpSettings?.from_email || '')
+    setSmtpFromName(smtpSettings?.from_name || '')
+    setSmtpError(null)
+  }
+
+  const handleSmtpSave = async () => {
+    if (!company) return
+    if (!smtpHost.trim() || !smtpUsername.trim() || !smtpFromEmail.trim() || !smtpFromName.trim()) {
+      setSmtpError('Host, username, from email, and from name are all required.')
+      return
+    }
+    if (!smtpSettings && !smtpPassword) {
+      setSmtpError('Enter a password to finish setting up SMTP for the first time.')
+      return
+    }
+    const port = Number(smtpPort)
+    if (!port || port <= 0) {
+      setSmtpError('Enter a valid port number.')
+      return
+    }
+    setSmtpSaving(true)
+    setSmtpError(null)
+    const { error: saveError } = await saveSmtpSettings({
+      companyId: company.id,
+      host: smtpHost.trim(),
+      port,
+      username: smtpUsername.trim(),
+      password: smtpPassword,
+      from_email: smtpFromEmail.trim(),
+      from_name: smtpFromName.trim(),
+    })
+    setSmtpSaving(false)
+    if (saveError) {
+      setSmtpError(saveError.message)
+      return
+    }
+    setSmtpPassword('')
+    setSmtpSaved(true)
+    setTimeout(() => setSmtpSaved(false), 2500)
   }
 
   if (!company || roleLoading) {
@@ -376,6 +455,90 @@ export default function Settings() {
               </button>
             </div>
           )}
+
+          <section className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
+                <Mail size={16} />
+              </span>
+              <h2 className="font-heading text-base font-semibold text-ink-900">Email / SMTP</h2>
+            </div>
+            <p className="mt-1 text-xs text-ink-400">
+              Used to email invoices and receipts to customers as a PDF attachment.
+            </p>
+
+            {smtpError && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                {smtpError}
+              </div>
+            )}
+
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <Field
+                    label="SMTP host *"
+                    value={smtpHost}
+                    onChange={(e) => setSmtpHost(e.target.value)}
+                    disabled={!isOwner}
+                    placeholder="smtp.gmail.com"
+                  />
+                </div>
+                <Field
+                  label="Port *"
+                  type="number"
+                  value={smtpPort}
+                  onChange={(e) => setSmtpPort(e.target.value)}
+                  disabled={!isOwner}
+                  placeholder="587"
+                />
+              </div>
+              <Field
+                label="Username *"
+                value={smtpUsername}
+                onChange={(e) => setSmtpUsername(e.target.value)}
+                disabled={!isOwner}
+                placeholder="you@yourbusiness.com"
+              />
+              <Field
+                label="Password *"
+                type="password"
+                value={smtpPassword}
+                onChange={(e) => setSmtpPassword(e.target.value)}
+                disabled={!isOwner}
+                placeholder={smtpSettings ? '•••••••• (leave blank to keep current)' : 'Required'}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label="From email *"
+                  type="email"
+                  value={smtpFromEmail}
+                  onChange={(e) => setSmtpFromEmail(e.target.value)}
+                  disabled={!isOwner}
+                  placeholder="billing@yourbusiness.com"
+                />
+                <Field
+                  label="From name *"
+                  value={smtpFromName}
+                  onChange={(e) => setSmtpFromName(e.target.value)}
+                  disabled={!isOwner}
+                  placeholder="Your Business"
+                />
+              </div>
+            </div>
+
+            {isOwner && (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button type="button" variant="primary" size="sm" disabled={!isSmtpDirty || smtpSaving} onClick={handleSmtpSave}>
+                  {smtpSaving ? 'Saving…' : smtpSaved ? <><Check size={14} /> Saved</> : 'Save SMTP settings'}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" disabled={!isSmtpDirty || smtpSaving} onClick={handleSmtpDiscard}>
+                  Discard
+                </Button>
+              </div>
+            )}
+          </section>
         </div>
 
         <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">

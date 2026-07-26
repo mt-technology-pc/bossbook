@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { X, Plus, AlertCircle, FileText, ShoppingBag, Download, Printer } from 'lucide-react'
+import { X, Plus, AlertCircle, FileText, ShoppingBag, Download, Printer, Mail } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
@@ -22,6 +22,7 @@ import SaleLineItemsEditor from '../../components/sales/SaleLineItemsEditor'
 import SaleDocument from '../../components/sales/SaleDocument'
 import SaleDocumentPos from '../../components/sales/SaleDocumentPos'
 import PrintFormatToggle from '../../components/sales/PrintFormatToggle'
+import EmailInvoiceModal from '../../components/sales/EmailInvoiceModal'
 import FormSkeleton from '../../components/ui/FormSkeleton'
 
 function todayISO() {
@@ -48,6 +49,7 @@ export default function NewInvoice() {
   const { balances, refetch: refetchBalances } = useSaleBalances()
   const { company } = useCompany()
   const [printFormat, setPrintFormat] = usePrintFormat()
+  const [emailModalOpen, setEmailModalOpen] = useState(false)
 
   const [customerId, setCustomerId] = useState('')
   const [salesRepId, setSalesRepId] = useState('')
@@ -293,6 +295,15 @@ export default function NewInvoice() {
               >
                 <Printer size={18} />
               </button>
+              <button
+                onClick={() => setEmailModalOpen(true)}
+                disabled={!documentData.customer?.email}
+                title={documentData.customer?.email ? 'Email to customer' : 'Add an email address for this customer first'}
+                aria-label="Email to customer"
+                className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 disabled:opacity-50"
+              >
+                <Mail size={18} />
+              </button>
             </>
           )}
           <button
@@ -480,6 +491,14 @@ export default function NewInvoice() {
           </div>
         </>
       )}
+
+      <EmailInvoiceModal
+        open={emailModalOpen}
+        onClose={() => setEmailModalOpen(false)}
+        documentData={documentData}
+        printFormat={printFormat}
+        company={company}
+      />
     </div>
   )
 }
