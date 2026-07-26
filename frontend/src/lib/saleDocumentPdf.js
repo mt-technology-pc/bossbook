@@ -14,6 +14,13 @@ const PAGE_HEIGHT = 297 // A4 portrait, mm
 // would leak the first company's logo onto every later PDF.
 const logoCache = new Map()
 
+// Uploaded logos can be up to 2MB at whatever resolution the owner's
+// original file was (e.g. a 2000px-wide PNG) — embedded on the page at
+// only ~32mm wide, that's wildly more pixel data than print needs, and
+// bloats the PDF (and, for the email feature, the base64 upload) by many
+// times over. 500px is comfortably sharp even at large print sizes.
+const MAX_LOGO_PX = 500
+
 function loadLogoDataUrl(url) {
   const key = url || 'default'
   if (logoCache.has(key)) return Promise.resolve(logoCache.get(key))
@@ -24,10 +31,11 @@ function loadLogoDataUrl(url) {
     // no-op for the same-origin bundled default.
     img.crossOrigin = 'anonymous'
     img.onload = () => {
+      const scale = Math.min(1, MAX_LOGO_PX / Math.max(img.naturalWidth, img.naturalHeight))
       const canvas = document.createElement('canvas')
-      canvas.width = img.naturalWidth
-      canvas.height = img.naturalHeight
-      canvas.getContext('2d').drawImage(img, 0, 0)
+      canvas.width = img.naturalWidth * scale
+      canvas.height = img.naturalHeight * scale
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
       const result = {
         dataUrl: canvas.toDataURL('image/png'),
         ratio: img.naturalHeight / img.naturalWidth,
