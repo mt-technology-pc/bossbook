@@ -96,13 +96,21 @@ function isRetryable(err) {
 // worst-case wait for no real benefit — a model having a bad moment is
 // usually still having it a second later). Only throws once every
 // candidate has failed once.
-async function completeWithRetry(params) {
-  const models = [AI_MODEL, ...AI_MODEL_FALLBACKS]
+//
+// `preferredModel` lets a multi-round tool-calling conversation remember
+// which model actually answered last time and try that one first — a
+// tool-heavy request can need several of these calls in a row, and
+// without this every single round re-pays the cost of timing out on a
+// currently-unhealthy AI_MODEL before ever reaching the one that works.
+async function completeWithRetry(params, preferredModel) {
+  const rest = [AI_MODEL, ...AI_MODEL_FALLBACKS].filter((m) => m !== preferredModel)
+  const models = preferredModel ? [preferredModel, ...rest] : rest
   let lastErr
 
   for (const model of models) {
     try {
-      return await completeOnce(model, params)
+      const completion = await completeOnce(model, params)
+      return { completion, model }
     } catch (err) {
       lastErr = err
       if (!isRetryable(err)) throw err
@@ -141,7 +149,7 @@ router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
   const actions = []
 
   try {
-    let completion = await completeWithRetry({ messages: chatMessages, tools })
+    let { completion, model } = await completeWithRetry({ messages: chatMessages, tools })
     let choice = completion.choices[0]
 
     let rounds = 0
@@ -149,7 +157,11 @@ router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
       rounds += 1
       chatMessages.push(choice.message)
 
-      for (const toolCall of choice.message.tool_calls) {
+      // A round's tool calls were all decided by the model in one shot
+      // from the same context — none of them can depend on another's
+      // result within this round — so running them concurrently is safe
+      // and meaningfully faster than awaiting each one in turn.
+      const toolResults = await Promise.all(choice.message.tool_calls.map(async (toolCall) => {
         let args = {}
         try {
           args = JSON.parse(toolCall.function.arguments || '{}')
@@ -157,6 +169,10 @@ router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
           // leave args empty if the model sent malformed JSON
         }
         const result = await executeTool(toolCall.function.name, args, supabase, req.user.id)
+        return { toolCall, result }
+      }))
+
+      for (const { toolCall, result } of toolResults) {
         if (result?.success) actions.push({ tool: toolCall.function.name, ...result })
         chatMessages.push({
           role: 'tool',
@@ -165,7 +181,7 @@ router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
         })
       }
 
-      completion = await completeWithRetry({ messages: chatMessages, tools })
+      ;({ completion, model } = await completeWithRetry({ messages: chatMessages, tools }, model))
       choice = completion.choices[0]
     }
 
@@ -187,7 +203,8 @@ router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
       })
     }
 
-    if ([500, 502, 503, 504].includes(err.status)) {
+    if ([500, 502, 503, 504].includes(err.status)
+      || (!err.status && /timeout|connection/i.test(err.name || ''))) {
       return res.json({
         reply: "The AI models I have access to are all struggling right now — this happens occasionally on the free tier under load. Please try again in a moment.",
         actions: [],

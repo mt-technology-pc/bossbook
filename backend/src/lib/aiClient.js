@@ -35,8 +35,12 @@ export const AI_MODEL = process.env.OPENROUTER_MODEL || 'google/gemma-4-26b-a4b-
 // tool/function calling via a live test) when AI_MODEL is having a bad
 // moment — free-tier models rarely all struggle at once, so trying the
 // next one is far more reliable than retrying the same flaky one.
+//
+// Ordered fastest-first by measured latency (plain chat / tool-calling):
+// nemotron ~0.7-1.4s, ling-3.0-flash ~0.9s, gpt-oss-20b ~3.4-8s — so
+// whichever fallback gets tried first is also the quickest one available.
 export const AI_MODEL_FALLBACKS = [
-  'openai/gpt-oss-20b:free',
   'nvidia/nemotron-3-super-120b-a12b:free',
   'inclusionai/ling-3.0-flash:free',
+  'openai/gpt-oss-20b:free',
 ].filter((m) => m !== AI_MODEL)
