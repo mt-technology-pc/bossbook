@@ -1,12 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Sparkles, X, ArrowUp, Bot, CheckCircle2, AlertCircle } from 'lucide-react'
+import {
+  Sparkles, X, ArrowUp, Bot, CheckCircle2, AlertCircle, History, SquarePen, ChevronLeft,
+} from 'lucide-react'
 import { useAssistant } from '../../hooks/useAssistant'
 import { formatCurrency } from '../../lib/currency'
 
 function formatMessageTime(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+}
+
+function formatConversationTime(iso) {
+  if (!iso) return ''
+  const date = new Date(iso)
+  const isToday = date.toDateString() === new Date().toDateString()
+  return isToday
+    ? date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 const SUGGESTIONS = [
@@ -115,8 +126,12 @@ function actionLabel(action) {
 
 export default function AssistantPanel() {
   const [open, setOpen] = useState(false)
+  const [view, setView] = useState('chat')
   const [input, setInput] = useState('')
-  const { messages, sending, error, send, clear } = useAssistant()
+  const {
+    messages, sending, error, send, newChat,
+    conversationId, conversations, loadConversations, openConversation,
+  } = useAssistant()
   const scrollRef = useRef(null)
 
   useEffect(() => {
@@ -128,6 +143,16 @@ export default function AssistantPanel() {
     if (!value) return
     setInput('')
     send(value)
+  }
+
+  const showHistory = () => {
+    setView('history')
+    loadConversations()
+  }
+
+  const selectConversation = async (id) => {
+    setView('chat')
+    await openConversation(id)
   }
 
   return (
@@ -152,23 +177,67 @@ export default function AssistantPanel() {
             className="fixed bottom-24 right-4 z-40 flex h-[32rem] max-h-[calc(100vh-7rem)] w-[23rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[20px] border border-ink-400/15 bg-cream-50 shadow-2xl sm:right-6 print:hidden"
           >
             <div className="flex items-center gap-3 border-b border-ink-400/10 px-4 py-3.5">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-900 text-cream-50">
-                <Bot size={16} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-[15px] font-bold text-ink-900">Assistant</p>
-                <p className="text-xs text-ink-400">Ask about your customers, sales & profit</p>
-              </div>
-              {messages.length > 0 && (
-                <button
-                  onClick={clear}
-                  className="shrink-0 text-xs font-medium text-ink-400 hover:text-clay-600"
-                >
-                  Clear
-                </button>
+              {view === 'history' ? (
+                <>
+                  <button
+                    onClick={() => setView('chat')}
+                    aria-label="Back to chat"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-500 hover:bg-ink-900/5"
+                  >
+                    <ChevronLeft size={18} />
+                  </button>
+                  <p className="flex-1 text-[15px] font-bold text-ink-900">Conversations</p>
+                </>
+              ) : (
+                <>
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-900 text-cream-50">
+                    <Bot size={16} />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[15px] font-bold text-ink-900">Assistant</p>
+                    <p className="text-xs text-ink-400">Ask about your customers, sales & profit</p>
+                  </div>
+                  <button
+                    onClick={showHistory}
+                    aria-label="Past conversations"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-400 hover:bg-ink-900/5 hover:text-clay-600"
+                  >
+                    <History size={16} />
+                  </button>
+                  {(messages.length > 0 || conversationId) && (
+                    <button
+                      onClick={newChat}
+                      aria-label="New chat"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-400 hover:bg-ink-900/5 hover:text-clay-600"
+                    >
+                      <SquarePen size={16} />
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
+            {view === 'history' ? (
+              <div className="flex-1 overflow-y-auto px-2 py-2">
+                {conversations.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center text-center text-ink-400">
+                    <History size={22} className="mb-2 opacity-50" />
+                    <p className="text-sm">No past conversations yet</p>
+                  </div>
+                ) : (
+                  conversations.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => selectConversation(c.id)}
+                      className={`block w-full rounded-xl px-3 py-2.5 text-left hover:bg-ink-900/5 ${c.id === conversationId ? 'bg-ink-900/5' : ''}`}
+                    >
+                      <p className="truncate text-sm font-medium text-ink-800">{c.title || 'New conversation'}</p>
+                      <p className="text-xs text-ink-400">{formatConversationTime(c.updated_at)}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            ) : (
             <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center">
@@ -255,36 +324,41 @@ export default function AssistantPanel() {
                 </div>
               )}
             </div>
+            )}
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                submit()
-              }}
-              className="border-t border-ink-400/10 px-4 py-3"
-            >
-              <div className="flex items-end gap-2">
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  placeholder="Message…"
-                  disabled={sending}
-                  className="flex-1 bg-transparent py-1.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none disabled:opacity-60"
-                />
-                <button
-                  type="submit"
-                  disabled={sending || !input.trim()}
-                  aria-label="Send"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay-500 text-cream-50 transition-colors hover:bg-clay-600 disabled:opacity-40"
+            {view === 'chat' && (
+              <>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    submit()
+                  }}
+                  className="border-t border-ink-400/10 px-4 py-3"
                 >
-                  <ArrowUp size={17} />
-                </button>
-              </div>
-            </form>
+                  <div className="flex items-end gap-2">
+                    <input
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      placeholder="Message…"
+                      disabled={sending}
+                      className="flex-1 bg-transparent py-1.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none disabled:opacity-60"
+                    />
+                    <button
+                      type="submit"
+                      disabled={sending || !input.trim()}
+                      aria-label="Send"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay-500 text-cream-50 transition-colors hover:bg-clay-600 disabled:opacity-40"
+                    >
+                      <ArrowUp size={17} />
+                    </button>
+                  </div>
+                </form>
 
-            <p className="border-t border-ink-400/10 py-2 text-center text-[11px] text-ink-400/70">
-              Powered by BossBooks AI
-            </p>
+                <p className="border-t border-ink-400/10 py-2 text-center text-[11px] text-ink-400/70">
+                  Powered by BossBooks AI
+                </p>
+              </>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

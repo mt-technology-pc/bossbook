@@ -5481,3 +5481,61 @@ drop trigger if exists set_smtp_settings_updated_at on public.smtp_settings;
 create trigger set_smtp_settings_updated_at
   before update on public.smtp_settings
   for each row execute function public.set_updated_at();
+
+-- AI assistant chat history -----------------------------------------------
+--
+-- Deliberately scoped to auth.uid() rather than company_id, unlike almost
+-- everything else in this schema — this is personal chat history (like a
+-- ChatGPT conversation), not a shared business record, so two users at the
+-- same company should not see each other's assistant conversations.
+
+create table if not exists public.assistant_conversations (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  title text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists assistant_conversations_user_id_idx on public.assistant_conversations(user_id);
+
+alter table public.assistant_conversations enable row level security;
+
+drop policy if exists "Users can view own assistant conversations" on public.assistant_conversations;
+create policy "Users can view own assistant conversations" on public.assistant_conversations for select using (auth.uid() = user_id);
+drop policy if exists "Users can insert own assistant conversations" on public.assistant_conversations;
+create policy "Users can insert own assistant conversations" on public.assistant_conversations for insert with check (auth.uid() = user_id);
+drop policy if exists "Users can update own assistant conversations" on public.assistant_conversations;
+create policy "Users can update own assistant conversations" on public.assistant_conversations for update using (auth.uid() = user_id);
+drop policy if exists "Users can delete own assistant conversations" on public.assistant_conversations;
+create policy "Users can delete own assistant conversations" on public.assistant_conversations for delete using (auth.uid() = user_id);
+
+drop trigger if exists set_assistant_conversations_updated_at on public.assistant_conversations;
+create trigger set_assistant_conversations_updated_at
+  before update on public.assistant_conversations
+  for each row execute function public.set_updated_at();
+
+-- user_id is denormalized onto messages too (rather than an RLS subquery
+-- through assistant_conversations) so each row's policy stays a simple,
+-- fast equality check — the same pattern sale_items/purchase_items use
+-- for owner_id instead of joining through sales/purchases.
+create table if not exists public.assistant_messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.assistant_conversations(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  role text not null check (role in ('user', 'assistant')),
+  text text not null,
+  actions jsonb,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists assistant_messages_conversation_id_idx on public.assistant_messages(conversation_id);
+create index if not exists assistant_messages_user_id_idx on public.assistant_messages(user_id);
+
+alter table public.assistant_messages enable row level security;
+
+drop policy if exists "Users can view own assistant messages" on public.assistant_messages;
+create policy "Users can view own assistant messages" on public.assistant_messages for select using (auth.uid() = user_id);
+drop policy if exists "Users can insert own assistant messages" on public.assistant_messages;
+create policy "Users can insert own assistant messages" on public.assistant_messages for insert with check (auth.uid() = user_id);
+

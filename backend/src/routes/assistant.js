@@ -168,8 +168,69 @@ async function completeWithRetry(params, preferredModel) {
   return raceModels(rest, params)
 }
 
+// Persists the turn that just happened for the chat history sidebar.
+// Never throws — a persistence failure shouldn't break the actual chat
+// response, it should just silently not be there to reopen later.
+async function persistTurn(supabase, userId, conversationId, userMessage, assistantReply, actions) {
+  let convoId = conversationId
+
+  if (convoId) {
+    // RLS's own select policy (auth.uid() = user_id) makes this return
+    // nothing for an id that doesn't exist OR belongs to someone else —
+    // either way, fall through to creating a fresh conversation instead
+    // of silently attaching this turn to an id we can't verify.
+    const { data: existing } = await supabase.from('assistant_conversations').select('id').eq('id', convoId).maybeSingle()
+    if (!existing) convoId = null
+  }
+
+  if (!convoId) {
+    const { data: convo, error } = await supabase
+      .from('assistant_conversations')
+      .insert({ user_id: userId, title: userMessage.text.slice(0, 80) })
+      .select('id')
+      .single()
+    if (error) {
+      console.error('Failed to create assistant conversation:', error.message)
+      return null
+    }
+    convoId = convo.id
+  }
+
+  const { error: insertError } = await supabase.from('assistant_messages').insert([
+    { conversation_id: convoId, user_id: userId, role: 'user', text: userMessage.text, created_at: userMessage.createdAt || undefined },
+    { conversation_id: convoId, user_id: userId, role: 'assistant', text: assistantReply, actions: actions.length ? actions : null },
+  ])
+  if (insertError) console.error('Failed to persist assistant messages:', insertError.message)
+
+  await supabase.from('assistant_conversations').update({ updated_at: new Date().toISOString() }).eq('id', convoId)
+
+  return convoId
+}
+
+router.get('/conversations', requireAuth, async (req, res) => {
+  const supabase = supabaseForUser(req.accessToken)
+  const { data, error } = await supabase
+    .from('assistant_conversations')
+    .select('id, title, updated_at')
+    .order('updated_at', { ascending: false })
+    .limit(50)
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ conversations: data })
+})
+
+router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
+  const supabase = supabaseForUser(req.accessToken)
+  const { data, error } = await supabase
+    .from('assistant_messages')
+    .select('role, text, actions, created_at')
+    .eq('conversation_id', req.params.id)
+    .order('created_at', { ascending: true })
+  if (error) return res.status(500).json({ error: error.message })
+  res.json({ messages: data })
+})
+
 router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
-  const { messages } = req.body
+  const { messages, conversationId } = req.body
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages must be a non-empty array' })
@@ -233,7 +294,11 @@ router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
       choice = completion.choices[0]
     }
 
-    res.json({ reply: choice.message.content ?? '', actions })
+    const reply = choice.message.content ?? ''
+    const lastUserMessage = messages[messages.length - 1]
+    const savedConversationId = await persistTurn(supabase, req.user.id, conversationId, lastUserMessage, reply, actions)
+
+    res.json({ reply, actions, conversationId: savedConversationId })
   } catch (err) {
     console.error(err)
 
