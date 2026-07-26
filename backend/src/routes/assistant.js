@@ -24,14 +24,37 @@ const chatLimiter = rateLimit({
   message: { error: 'Too many assistant requests — please wait a few minutes and try again.' },
 })
 
+// Read-only for now (create_invoice, receive_payment, etc. stay defined
+// in assistantTools.js but aren't exposed here) — trades away in-chat
+// actions for a smaller tool schema (faster inference, since the model
+// has fewer options to weigh every round) and zero risk of an
+// unconfirmed financial mutation. Flip this back to `toolDeclarations`
+// once a confirm-before-write flow exists.
+const tools = toolDeclarations
+  .filter((decl) => decl.readOnly)
+  .map((decl) => ({
+    type: 'function',
+    function: {
+      name: decl.name,
+      description: decl.description,
+      parameters: decl.parameters,
+    },
+  }))
+
 function buildSystemInstructionRules() {
   const today = todayColombo()
-  return `You are the billing assistant inside BossBooks, an accounting app for
-small businesses. You help the signed-in user create invoices, sales
-receipts, purchase bills, and record payments, and answer questions about
-their customers, suppliers, products, and outstanding balances — entirely
-by calling the tools you're given. Never claim to have done something you
+  return `You are the assistant inside BossBooks, an accounting app for small
+businesses. You answer questions about the signed-in user's customers,
+suppliers, products, sales, purchases, expenses, and profit — entirely by
+calling the tools you're given. Never claim to have done something you
 didn't actually call a tool for.
+
+You cannot create, edit, or delete anything right now — you are
+read-only. If asked to create an invoice, record a payment, add a
+customer, log an expense, or change/remove anything already recorded,
+say plainly that you can't do that yet and tell the user to do it from
+the relevant page in the app instead. Don't apologize at length — one
+short sentence, then keep helping with whatever you can answer.
 
 Today's date is ${today}. Use it to resolve any relative date the user
 mentions ("this month", "last week", "today", "this year") into actual
@@ -44,20 +67,7 @@ Rules:
   goods sold, or margin, always call get_income_statement — never
   estimate it by summing search_sales/search_purchases totals, since
   that ignores cost of goods sold and won't match the real numbers.
-- Before creating any document, resolve every customer/supplier/product/
-  account name through the matching list_/search_ tool first. If a name
-  is ambiguous, ask the user to clarify instead of guessing. If a
-  customer or supplier genuinely doesn't exist yet, create them with
-  create_customer/create_supplier first (name is enough — other details
-  are optional), then continue with what the user actually asked for,
-  without asking permission for that intermediate step.
-- If the user doesn't specify a unit price/cost, it's fine to omit it —
-  the tool will default to the product's own price/cost.
-- You cannot edit or delete existing documents — if asked to change or
-  remove something already recorded, tell the user to do that from the
-  relevant page in the app instead.
-- Keep replies short and concrete. When you create something, state its
-  reference code and total.
+- Keep replies short and concrete.
 
 For data questions (balances, sales, products, etc.) always use the
 tools — never guess or estimate a number.
@@ -67,15 +77,6 @@ page does, whether something is supported), answer strictly from the
 product knowledge below. If it's not covered there, say plainly that you
 don't have enough information about that instead of guessing.`
 }
-
-const tools = toolDeclarations.map((decl) => ({
-  type: 'function',
-  function: {
-    name: decl.name,
-    description: decl.description,
-    parameters: decl.parameters,
-  },
-}))
 
 // OpenRouter sometimes hands back HTTP 200 with an error body instead of
 // an error status — seen when a free model's upstream provider times out

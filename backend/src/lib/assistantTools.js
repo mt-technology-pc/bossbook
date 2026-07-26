@@ -146,6 +146,7 @@ const purchaseItemSchema = {
 export const toolDeclarations = [
   {
     name: 'list_customers',
+    readOnly: true,
     description: 'Search the customer list by (partial) name. Use this to look up a customer before creating a document, or to answer questions about who a customer is / their balance.',
     parameters: {
       type: 'object',
@@ -154,6 +155,7 @@ export const toolDeclarations = [
   },
   {
     name: 'list_suppliers',
+    readOnly: true,
     description: 'Search the supplier list by (partial) name.',
     parameters: {
       type: 'object',
@@ -192,6 +194,7 @@ export const toolDeclarations = [
   },
   {
     name: 'list_products',
+    readOnly: true,
     description: 'Search the product catalog by (partial) name. Returns price, cost, stock on hand, and whether it tracks serial/IMEI numbers.',
     parameters: {
       type: 'object',
@@ -200,11 +203,13 @@ export const toolDeclarations = [
   },
   {
     name: 'list_accounts',
+    readOnly: true,
     description: 'List cash/bank accounts and their current balances — needed to know which account a receipt/payment should go to or from.',
     parameters: { type: 'object', properties: {} },
   },
   {
     name: 'get_income_statement',
+    readOnly: true,
     description: 'The authoritative way to answer any question about profit, gross profit, net profit/income, revenue, cost of goods sold, or margin over a period — computes them the same way the Income Statement report does (accrual basis, FIFO cost of goods sold), not by estimating from raw sales/purchase totals. Always use this instead of summing search_sales/search_purchases results for profit-type questions.',
     parameters: {
       type: 'object',
@@ -216,6 +221,7 @@ export const toolDeclarations = [
   },
   {
     name: 'search_sales',
+    readOnly: true,
     description: 'Search invoices and sales receipts by customer name, type, reference, or date range.',
     parameters: {
       type: 'object',
@@ -231,6 +237,7 @@ export const toolDeclarations = [
   },
   {
     name: 'search_purchases',
+    readOnly: true,
     description: 'Search purchase bills by supplier name, reference, or date range.',
     parameters: {
       type: 'object',
@@ -338,6 +345,7 @@ export const toolDeclarations = [
   },
   {
     name: 'search_expenses',
+    readOnly: true,
     description: 'Search logged expenses by category or date range.',
     parameters: {
       type: 'object',
