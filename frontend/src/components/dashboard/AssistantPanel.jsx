@@ -10,21 +10,91 @@ const SUGGESTIONS = [
   "What's my top customer's balance?",
 ]
 
-// The model replies with light markdown (**bold**, line breaks) — this
-// renders just that, not a full markdown parser, since that's all it uses.
-function renderMessageText(text) {
-  return text.split('\n').map((line, lineIndex, lines) => (
-    <span key={lineIndex}>
-      {line.split(/(\*\*[^*]+\*\*)/g).map((part, partIndex) =>
-        part.startsWith('**') && part.endsWith('**') ? (
-          <strong key={partIndex}>{part.slice(2, -2)}</strong>
-        ) : (
-          part
-        ),
-      )}
-      {lineIndex < lines.length - 1 && <br />}
-    </span>
+// The model replies with light markdown (**bold**, line breaks, and
+// sometimes a table for list-y answers) — this renders just that, not a
+// full markdown parser, since that's all it uses.
+function renderInlineBold(text) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => (
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={i}>{part.slice(2, -2)}</strong>
+      : <span key={i}>{part}</span>
   ))
+}
+
+const isTableRow = (line) => /^\s*\|.*\|\s*$/.test(line)
+// A separator row is only |, -, :, and whitespace, e.g. "| :--- | --- |".
+const isSeparatorRow = (line) => /^[\s|:-]+$/.test(line) && line.includes('-')
+
+function parseTableRow(line) {
+  return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim())
+}
+
+// Groups the message into alternating text/table blocks — a markdown
+// table is a header row, a "| :--- | ---: |"-style separator row, then
+// one or more data rows, all starting/ending with "|".
+function renderMessageText(text) {
+  const lines = text.split('\n')
+  const blocks = []
+  let textBuffer = []
+  const flushText = () => {
+    if (textBuffer.length > 0) blocks.push({ type: 'text', lines: textBuffer })
+    textBuffer = []
+  }
+
+  for (let i = 0; i < lines.length; i += 1) {
+    if (isTableRow(lines[i]) && isSeparatorRow(lines[i + 1] || '')) {
+      flushText()
+      const header = parseTableRow(lines[i])
+      const rows = []
+      i += 2
+      while (i < lines.length && isTableRow(lines[i])) {
+        rows.push(parseTableRow(lines[i]))
+        i += 1
+      }
+      i -= 1
+      blocks.push({ type: 'table', header, rows })
+    } else {
+      textBuffer.push(lines[i])
+    }
+  }
+  flushText()
+
+  return blocks.map((block, bi) => {
+    if (block.type === 'table') {
+      return (
+        <div key={bi} className="-mx-1 my-1.5 overflow-x-auto">
+          <table className="w-full min-w-max border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-ink-400/20">
+                {block.header.map((cell, ci) => (
+                  <th key={ci} className="px-2 py-1 text-left font-semibold text-ink-700">{renderInlineBold(cell)}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, ri) => (
+                <tr key={ri} className="border-b border-ink-400/10 last:border-0">
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="px-2 py-1 align-top text-ink-700">{renderInlineBold(cell)}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+    return (
+      <span key={bi}>
+        {block.lines.map((line, li) => (
+          <span key={li}>
+            {renderInlineBold(line)}
+            {li < block.lines.length - 1 && <br />}
+          </span>
+        ))}
+      </span>
+    )
+  })
 }
 
 function actionLabel(action) {

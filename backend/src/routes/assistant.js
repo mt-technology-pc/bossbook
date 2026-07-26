@@ -81,15 +81,21 @@ async function completeOnce(model, params) {
 }
 
 function isRetryable(err) {
-  return (err.status === 400 && err.code !== 'context_length_exceeded')
-    || [429, 500, 502, 503, 504].includes(err.status)
+  if ((err.status === 400 && err.code !== 'context_length_exceeded')
+    || [429, 500, 502, 503, 504].includes(err.status)) return true
+  // Timeouts/connection failures (aiClient.js's 10s client timeout, or a
+  // genuine network error) carry no HTTP status at all — still worth
+  // falling through to the next model rather than giving up entirely.
+  return !err.status && /timeout|connection/i.test(err.name || '')
 }
 
 // Free-tier models each have transient bad moments (500s, timeouts, a
-// malformed tool call) — retrying the *same* model once covers a one-off
-// glitch, but if it's genuinely struggling right now, falling through to
-// the next model in AI_MODEL_FALLBACKS is far more reliable than hammering
-// the same flaky one. Only throws once every candidate has failed twice.
+// malformed tool call) — one attempt per model, immediately falling
+// through to the next on failure, is far more reliable *and* faster than
+// retrying the same flaky one before moving on (that just doubles the
+// worst-case wait for no real benefit — a model having a bad moment is
+// usually still having it a second later). Only throws once every
+// candidate has failed once.
 async function completeWithRetry(params) {
   const models = [AI_MODEL, ...AI_MODEL_FALLBACKS]
   let lastErr
@@ -100,12 +106,6 @@ async function completeWithRetry(params) {
     } catch (err) {
       lastErr = err
       if (!isRetryable(err)) throw err
-      try {
-        return await completeOnce(model, params)
-      } catch (retryErr) {
-        lastErr = retryErr
-        if (!isRetryable(retryErr)) throw retryErr
-      }
     }
   }
 

@@ -13,6 +13,10 @@ if (!process.env.OPENROUTER_API_KEY) {
 export const ai = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: 'https://openrouter.ai/api/v1',
+  // The SDK's own default (10 minutes) is far too long for a chat UI —
+  // without this, a hung free-tier model blocks the whole fallback chain
+  // in assistant.js instead of failing fast onto the next candidate.
+  timeout: 10_000,
   defaultHeaders: {
     'HTTP-Referer': process.env.CLIENT_ORIGIN || 'http://localhost:5173',
     'X-Title': 'BossBooks',
