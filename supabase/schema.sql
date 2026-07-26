@@ -3098,6 +3098,7 @@ alter table public.companies add column if not exists phone text;
 -- security boundary — tenant isolation, any company member can write
 -- their own company's branding row, nobody can touch another company's.
 drop policy if exists "Owners can update own company" on public.companies;
+drop policy if exists "Users can update own company" on public.companies;
 create policy "Users can update own company"
   on public.companies for update
   using (id = public.current_company_id())
@@ -3118,6 +3119,7 @@ create policy "Public can view company logos"
   using (bucket_id = 'company-logos');
 
 drop policy if exists "Owners can upload own company logo" on storage.objects;
+drop policy if exists "Users can upload own company logo" on storage.objects;
 create policy "Users can upload own company logo"
   on storage.objects for insert
   with check (
@@ -3126,6 +3128,7 @@ create policy "Users can upload own company logo"
   );
 
 drop policy if exists "Owners can update own company logo" on storage.objects;
+drop policy if exists "Users can update own company logo" on storage.objects;
 create policy "Users can update own company logo"
   on storage.objects for update
   using (
@@ -3134,6 +3137,7 @@ create policy "Users can update own company logo"
   );
 
 drop policy if exists "Owners can delete own company logo" on storage.objects;
+drop policy if exists "Users can delete own company logo" on storage.objects;
 create policy "Users can delete own company logo"
   on storage.objects for delete
   using (
@@ -5443,3 +5447,37 @@ begin
   return new;
 end;
 $$;
+
+-- Per-company SMTP settings, used to email invoices/receipts as a PDF.
+-- The frontend never selects the password column (its fetch explicitly
+-- lists every column except it), so the plaintext value only ever
+-- travels DB <-> backend (via the caller's own RLS-scoped session, when
+-- actually sending) — never DB <-> browser. RLS here is tenant isolation
+-- only (company_id = current_company_id()); owner-only editing is
+-- enforced in the UI, same as the branding/company-info settings.
+create table if not exists public.smtp_settings (
+  company_id uuid primary key references public.companies(id) on delete cascade,
+  host text not null,
+  port integer not null default 587,
+  username text not null,
+  password text not null,
+  from_email text not null,
+  from_name text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.smtp_settings enable row level security;
+
+drop policy if exists "Users can view own smtp settings" on public.smtp_settings;
+create policy "Users can view own smtp settings" on public.smtp_settings for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own smtp settings" on public.smtp_settings;
+create policy "Users can insert own smtp settings" on public.smtp_settings for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can update own smtp settings" on public.smtp_settings;
+create policy "Users can update own smtp settings" on public.smtp_settings for update using (company_id = public.current_company_id());
+drop policy if exists "Users can delete own smtp settings" on public.smtp_settings;
+create policy "Users can delete own smtp settings" on public.smtp_settings for delete using (company_id = public.current_company_id());
+
+drop trigger if exists set_smtp_settings_updated_at on public.smtp_settings;
+create trigger set_smtp_settings_updated_at
+  before update on public.smtp_settings
+  for each row execute function public.set_updated_at();
