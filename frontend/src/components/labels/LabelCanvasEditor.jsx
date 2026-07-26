@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Stage, Layer, Rect, Circle, Line as KonvaLine, Text as KonvaText, Image as KonvaImage, Transformer, Group } from 'react-konva'
 import useImage from 'use-image'
 import {
-  RotateCcw, ScanLine, QrCode, Type, Image as ImageIcon, Square, Minus, Circle as CircleIcon,
+  RotateCcw, ScanLine, QrCode, Type, Image as ImageIcon, Square, Minus, Circle as CircleIcon, AlertCircle,
 } from 'lucide-react'
 import BarcodeImageNode from './nodes/BarcodeImageNode'
 import QrImageNode from './nodes/QrImageNode'
@@ -21,6 +21,18 @@ const NEW_LAYER_DEFAULTS = {
   qr: { w: 0.32, h: 0.35 },
   image: { w: 0.3, h: 0.3 },
   shape: { w: 0.3, h: 0.2 },
+}
+
+// Same allowlist/cap as the company logo upload (Settings.jsx) — a UX
+// guard, not real enforcement (file.type/file.size are client-reported),
+// but this component previously had no check at all.
+const MAX_IMAGE_BYTES = 2 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml']
+
+function validateImageFile(file) {
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return 'Image must be a PNG, JPG, or SVG file.'
+  if (file.size > MAX_IMAGE_BYTES) return 'Image must be 2MB or smaller.'
+  return null
 }
 
 function readImageFile(file) {
@@ -80,6 +92,7 @@ export default function LabelCanvasEditor({
   const nodeRefs = useRef({})
   const [selectedIds, setSelectedIds] = useState([])
   const [guides, setGuides] = useState({ x: null, y: null })
+  const [imageError, setImageError] = useState(null)
 
   const scale = Math.min(7, 380 / Math.max(labelWidth, 1))
   const pxW = Math.max(labelWidth, 1) * scale
@@ -159,6 +172,12 @@ export default function LabelCanvasEditor({
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
+    const validationError = validateImageFile(file)
+    if (validationError) {
+      setImageError(validationError)
+      return
+    }
+    setImageError(null)
     const { src, naturalW, naturalH } = await readImageFile(file)
     const size = NEW_LAYER_DEFAULTS.image
     const layer = {
@@ -399,6 +418,13 @@ export default function LabelCanvasEditor({
       </div>
       <input ref={fileInputRef} type="file" accept="image/*" onChange={onImagePicked} className="hidden" />
 
+      {imageError && (
+        <div className="mt-2 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          {imageError}
+        </div>
+      )}
+
       <div className="mt-3 overflow-hidden rounded-lg border border-dashed border-ink-400/30 bg-white" style={{ width: pxW, height: pxH }}>
         <Stage
           ref={stageRef}
@@ -617,6 +643,12 @@ export default function LabelCanvasEditor({
                 const file = e.target.files?.[0]
                 e.target.value = ''
                 if (!file) return
+                const validationError = validateImageFile(file)
+                if (validationError) {
+                  setImageError(validationError)
+                  return
+                }
+                setImageError(null)
                 const { src, naturalW, naturalH } = await readImageFile(file)
                 updateLayer(selected.id, { src, naturalW, naturalH })
               }}

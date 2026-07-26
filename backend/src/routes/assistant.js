@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import rateLimit from 'express-rate-limit'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
 import { ai, AI_MODEL, AI_MODEL_FALLBACKS } from '../lib/aiClient.js'
@@ -8,6 +9,19 @@ import { loadKnowledgeBase } from '../lib/knowledgeBase.js'
 const router = Router()
 
 const MAX_TOOL_ROUNDS = 8
+const MAX_MESSAGES = 50
+const MAX_TOTAL_CHARS = 20000
+
+// Stricter than the app-wide limiter (index.js) — this endpoint calls a
+// paid LLM, and can loop up to MAX_TOOL_ROUNDS times per single request,
+// so it's the one route where per-request cost scales fastest.
+const chatLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many assistant requests — please wait a few minutes and try again.' },
+})
 
 const SYSTEM_INSTRUCTION_RULES = `You are the billing assistant inside BossBooks, an accounting app for
 small businesses. You help the signed-in user create invoices, sales
@@ -98,11 +112,18 @@ async function completeWithRetry(params) {
   throw lastErr
 }
 
-router.post('/chat', requireAuth, async (req, res) => {
+router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
   const { messages } = req.body
 
   if (!Array.isArray(messages) || messages.length === 0) {
     return res.status(400).json({ error: 'messages must be a non-empty array' })
+  }
+  if (messages.length > MAX_MESSAGES) {
+    return res.status(400).json({ error: `Conversation is too long (max ${MAX_MESSAGES} messages) — start a new chat.` })
+  }
+  const totalChars = messages.reduce((sum, m) => sum + String(m?.text || '').length, 0)
+  if (totalChars > MAX_TOTAL_CHARS) {
+    return res.status(400).json({ error: 'Conversation is too long — start a new chat.' })
   }
 
   const supabase = supabaseForUser(req.accessToken)

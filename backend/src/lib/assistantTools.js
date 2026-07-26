@@ -46,7 +46,10 @@ async function resolveAccount(supabase, name) {
   return { row: data[0] }
 }
 
+const MAX_LINE_ITEMS = 200
+
 async function buildSaleItems(supabase, items) {
+  if (items.length > MAX_LINE_ITEMS) return { error: `Too many line items (max ${MAX_LINE_ITEMS}).` }
   const built = []
   for (const item of items) {
     const { row: product, error } = await resolveProduct(supabase, item.product_name)
@@ -85,6 +88,7 @@ async function buildSaleItems(supabase, items) {
 }
 
 async function buildPurchaseItems(supabase, items) {
+  if (items.length > MAX_LINE_ITEMS) return { error: `Too many line items (max ${MAX_LINE_ITEMS}).` }
   const built = []
   for (const item of items) {
     const { row: product, error } = await resolveProduct(supabase, item.product_name)
@@ -233,7 +237,7 @@ export const toolDeclarations = [
       type: 'object',
       properties: {
         customer_name: { type: 'string' },
-        items: { type: 'array', items: itemSchema },
+        items: { type: 'array', items: itemSchema, maxItems: MAX_LINE_ITEMS },
         reference: { type: 'string', description: 'Optional invoice number, auto-generated if omitted.' },
         notes: { type: 'string' },
         sale_date: { type: 'string', description: 'YYYY-MM-DD, defaults to today.' },
@@ -250,7 +254,7 @@ export const toolDeclarations = [
       properties: {
         customer_name: { type: 'string', description: 'Optional — omit for a walk-in customer.' },
         deposit_account_name: { type: 'string', description: 'Which cash/bank account the money goes into.' },
-        items: { type: 'array', items: itemSchema },
+        items: { type: 'array', items: itemSchema, maxItems: MAX_LINE_ITEMS },
         reference: { type: 'string' },
         notes: { type: 'string' },
         sale_date: { type: 'string', description: 'YYYY-MM-DD, defaults to today.' },
@@ -265,7 +269,7 @@ export const toolDeclarations = [
       type: 'object',
       properties: {
         supplier_name: { type: 'string' },
-        items: { type: 'array', items: purchaseItemSchema },
+        items: { type: 'array', items: purchaseItemSchema, maxItems: MAX_LINE_ITEMS },
         reference: { type: 'string' },
         notes: { type: 'string' },
         bill_date: { type: 'string', description: 'YYYY-MM-DD, defaults to today.' },
