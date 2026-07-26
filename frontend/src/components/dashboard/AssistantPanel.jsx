@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Sparkles, X, Send, Bot, User, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Sparkles, X, ArrowUp, Bot, CheckCircle2, AlertCircle } from 'lucide-react'
 import { useAssistant } from '../../hooks/useAssistant'
 import { formatCurrency } from '../../lib/currency'
+
+function formatMessageTime(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+}
 
 const SUGGESTIONS = [
   'Show all unpaid invoices',
@@ -144,29 +149,27 @@ export default function AssistantPanel() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 24, scale: 0.97 }}
             transition={{ duration: 0.2 }}
-            className="fixed bottom-24 right-4 z-40 flex h-[32rem] max-h-[calc(100vh-7rem)] w-[23rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 shadow-2xl sm:right-6 print:hidden"
+            className="fixed bottom-24 right-4 z-40 flex h-[32rem] max-h-[calc(100vh-7rem)] w-[23rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-[20px] border border-ink-400/15 bg-cream-50 shadow-2xl sm:right-6 print:hidden"
           >
-            <div className="flex items-center justify-between border-b border-ink-400/10 px-4 py-3.5">
-              <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
-                  <Bot size={16} />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-ink-900">Assistant</p>
-                  <p className="text-[11px] text-ink-400">Ask it to create or find things</p>
-                </div>
+            <div className="flex items-center gap-3 border-b border-ink-400/10 px-4 py-3.5">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ink-900 text-cream-50">
+                <Bot size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-bold text-ink-900">Assistant</p>
+                <p className="text-xs text-ink-400">Ask it to create or find things</p>
               </div>
               {messages.length > 0 && (
                 <button
                   onClick={clear}
-                  className="text-xs font-medium text-ink-400 hover:text-clay-600"
+                  className="shrink-0 text-xs font-medium text-ink-400 hover:text-clay-600"
                 >
                   Clear
                 </button>
               )}
             </div>
 
-            <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
               {messages.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-center text-center">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
@@ -188,22 +191,20 @@ export default function AssistantPanel() {
                   </div>
                 </div>
               ) : (
-                messages.map((m, i) => (
-                  <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`flex max-w-[85%] items-start gap-2 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                      <span
-                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                          m.role === 'user' ? 'bg-ink-900/10 text-ink-700' : 'bg-clay-500/10 text-clay-600'
-                        }`}
-                      >
-                        {m.role === 'user' ? <User size={12} /> : <Bot size={12} />}
-                      </span>
-                      <div>
+                messages.map((m, i) => {
+                  const isUser = m.role === 'user'
+                  const grouped = messages[i - 1]?.role === m.role
+                  return (
+                    <div
+                      key={i}
+                      className={`flex ${isUser ? 'justify-end' : 'justify-start'} ${grouped ? 'mt-1' : 'mt-3.5'} first:mt-0`}
+                    >
+                      <div className="max-w-[85%]">
                         <div
-                          className={`rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${
-                            m.role === 'user'
-                              ? 'bg-clay-500 text-cream-50'
-                              : 'bg-cream-200 text-ink-800'
+                          className={`px-4 py-3 text-sm leading-relaxed ${
+                            isUser
+                              ? 'rounded-tl-2xl rounded-tr-2xl rounded-bl-2xl rounded-br-md bg-ink-900 text-cream-50'
+                              : 'rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-md bg-cream-200 text-ink-800'
                           }`}
                         >
                           {renderMessageText(m.text)}
@@ -221,18 +222,20 @@ export default function AssistantPanel() {
                             ))}
                           </div>
                         )}
+                        {m.createdAt && (
+                          <p className={`mt-1 text-[11px] text-ink-400 ${isUser ? 'text-right' : 'text-left'}`}>
+                            {formatMessageTime(m.createdAt)}
+                          </p>
+                        )}
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
 
               {sending && (
-                <div className="flex items-center gap-2">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
-                    <Bot size={12} />
-                  </span>
-                  <div className="flex gap-1 rounded-2xl bg-cream-200 px-3.5 py-3">
+                <div className="mt-3.5 flex justify-start">
+                  <div className="flex gap-1 rounded-tl-2xl rounded-tr-2xl rounded-br-2xl rounded-bl-md bg-cream-200 px-4 py-3.5">
                     {[0, 1, 2].map((i) => (
                       <motion.span
                         key={i}
@@ -246,7 +249,7 @@ export default function AssistantPanel() {
               )}
 
               {error && (
-                <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600">
+                <div className="mt-3.5 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-600">
                   <AlertCircle size={14} className="mt-0.5 shrink-0" />
                   {error}
                 </div>
@@ -258,24 +261,30 @@ export default function AssistantPanel() {
                 e.preventDefault()
                 submit()
               }}
-              className="flex items-center gap-2 border-t border-ink-400/10 p-3"
+              className="border-t border-ink-400/10 px-4 py-3"
             >
-              <input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Create an invoice for..."
-                disabled={sending}
-                className="flex-1 rounded-full border border-ink-400/20 bg-cream-100 px-3.5 py-2 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 disabled:opacity-60"
-              />
-              <button
-                type="submit"
-                disabled={sending || !input.trim()}
-                aria-label="Send"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay-500 text-cream-50 transition-colors hover:bg-clay-600 disabled:opacity-40"
-              >
-                <Send size={15} />
-              </button>
+              <div className="flex items-end gap-2">
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Message…"
+                  disabled={sending}
+                  className="flex-1 bg-transparent py-1.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none disabled:opacity-60"
+                />
+                <button
+                  type="submit"
+                  disabled={sending || !input.trim()}
+                  aria-label="Send"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-clay-500 text-cream-50 transition-colors hover:bg-clay-600 disabled:opacity-40"
+                >
+                  <ArrowUp size={17} />
+                </button>
+              </div>
             </form>
+
+            <p className="border-t border-ink-400/10 py-2 text-center text-[11px] text-ink-400/70">
+              Powered by BossBooks AI
+            </p>
           </motion.div>
         )}
       </AnimatePresence>

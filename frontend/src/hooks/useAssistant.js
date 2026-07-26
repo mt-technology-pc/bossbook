@@ -10,7 +10,7 @@ export function useAssistant() {
     const trimmed = text.trim()
     if (!trimmed || sending) return
 
-    const next = [...messages, { role: 'user', text: trimmed }]
+    const next = [...messages, { role: 'user', text: trimmed, createdAt: new Date().toISOString() }]
     setMessages(next)
     setSending(true)
     setError(null)
@@ -20,7 +20,7 @@ export function useAssistant() {
         method: 'POST',
         body: JSON.stringify({ messages: next }),
       })
-      setMessages([...next, { role: 'assistant', text: reply, actions }])
+      setMessages([...next, { role: 'assistant', text: reply, actions, createdAt: new Date().toISOString() }])
     } catch (err) {
       setError(err.message)
     } finally {
