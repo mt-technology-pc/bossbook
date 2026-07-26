@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
-import { X, Plus, AlertCircle, FileText, ShoppingBag, Download, Printer, Mail } from 'lucide-react'
+import { X, Plus, AlertCircle, FileText, ShoppingBag, Download, Printer, Mail, MessageSquare } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
@@ -23,6 +23,7 @@ import SaleDocument from '../../components/sales/SaleDocument'
 import SaleDocumentPos from '../../components/sales/SaleDocumentPos'
 import PrintFormatToggle from '../../components/sales/PrintFormatToggle'
 import EmailInvoiceModal from '../../components/sales/EmailInvoiceModal'
+import SmsInvoiceModal from '../../components/sales/SmsInvoiceModal'
 import FormSkeleton from '../../components/ui/FormSkeleton'
 
 function todayISO() {
@@ -50,6 +51,7 @@ export default function NewInvoice() {
   const { company } = useCompany()
   const [printFormat, setPrintFormat] = usePrintFormat()
   const [emailModalOpen, setEmailModalOpen] = useState(false)
+  const [smsModalOpen, setSmsModalOpen] = useState(false)
 
   const [customerId, setCustomerId] = useState('')
   const [salesRepId, setSalesRepId] = useState('')
@@ -63,6 +65,7 @@ export default function NewInvoice() {
   const [loaded, setLoaded] = useState(!isEdit)
   const [ownUnits, setOwnUnits] = useState([])
   const [originalQuantities, setOriginalQuantities] = useState({})
+  const submitButtonRef = useRef(null)
 
   const getProduct = (id) => products.find((p) => p.id === id)
 
@@ -304,6 +307,15 @@ export default function NewInvoice() {
               >
                 <Mail size={18} />
               </button>
+              <button
+                onClick={() => setSmsModalOpen(true)}
+                disabled={!documentData.customer?.phone}
+                title={documentData.customer?.phone ? 'Send SMS to customer' : 'Add a phone number for this customer first'}
+                aria-label="Send SMS to customer"
+                className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 disabled:opacity-50"
+              >
+                <MessageSquare size={18} />
+              </button>
             </>
           )}
           <button
@@ -427,6 +439,7 @@ export default function NewInvoice() {
                   availableUnits={mergedAvailableUnits}
                   priceLabel="Rate"
                   stockAdjustments={originalQuantities}
+                  onAllLinesComplete={() => submitButtonRef.current?.focus()}
                 />
                 <div className="mt-3 flex justify-end">
                   <p className="text-sm text-ink-500">
@@ -474,7 +487,7 @@ export default function NewInvoice() {
             <Button variant="outline" disabled={loading} onClick={() => submit({ andPrint: true })}>
               <Printer size={15} /> {loading ? 'Saving…' : 'Save & Print'}
             </Button>
-            <Button variant="primary" disabled={loading} onClick={() => submit({ andNew: false })}>
+            <Button ref={submitButtonRef} variant="primary" disabled={loading} onClick={() => submit({ andNew: false })}>
               {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Save'}
             </Button>
           </div>
@@ -495,6 +508,14 @@ export default function NewInvoice() {
       <EmailInvoiceModal
         open={emailModalOpen}
         onClose={() => setEmailModalOpen(false)}
+        documentData={documentData}
+        printFormat={printFormat}
+        company={company}
+      />
+
+      <SmsInvoiceModal
+        open={smsModalOpen}
+        onClose={() => setSmsModalOpen(false)}
         documentData={documentData}
         printFormat={printFormat}
         company={company}

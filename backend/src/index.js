@@ -10,6 +10,8 @@ import assistantRouter from './routes/assistant.js'
 import backupRouter from './routes/backup.js'
 import adminRouter from './routes/admin.js'
 import emailRouter from './routes/email.js'
+import smsRouter from './routes/sms.js'
+import googleDriveRouter from './routes/googleDrive.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -42,6 +44,8 @@ app.use('/api/assistant', assistantRouter)
 app.use('/api/backup', backupRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/email', emailRouter)
+app.use('/api/sms', smsRouter)
+app.use('/api/google-drive', googleDriveRouter)
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' })

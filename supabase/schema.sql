@@ -5539,3 +5539,103 @@ create policy "Users can view own assistant messages" on public.assistant_messag
 drop policy if exists "Users can insert own assistant messages" on public.assistant_messages;
 create policy "Users can insert own assistant messages" on public.assistant_messages for insert with check (auth.uid() = user_id);
 
+-- SMS invoice delivery (text.lk) + Google Drive OAuth ----------------------
+--
+-- Split deliberately: Google Drive is ONE app-wide connection (a platform
+-- admin connects a single Drive account in /admin, used to host every
+-- company's invoice PDFs — just file storage, not a per-usage cost). SMS
+-- is per-company (each business has its own text.lk account/API key,
+-- since SMS sending has a real per-message cost each company should pay
+-- for and manage themselves) — same shape as smtp_settings.
+drop table if exists public.google_drive_connections;
+
+create table if not exists public.sms_settings (
+  company_id uuid primary key references public.companies(id) on delete cascade,
+  api_key text not null,
+  sender_id text not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.sms_settings alter column company_id set default public.current_company_id();
+
+alter table public.sms_settings enable row level security;
+
+drop policy if exists "Users can view own sms settings" on public.sms_settings;
+create policy "Users can view own sms settings" on public.sms_settings for select using (company_id = public.current_company_id());
+drop policy if exists "Users can insert own sms settings" on public.sms_settings;
+create policy "Users can insert own sms settings" on public.sms_settings for insert with check (company_id = public.current_company_id());
+drop policy if exists "Users can update own sms settings" on public.sms_settings;
+create policy "Users can update own sms settings" on public.sms_settings for update using (company_id = public.current_company_id());
+drop policy if exists "Users can delete own sms settings" on public.sms_settings;
+create policy "Users can delete own sms settings" on public.sms_settings for delete using (company_id = public.current_company_id());
+
+drop trigger if exists set_sms_settings_updated_at on public.sms_settings;
+create trigger set_sms_settings_updated_at
+  before update on public.sms_settings
+  for each row execute function public.set_updated_at();
+
+-- Google Drive OAuth client id/secret + the single connected account's
+-- refresh token/email live in Vault (app-wide, not company data).
+create extension if not exists supabase_vault;
+
+create or replace function public.get_app_secret(secret_name text)
+returns text
+language sql
+security definer
+set search_path = public, vault
+as $$
+  select decrypted_secret from vault.decrypted_secrets where name = secret_name limit 1;
+$$;
+
+revoke all on function public.get_app_secret(text) from public, authenticated, anon;
+grant execute on function public.get_app_secret(text) to service_role;
+
+-- Upsert (vault.create_secret fails on a duplicate name, so update if a
+-- secret with this name already exists, else create it) — lets the
+-- backend set/rotate a secret programmatically (e.g. on every Google
+-- Drive reconnect) instead of requiring manual SQL each time.
+create or replace function public.set_app_secret(secret_name text, secret_value text)
+returns void
+language plpgsql
+security definer
+set search_path = public, vault
+as $$
+declare
+  existing_id uuid;
+begin
+  select id into existing_id from vault.secrets where name = secret_name;
+  if existing_id is not null then
+    perform vault.update_secret(existing_id, secret_value);
+  else
+    perform vault.create_secret(secret_value, secret_name);
+  end if;
+end;
+$$;
+
+revoke all on function public.set_app_secret(text, text) from public, authenticated, anon;
+grant execute on function public.set_app_secret(text, text) to service_role;
+
+create or replace function public.delete_app_secret(secret_name text)
+returns void
+language sql
+security definer
+set search_path = public, vault
+as $$
+  delete from vault.secrets where name = secret_name;
+$$;
+
+revoke all on function public.delete_app_secret(text) from public, authenticated, anon;
+grant execute on function public.delete_app_secret(text) to service_role;
+
+-- Google OAuth client id/secret: create these once in Google Cloud
+-- Console, then run in the Supabase SQL editor:
+--
+-- select public.set_app_secret('google_oauth_client_id', 'your-google-oauth-client-id');
+-- select public.set_app_secret('google_oauth_client_secret', 'your-google-oauth-client-secret');
+--
+-- google_drive_refresh_token / google_drive_connected_email are set
+-- automatically by the OAuth callback (backend/src/routes/googleDrive.js)
+-- when a platform admin clicks "Connect Google Drive" in /admin —
+-- nothing to run manually for those. Each company's own text.lk
+-- credentials are entered directly in their Settings page (sms_settings
+-- table above), not via Vault/SQL.

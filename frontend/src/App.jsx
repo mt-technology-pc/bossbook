@@ -46,6 +46,7 @@ import UtilityWidgets from './components/widgets/UtilityWidgets'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminCompanies from './pages/admin/AdminCompanies'
 import AdminCompanyDetail from './pages/admin/AdminCompanyDetail'
+import AdminIntegrations from './pages/admin/AdminIntegrations'
 import { useAuth } from './context/AuthContext'
 
 function App() {
@@ -68,6 +69,7 @@ function App() {
         >
           <Route index element={<AdminCompanies />} />
           <Route path="companies/:id" element={<AdminCompanyDetail />} />
+          <Route path="integrations" element={<AdminIntegrations />} />
         </Route>
 
         <Route

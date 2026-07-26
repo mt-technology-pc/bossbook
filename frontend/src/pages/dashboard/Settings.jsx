@@ -2,12 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Palette, ImagePlus, Trash2, RotateCcw, AlertCircle, Check, ShieldAlert, Building2, Mail,
+  MessageSquare,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import { useCompany } from '../../hooks/useCompany'
 import { useCompanyRole } from '../../hooks/useCompanyRole'
 import { useSmtpSettings } from '../../hooks/useSmtpSettings'
+import { useSmsSettings } from '../../hooks/useSmsSettings'
 import { deriveShades, isValidHex, getContrastRatio } from '../../lib/brandColor'
 import Button from '../../components/ui/Button'
 
@@ -20,6 +22,7 @@ export default function Settings() {
   const { company, refetch } = useCompany()
   const { isOwner, loading: roleLoading } = useCompanyRole()
   const { settings: smtpSettings, loading: smtpLoading, saveSettings: saveSmtpSettings } = useSmtpSettings()
+  const { settings: smsSettings, loading: smsLoading, saveSettings: saveSmsSettings } = useSmsSettings()
 
   const [initialized, setInitialized] = useState(false)
   const [companyName, setCompanyName] = useState('')
@@ -46,6 +49,13 @@ export default function Settings() {
   const [smtpSaving, setSmtpSaving] = useState(false)
   const [smtpSaved, setSmtpSaved] = useState(false)
 
+  const [smsInitialized, setSmsInitialized] = useState(false)
+  const [smsApiKey, setSmsApiKey] = useState('')
+  const [smsSenderId, setSmsSenderId] = useState('')
+  const [smsError, setSmsError] = useState(null)
+  const [smsSaving, setSmsSaving] = useState(false)
+  const [smsSaved, setSmsSaved] = useState(false)
+
   // Sync the draft from the saved company exactly once, when it first
   // loads — not on every refetch, so a Save-triggered refetch mid-edit
   // can't clobber unsaved changes the user is still looking at.
@@ -70,6 +80,13 @@ export default function Settings() {
       setSmtpInitialized(true)
     }
   }, [smtpLoading, smtpSettings, smtpInitialized])
+
+  useEffect(() => {
+    if (!smsLoading && !smsInitialized) {
+      setSmsSenderId(smsSettings?.sender_id || '')
+      setSmsInitialized(true)
+    }
+  }, [smsLoading, smsSettings, smsInitialized])
 
   const isDirty =
     logoFile !== null ||
@@ -256,6 +273,44 @@ export default function Settings() {
     setSmtpPassword('')
     setSmtpSaved(true)
     setTimeout(() => setSmtpSaved(false), 2500)
+  }
+
+  const isSmsDirty = smsInitialized && (
+    smsSenderId !== (smsSettings?.sender_id || '') ||
+    smsApiKey !== ''
+  )
+
+  const handleSmsDiscard = () => {
+    setSmsSenderId(smsSettings?.sender_id || '')
+    setSmsApiKey('')
+    setSmsError(null)
+  }
+
+  const handleSmsSave = async () => {
+    if (!company) return
+    if (!smsSenderId.trim()) {
+      setSmsError('Sender ID is required.')
+      return
+    }
+    if (!smsSettings && !smsApiKey) {
+      setSmsError('Enter an API key to finish setting up SMS for the first time.')
+      return
+    }
+    setSmsSaving(true)
+    setSmsError(null)
+    const { error: saveError } = await saveSmsSettings({
+      companyId: company.id,
+      apiKey: smsApiKey,
+      sender_id: smsSenderId.trim(),
+    })
+    setSmsSaving(false)
+    if (saveError) {
+      setSmsError(saveError.message)
+      return
+    }
+    setSmsApiKey('')
+    setSmsSaved(true)
+    setTimeout(() => setSmsSaved(false), 2500)
   }
 
   if (!company || roleLoading) {
@@ -534,6 +589,59 @@ export default function Settings() {
                   {smtpSaving ? 'Saving…' : smtpSaved ? <><Check size={14} /> Saved</> : 'Save SMTP settings'}
                 </Button>
                 <Button type="button" variant="ghost" size="sm" disabled={!isSmtpDirty || smtpSaving} onClick={handleSmtpDiscard}>
+                  Discard
+                </Button>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
+                <MessageSquare size={16} />
+              </span>
+              <h2 className="font-heading text-base font-semibold text-ink-900">SMS (text.lk)</h2>
+            </div>
+            <p className="mt-1 text-xs text-ink-400">
+              Used to text customers a link to their invoice/receipt PDF. Your own text.lk account — SMS costs are billed to you directly.
+            </p>
+
+            {smsError && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                {smsError}
+              </div>
+            )}
+
+            <div className="mt-4 space-y-4">
+              <Field
+                label="API key *"
+                type="password"
+                value={smsApiKey}
+                onChange={(e) => setSmsApiKey(e.target.value)}
+                disabled={!isOwner}
+                placeholder={smsSettings ? '•••••••• (leave blank to keep current)' : 'Required'}
+              />
+              <div>
+                <Field
+                  label="Sender ID *"
+                  value={smsSenderId}
+                  onChange={(e) => setSmsSenderId(e.target.value)}
+                  disabled={!isOwner}
+                  placeholder="YourBrand"
+                />
+                <p className="mt-1.5 text-xs text-ink-400">
+                  Must be an approved sender ID or registered phone number — set this up in your text.lk account first.
+                </p>
+              </div>
+            </div>
+
+            {isOwner && (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button type="button" variant="primary" size="sm" disabled={!isSmsDirty || smsSaving} onClick={handleSmsSave}>
+                  {smsSaving ? 'Saving…' : smsSaved ? <><Check size={14} /> Saved</> : 'Save SMS settings'}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" disabled={!isSmsDirty || smsSaving} onClick={handleSmsDiscard}>
                   Discard
                 </Button>
               </div>
