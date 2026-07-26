@@ -17,6 +17,12 @@ export const ai = new OpenAI({
   // without this, a hung free-tier model blocks the whole fallback chain
   // in assistant.js instead of failing fast onto the next candidate.
   timeout: 10_000,
+  // assistant.js already retries across 4 different models on failure —
+  // the SDK's own default of 2 extra internal retries (with backoff) on
+  // the SAME model before giving up triples the wall-clock cost of one
+  // bad model and was observed burning ~30s on a single timeout before
+  // ever reaching the other 3 configured fallbacks. Fail fast instead.
+  maxRetries: 0,
   defaultHeaders: {
     'HTTP-Referer': process.env.CLIENT_ORIGIN || 'http://localhost:5173',
     'X-Title': 'BossBooks',

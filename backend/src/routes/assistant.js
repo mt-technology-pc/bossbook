@@ -80,13 +80,19 @@ async function completeOnce(model, params) {
   return completion
 }
 
+// The openai SDK's error classes (APIConnectionTimeoutError etc.) never
+// set `this.name`, so `err.name` is always just the inherited "Error" —
+// the real class name only shows up as `err.constructor.name`. Checking
+// `err.name` here always silently failed to match.
+const isTimeoutOrConnectionError = (err) => /timeout|connection/i.test(err.constructor?.name || err.name || '')
+
 function isRetryable(err) {
   if ((err.status === 400 && err.code !== 'context_length_exceeded')
     || [429, 500, 502, 503, 504].includes(err.status)) return true
   // Timeouts/connection failures (aiClient.js's 10s client timeout, or a
   // genuine network error) carry no HTTP status at all — still worth
   // falling through to the next model rather than giving up entirely.
-  return !err.status && /timeout|connection/i.test(err.name || '')
+  return !err.status && isTimeoutOrConnectionError(err)
 }
 
 // Free-tier models each have transient bad moments (500s, timeouts, a
@@ -204,7 +210,7 @@ router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
     }
 
     if ([500, 502, 503, 504].includes(err.status)
-      || (!err.status && /timeout|connection/i.test(err.name || ''))) {
+      || (!err.status && isTimeoutOrConnectionError(err))) {
       return res.json({
         reply: "The AI models I have access to are all struggling right now — this happens occasionally on the free tier under load. Please try again in a moment.",
         actions: [],
