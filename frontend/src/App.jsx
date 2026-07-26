@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Landing from './pages/Landing'
 import About from './pages/About'
@@ -43,6 +44,9 @@ import AdminRoute from './components/auth/AdminRoute'
 import DashboardLayout from './layouts/DashboardLayout'
 import AdminLayout from './layouts/AdminLayout'
 import UtilityWidgets from './components/widgets/UtilityWidgets'
+import PrivacyQuickSwitch from './components/widgets/PrivacyQuickSwitch'
+import DecoySalesReceipt from './components/widgets/DecoySalesReceipt'
+import { useLockState } from './hooks/useLockState'
 import AdminLogin from './pages/admin/AdminLogin'
 import AdminCompanies from './pages/admin/AdminCompanies'
 import AdminCompanyDetail from './pages/admin/AdminCompanyDetail'
@@ -50,7 +54,49 @@ import AdminIntegrations from './pages/admin/AdminIntegrations'
 import { useAuth } from './context/AuthContext'
 
 function App() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
+  const [locked, setLocked] = useLockState()
+
+  // Without an authenticated user, "locked" is meaningless — clear it so
+  // a stray leftover flag (from any sign-out path, not just the shortcut's
+  // own) can never strand a fresh, legitimate login into decoy mode.
+  //
+  // Critically gated on `!authLoading` too, not just `!user` — right after
+  // every reload, `user` is transiently null for the brief window before
+  // Supabase's getSession() resolves, even when a real session exists.
+  // Without the authLoading check, this effect fired during that window
+  // on EVERY reload and cleared a legitimate lock before auth ever got a
+  // chance to confirm the user was actually still logged in — this was a
+  // real, confirmed bug: reloading while locked silently unlocked the app.
+  useEffect(() => {
+    if (!authLoading && !user && locked) setLocked(false)
+  }, [user, authLoading, locked, setLocked])
+
+  if (locked) {
+    // Gated on `locked` alone, not `user && locked` — `locked` is read
+    // synchronously on the very first render (useLockState's lazy
+    // useState initializer), before Supabase's getSession() has even had
+    // a chance to resolve. Requiring `user` too would mean that on every
+    // reload, there's a real window (however brief) where `user` is still
+    // null and this check would fail open into the real route tree.
+    // Gating on `locked` alone means the decoy shows immediately, with no
+    // dependency on auth-resolution timing at all — the only way `locked`
+    // is true with no real user behind it is the stale-flag edge case the
+    // cleanup effect above already handles (a one-render flash of the
+    // decoy before it corrects itself, not a leak of anything real).
+    //
+    // Replaces the ENTIRE route tree — no sidebar, no other page is ever
+    // mounted while locked, which is what actually blocks navigation
+    // (there's nothing real for the sidebar/back-button/a typed URL to
+    // reveal, since nothing else renders at all). PrivacyQuickSwitch stays
+    // mounted below so the same shortcut can still sign out of this.
+    return (
+      <>
+        <DecoySalesReceipt />
+        <PrivacyQuickSwitch />
+      </>
+    )
+  }
 
   return (
     <>
@@ -197,6 +243,7 @@ function App() {
         </Route>
       </Routes>
       {user && <UtilityWidgets />}
+      {user && <PrivacyQuickSwitch />}
     </>
   )
 }

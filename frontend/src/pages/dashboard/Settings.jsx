@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Palette, ImagePlus, Trash2, RotateCcw, AlertCircle, Check, ShieldAlert, Building2, Mail,
-  MessageSquare,
+  MessageSquare, Keyboard,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
@@ -10,6 +10,7 @@ import { useCompany } from '../../hooks/useCompany'
 import { useCompanyRole } from '../../hooks/useCompanyRole'
 import { useSmtpSettings } from '../../hooks/useSmtpSettings'
 import { useSmsSettings } from '../../hooks/useSmsSettings'
+import { useQuickSwitchShortcut, DEFAULT_SHORTCUT } from '../../hooks/useQuickSwitchShortcut'
 import { deriveShades, isValidHex, getContrastRatio } from '../../lib/brandColor'
 import Button from '../../components/ui/Button'
 
@@ -23,6 +24,8 @@ export default function Settings() {
   const { isOwner, loading: roleLoading } = useCompanyRole()
   const { settings: smtpSettings, loading: smtpLoading, saveSettings: saveSmtpSettings } = useSmtpSettings()
   const { settings: smsSettings, loading: smsLoading, saveSettings: saveSmsSettings } = useSmsSettings()
+  const [quickSwitchShortcut, setQuickSwitchShortcut] = useQuickSwitchShortcut()
+  const isMac = /Mac/i.test(navigator.platform)
 
   const [initialized, setInitialized] = useState(false)
   const [companyName, setCompanyName] = useState('')
@@ -646,6 +649,42 @@ export default function Settings() {
                 </Button>
               </div>
             )}
+          </section>
+
+          <section className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
+                <Keyboard size={16} />
+              </span>
+              <h2 className="font-heading text-base font-semibold text-ink-900">Privacy quick-switch</h2>
+            </div>
+            <p className="mt-1 text-xs text-ink-400">
+              From anywhere in the app, jump straight to a blank new sale — a per-device preference, not shared with other staff.
+            </p>
+
+            <div className="mt-4 flex items-center gap-3">
+              <span className="rounded-lg border border-ink-400/20 bg-cream-100 px-3 py-2 text-sm font-mono text-ink-700">
+                {isMac ? 'Cmd' : 'Ctrl'} + Shift + {quickSwitchShortcut.code.replace('Digit', '')}
+              </span>
+              <select
+                value={quickSwitchShortcut.code}
+                onChange={(e) => setQuickSwitchShortcut({ shift: true, code: e.target.value })}
+                className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-2 text-sm text-ink-900 outline-none focus:border-clay-500"
+              >
+                {Array.from({ length: 10 }, (_, i) => (
+                  <option key={i} value={`Digit${i}`}>{i}</option>
+                ))}
+              </select>
+              {quickSwitchShortcut.code !== DEFAULT_SHORTCUT.code && (
+                <button
+                  type="button"
+                  onClick={() => setQuickSwitchShortcut(DEFAULT_SHORTCUT)}
+                  className="text-xs font-medium text-ink-400 hover:text-clay-600"
+                >
+                  Reset to default
+                </button>
+              )}
+            </div>
           </section>
         </div>
 
