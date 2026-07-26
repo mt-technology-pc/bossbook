@@ -1,16 +1,40 @@
-import { useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, Trash2, Copy, ScanLine, Search } from 'lucide-react'
+import { Plus, Trash2, Copy } from 'lucide-react'
 import { formatCurrency } from '../../lib/currency'
 import { newSaleLine } from '../../lib/saleLines'
 import SearchSelect from '../ui/SearchSelect'
+import SerialSlotGrid from './SerialSlotGrid'
 
 export default function SaleLineItemsEditor({
-  lines, setLines, products, availableUnits, priceLabel = 'Rate', stockAdjustments = {},
+  lines, setLines, products, availableUnits, priceLabel = 'Rate', stockAdjustments = {}, onAllLinesComplete,
 }) {
-  const [unitSearch, setUnitSearch] = useState({})
-
   const getProduct = (id) => products.find((p) => p.id === id)
+
+  // Focuses the newly-selected product's first scan slot without making it
+  // part of line state (must never survive a duplicateLine spread or reach
+  // buildSaleItems). Cleared after every render — child mount effects run
+  // first, so SerialSlotGrid always sees it before it's gone.
+  const autoFocusKeyRef = useRef(null)
+  useEffect(() => {
+    autoFocusKeyRef.current = null
+  })
+
+  // line.key -> SerialSlotGrid imperative handle, so a completed line can
+  // hand focus to the next serialized line (or the page's submit button).
+  const lineRefs = useRef(new Map())
+  const handleLineComplete = (fromKey) => {
+    const idx = lines.findIndex((l) => l.key === fromKey)
+    for (let i = idx + 1; i < lines.length; i += 1) {
+      const next = lines[i]
+      const nextProduct = getProduct(next.productId)
+      if (nextProduct?.tracks_serial && Number(next.quantity) > 0) {
+        lineRefs.current.get(next.key)?.focusFirstEmptySlot()
+        return
+      }
+    }
+    onAllLinesComplete?.()
+  }
 
   const productOptions = products.map((p) => ({
     id: p.id,
@@ -31,6 +55,7 @@ export default function SaleLineItemsEditor({
             if (!next.unitPrice) next.unitPrice = String(product.price)
             if (!next.quantity) next.quantity = '1'
           }
+          autoFocusKeyRef.current = key
         }
         if (product?.tracks_serial) {
           const qty = Math.max(0, Number(next.quantity) || 0)
@@ -39,18 +64,6 @@ export default function SaleLineItemsEditor({
           next.unitIds = []
         }
         return next
-      }),
-    )
-  }
-
-  const toggleUnit = (key, unitId, quantity) => {
-    setLines((prev) =>
-      prev.map((l) => {
-        if (l.key !== key) return l
-        const already = l.unitIds.includes(unitId)
-        if (already) return { ...l, unitIds: l.unitIds.filter((id) => id !== unitId) }
-        if (l.unitIds.length >= quantity) return l
-        return { ...l, unitIds: [...l.unitIds, unitId] }
       }),
     )
   }
@@ -94,12 +107,12 @@ export default function SaleLineItemsEditor({
         <AnimatePresence initial={false}>
           {lines.map((line) => {
             const product = getProduct(line.productId)
-            const units = product ? availableUnits.forProduct(product.id) : []
             const qty = Math.max(0, Number(line.quantity) || 0)
-            const search = (unitSearch[line.key] || '').trim().toLowerCase()
-            const visibleUnits = search
-              ? units.filter((u) => u.serial_number.toLowerCase().includes(search) || line.unitIds.includes(u.id))
-              : units
+            const usedElsewhere = new Set()
+            for (const l of lines) {
+              if (l.key === line.key) continue
+              for (const id of l.unitIds) usedElsewhere.add(id)
+            }
 
             return (
               <motion.div
@@ -164,54 +177,21 @@ export default function SaleLineItemsEditor({
                 </div>
 
                 {product?.tracks_serial && qty > 0 && (
-                  <div className="mt-3 rounded-lg border border-clay-500/20 bg-clay-500/5 p-3">
-                    <p className="flex items-center gap-1.5 text-[11px] font-medium text-clay-600">
-                      <ScanLine size={12} /> Select {qty} unit{qty === 1 ? '' : 's'} to sell
-                      <span className="ml-auto font-semibold">{line.unitIds.length}/{qty} selected</span>
-                    </p>
-                    {units.length === 0 ? (
-                      <p className="mt-2 text-xs text-ink-400">No units in stock for this product.</p>
-                    ) : (
-                      <>
-                        <div className="relative mt-2">
-                          <Search size={12} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-400" />
-                          <input
-                            value={unitSearch[line.key] || ''}
-                            onChange={(e) => setUnitSearch((prev) => ({ ...prev, [line.key]: e.target.value }))}
-                            placeholder="Search serial/IMEI…"
-                            className="w-full rounded-lg border border-ink-400/20 bg-cream-50 py-1.5 pl-7 pr-2.5 text-xs text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500"
-                          />
-                        </div>
-                        {visibleUnits.length === 0 ? (
-                          <p className="mt-2 text-xs text-ink-400">No units match &quot;{unitSearch[line.key]}&quot;.</p>
-                        ) : (
-                          <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                            {visibleUnits.map((u) => {
-                              const checked = line.unitIds.includes(u.id)
-                              return (
-                                <label
-                                  key={u.id}
-                                  className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
-                                    checked
-                                      ? 'border-clay-500 bg-clay-500/10 text-clay-700'
-                                      : 'border-ink-400/20 text-ink-600 hover:border-ink-400/40'
-                                  }`}
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={() => toggleUnit(line.key, u.id, qty)}
-                                    className="h-3.5 w-3.5 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
-                                  />
-                                  <span className="truncate font-mono">{u.serial_number}</span>
-                                </label>
-                              )
-                            })}
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+                  <SerialSlotGrid
+                    ref={(el) => {
+                      if (el) lineRefs.current.set(line.key, el)
+                      else lineRefs.current.delete(line.key)
+                    }}
+                    line={line}
+                    product={product}
+                    availableUnits={availableUnits}
+                    stockAdjustment={stockAdjustments[product.id] || 0}
+                    usedElsewhere={usedElsewhere}
+                    autoFocus={autoFocusKeyRef.current === line.key}
+                    onChangeUnitIds={(unitIds) => updateLine(line.key, { unitIds })}
+                    onGrowQuantity={(nextQty) => updateLine(line.key, { quantity: String(nextQty) })}
+                    onLineComplete={() => handleLineComplete(line.key)}
+                  />
                 )}
               </motion.div>
             )
