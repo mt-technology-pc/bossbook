@@ -1,3 +1,5 @@
+import { computeProductValuation } from './inventoryValuation.js'
+import { todayColombo } from './todayColombo.js'
 
 // Every tool here wraps a query or RPC the frontend already calls directly
 // (create_sale, create_purchase, receive_payment, pay_bill, and read-only
@@ -202,6 +204,17 @@ export const toolDeclarations = [
     parameters: { type: 'object', properties: {} },
   },
   {
+    name: 'get_income_statement',
+    description: 'The authoritative way to answer any question about profit, gross profit, net profit/income, revenue, cost of goods sold, or margin over a period — computes them the same way the Income Statement report does (accrual basis, FIFO cost of goods sold), not by estimating from raw sales/purchase totals. Always use this instead of summing search_sales/search_purchases results for profit-type questions.',
+    parameters: {
+      type: 'object',
+      properties: {
+        from_date: { type: 'string', description: 'YYYY-MM-DD, defaults to the first day of the current month.' },
+        to_date: { type: 'string', description: 'YYYY-MM-DD, defaults to today.' },
+      },
+    },
+  },
+  {
     name: 'search_sales',
     description: 'Search invoices and sales receipts by customer name, type, reference, or date range.',
     parameters: {
@@ -374,6 +387,75 @@ export async function executeTool(name, args, supabase, ownerId) {
     case 'list_accounts': {
       const { data, error } = await supabase.from('account_balances').select('account_id, name, type, balance').order('name')
       return error ? { error: error.message } : { accounts: data }
+    }
+
+    case 'get_income_statement': {
+      const toDate = args.to_date || todayColombo()
+      const fromDate = args.from_date || `${toDate.slice(0, 7)}-01`
+
+      const [productsRes, purchaseItemsRes, saleItemsRes, expensesRes] = await Promise.all([
+        supabase.from('products').select('*'),
+        supabase.from('purchase_items').select('*, purchases(bill_date, reference)'),
+        supabase.from('sale_items').select('*, sales(sale_date, type, reference)'),
+        supabase.from('expenses').select('*'),
+      ])
+      if (productsRes.error) return { error: productsRes.error.message }
+      if (purchaseItemsRes.error) return { error: purchaseItemsRes.error.message }
+      if (saleItemsRes.error) return { error: saleItemsRes.error.message }
+      if (expensesRes.error) return { error: expensesRes.error.message }
+
+      const products = productsRes.data
+      const purchaseItems = purchaseItemsRes.data
+      const saleItems = saleItemsRes.data
+      const expenses = expensesRes.data
+
+      const revenueByCategory = new Map()
+      let totalRevenue = 0
+      let totalCogs = 0
+
+      products.forEach((product) => {
+        const pItems = purchaseItems.filter((pi) => pi.product_id === product.id)
+        const sItems = saleItems.filter((si) => si.product_id === product.id)
+        const inPeriod = sItems.some((s) => s.sales?.sale_date >= fromDate && s.sales?.sale_date <= toDate)
+        if (!inPeriod) return
+
+        const valuation = computeProductValuation(product, pItems, sItems, { asOfDate: toDate, method: 'fifo' })
+        const category = product.category || 'Uncategorized'
+        const bucket = revenueByCategory.get(category) ?? { category, revenue: 0, cogs: 0 }
+
+        valuation.ledger
+          .filter((e) => e.type === 'out' && e.date >= fromDate && e.date <= toDate)
+          .forEach((e) => {
+            const revenue = e.qty * (e.unitPrice ?? 0)
+            bucket.revenue += revenue
+            bucket.cogs += e.cogs ?? 0
+            totalRevenue += revenue
+            totalCogs += e.cogs ?? 0
+          })
+
+        revenueByCategory.set(category, bucket)
+      })
+
+      const categories = [...revenueByCategory.values()]
+        .map((c) => ({ ...c, grossProfit: c.revenue - c.cogs }))
+        .sort((a, b) => b.revenue - a.revenue)
+
+      const expensesInPeriod = expenses.filter((e) => e.expense_date >= fromDate && e.expense_date <= toDate)
+      const totalExpenses = expensesInPeriod.reduce((sum, e) => sum + Number(e.amount), 0)
+
+      const grossProfit = totalRevenue - totalCogs
+      const netIncome = grossProfit - totalExpenses
+
+      return {
+        from_date: fromDate,
+        to_date: toDate,
+        total_revenue: totalRevenue,
+        total_cost_of_goods_sold: totalCogs,
+        gross_profit: grossProfit,
+        total_expenses: totalExpenses,
+        net_profit: netIncome,
+        by_category: categories,
+      }
     }
 
     case 'search_sales': {

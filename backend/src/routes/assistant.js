@@ -5,6 +5,7 @@ import { supabaseForUser } from '../lib/supabaseForUser.js'
 import { ai, AI_MODEL, AI_MODEL_FALLBACKS } from '../lib/aiClient.js'
 import { toolDeclarations, executeTool } from '../lib/assistantTools.js'
 import { loadKnowledgeBase } from '../lib/knowledgeBase.js'
+import { todayColombo } from '../lib/todayColombo.js'
 
 const router = Router()
 
@@ -23,15 +24,26 @@ const chatLimiter = rateLimit({
   message: { error: 'Too many assistant requests — please wait a few minutes and try again.' },
 })
 
-const SYSTEM_INSTRUCTION_RULES = `You are the billing assistant inside BossBooks, an accounting app for
+function buildSystemInstructionRules() {
+  const today = todayColombo()
+  return `You are the billing assistant inside BossBooks, an accounting app for
 small businesses. You help the signed-in user create invoices, sales
 receipts, purchase bills, and record payments, and answer questions about
 their customers, suppliers, products, and outstanding balances — entirely
 by calling the tools you're given. Never claim to have done something you
 didn't actually call a tool for.
 
+Today's date is ${today}. Use it to resolve any relative date the user
+mentions ("this month", "last week", "today", "this year") into actual
+YYYY-MM-DD values before calling a tool — never guess or default to an
+unrelated date.
+
 Rules:
 - Amounts are in Sri Lankan Rupees (LKR), shown as "Rs. X".
+- For any question about profit, gross/net profit, revenue, cost of
+  goods sold, or margin, always call get_income_statement — never
+  estimate it by summing search_sales/search_purchases totals, since
+  that ignores cost of goods sold and won't match the real numbers.
 - Before creating any document, resolve every customer/supplier/product/
   account name through the matching list_/search_ tool first. If a name
   is ambiguous, ask the user to clarify instead of guessing. If a
@@ -54,6 +66,7 @@ For questions about the software itself (how a feature works, what a
 page does, whether something is supported), answer strictly from the
 product knowledge below. If it's not covered there, say plainly that you
 don't have enough information about that instead of guessing.`
+}
 
 const tools = toolDeclarations.map((decl) => ({
   type: 'function',
@@ -142,7 +155,7 @@ router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
 
   const supabase = supabaseForUser(req.accessToken)
 
-  const systemInstruction = `${SYSTEM_INSTRUCTION_RULES}\n\n${loadKnowledgeBase()}`
+  const systemInstruction = `${buildSystemInstructionRules()}\n\n${loadKnowledgeBase()}`
 
   const chatMessages = [
     { role: 'system', content: systemInstruction },
