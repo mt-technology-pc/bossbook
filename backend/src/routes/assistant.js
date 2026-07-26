@@ -83,8 +83,8 @@ const tools = toolDeclarations.map((decl) => ({
 // on non-2xx, so without this the response has no `choices` and the
 // caller crashes on completion.choices[0]. Normalize it into a thrown
 // error so it's handled the same way as any other failure.
-async function completeOnce(model, params) {
-  const completion = await ai.chat.completions.create({ ...params, model })
+async function completeOnce(model, params, signal) {
+  const completion = await ai.chat.completions.create({ ...params, model }, { signal })
   if (completion.error) {
     const err = new Error(completion.error.message || 'Upstream model error')
     err.status = completion.error.code
@@ -115,17 +115,29 @@ function isRetryable(err) {
 // caps that at roughly one timeout no matter how many candidates fail,
 // and in the common case returns as fast as the single fastest model
 // responds instead of always paying the primary's latency first.
+//
+// The free tier's daily request budget is shared and scarce (50/day on
+// a bare OpenRouter account, confirmed by hitting it live) — losing
+// racers must be aborted the instant a winner is found, or every
+// fallback event burns 3-4x its actual quota cost for nothing.
 async function raceModels(models, params) {
+  const controller = new AbortController()
   try {
-    return await Promise.any(models.map(async (model) => ({ completion: await completeOnce(model, params), model })))
+    const winner = await Promise.any(
+      models.map(async (model) => ({ completion: await completeOnce(model, params, controller.signal), model })),
+    )
+    controller.abort()
+    return winner
   } catch (aggregate) {
+    controller.abort()
     // Promise.any rejects with an AggregateError bundling every
     // individual failure — surface a non-retryable one if there is one
     // (e.g. context_length_exceeded, which no other free model will fix
     // either) since that's the actionable failure, not just whichever
-    // happened to be listed first.
-    const errors = aggregate.errors || [aggregate]
-    throw errors.find((e) => !isRetryable(e)) || errors[0]
+    // happened to be listed first. Ignore the abort errors this abort()
+    // itself causes in the still-pending racers.
+    const errors = (aggregate.errors || [aggregate]).filter((e) => e.constructor?.name !== 'APIUserAbortError')
+    throw errors.find((e) => !isRetryable(e)) || errors[0] || aggregate
   }
 }
 

@@ -321,6 +321,33 @@ export const toolDeclarations = [
       required: ['supplier_name', 'account_name', 'amount'],
     },
   },
+  {
+    name: 'create_expense',
+    description: 'Log a business expense (rent, utilities, supplies, etc.) paid from a cash/bank account.',
+    parameters: {
+      type: 'object',
+      properties: {
+        account_name: { type: 'string', description: 'Which cash/bank account the expense was paid from.' },
+        category: { type: 'string', description: 'e.g. "Rent", "Utilities", "Office Supplies".' },
+        amount: { type: 'number' },
+        description: { type: 'string', description: 'Optional — e.g. the vendor name or what it was for.' },
+        expense_date: { type: 'string', description: 'YYYY-MM-DD, defaults to today.' },
+      },
+      required: ['account_name', 'category', 'amount'],
+    },
+  },
+  {
+    name: 'search_expenses',
+    description: 'Search logged expenses by category or date range.',
+    parameters: {
+      type: 'object',
+      properties: {
+        category: { type: 'string' },
+        from_date: { type: 'string', description: 'YYYY-MM-DD' },
+        to_date: { type: 'string', description: 'YYYY-MM-DD' },
+      },
+    },
+  },
 ]
 
 export async function executeTool(name, args, supabase, ownerId) {
@@ -663,6 +690,40 @@ export async function executeTool(name, args, supabase, ownerId) {
       })
       if (error) return { error: error.message }
       return { success: true, payment_id: paymentId, amount: Number(args.amount), supplier: supplier.name }
+    }
+
+    case 'create_expense': {
+      const { row: account, error: accError } = await resolveAccount(supabase, args.account_name)
+      if (accError) return { error: accError }
+
+      const category = args.category?.trim()
+      if (!category) return { error: 'Enter an expense category.' }
+
+      const amount = Number(args.amount)
+      if (!amount || amount <= 0) return { error: 'Enter an amount greater than 0.' }
+
+      const { data: expenseId, error } = await supabase.rpc('record_expense', {
+        p_account_id: account.account_id,
+        p_category: category,
+        p_description: args.description || null,
+        p_amount: amount,
+        p_expense_date: args.expense_date || null,
+      })
+      if (error) return { error: error.message }
+      return { success: true, expense_id: expenseId, amount, category }
+    }
+
+    case 'search_expenses': {
+      let q = supabase
+        .from('expenses')
+        .select('id, code, category, description, amount, expense_date')
+        .order('expense_date', { ascending: false })
+        .limit(25)
+      if (args.category) q = q.ilike('category', `%${args.category}%`)
+      if (args.from_date) q = q.gte('expense_date', args.from_date)
+      if (args.to_date) q = q.lte('expense_date', args.to_date)
+      const { data, error } = await q
+      return error ? { error: error.message } : { expenses: data }
     }
 
     default:
