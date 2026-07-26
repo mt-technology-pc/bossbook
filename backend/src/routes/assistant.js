@@ -108,35 +108,51 @@ function isRetryable(err) {
   return !err.status && isTimeoutOrConnectionError(err)
 }
 
+// Races several models concurrently and returns whichever succeeds
+// first — trying them one at a time meant a bad patch across the whole
+// free tier cost the full sum of every model's timeout (up to 4 x 10s =
+// 40s, confirmed live) before the caller saw anything at all. Racing
+// caps that at roughly one timeout no matter how many candidates fail,
+// and in the common case returns as fast as the single fastest model
+// responds instead of always paying the primary's latency first.
+async function raceModels(models, params) {
+  try {
+    return await Promise.any(models.map(async (model) => ({ completion: await completeOnce(model, params), model })))
+  } catch (aggregate) {
+    // Promise.any rejects with an AggregateError bundling every
+    // individual failure — surface a non-retryable one if there is one
+    // (e.g. context_length_exceeded, which no other free model will fix
+    // either) since that's the actionable failure, not just whichever
+    // happened to be listed first.
+    const errors = aggregate.errors || [aggregate]
+    throw errors.find((e) => !isRetryable(e)) || errors[0]
+  }
+}
+
 // Free-tier models each have transient bad moments (500s, timeouts, a
-// malformed tool call) — one attempt per model, immediately falling
-// through to the next on failure, is far more reliable *and* faster than
-// retrying the same flaky one before moving on (that just doubles the
-// worst-case wait for no real benefit — a model having a bad moment is
-// usually still having it a second later). Only throws once every
-// candidate has failed once.
+// malformed tool call) — falling through to another candidate rather
+// than retrying the same flaky one is far more reliable (a model having
+// a bad moment is usually still having it a second later).
 //
 // `preferredModel` lets a multi-round tool-calling conversation remember
-// which model actually answered last time and try that one first — a
-// tool-heavy request can need several of these calls in a row, and
-// without this every single round re-pays the cost of timing out on a
-// currently-unhealthy AI_MODEL before ever reaching the one that works.
+// which model actually answered last time and try that one first, solo
+// — a tool-heavy request can need several of these calls in a row, and
+// trying the known-good model alone first avoids firing 3 wasted
+// concurrent requests every single round once one is already working.
+// If it fails (or there's no preferred model yet), race the rest.
 async function completeWithRetry(params, preferredModel) {
   const rest = [AI_MODEL, ...AI_MODEL_FALLBACKS].filter((m) => m !== preferredModel)
-  const models = preferredModel ? [preferredModel, ...rest] : rest
-  let lastErr
 
-  for (const model of models) {
+  if (preferredModel) {
     try {
-      const completion = await completeOnce(model, params)
-      return { completion, model }
+      const completion = await completeOnce(preferredModel, params)
+      return { completion, model: preferredModel }
     } catch (err) {
-      lastErr = err
       if (!isRetryable(err)) throw err
     }
   }
 
-  throw lastErr
+  return raceModels(rest, params)
 }
 
 router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
