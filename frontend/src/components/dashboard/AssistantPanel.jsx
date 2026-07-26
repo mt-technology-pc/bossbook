@@ -11,7 +11,7 @@ function formatMessageTime(iso) {
 
 const SUGGESTIONS = [
   'Show all unpaid invoices',
-  'Create a sales receipt',
+  "What's my profit this month?",
   "What's my top customer's balance?",
 ]
 
@@ -157,7 +157,7 @@ export default function AssistantPanel() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[15px] font-bold text-ink-900">Assistant</p>
-                <p className="text-xs text-ink-400">Ask it to create or find things</p>
+                <p className="text-xs text-ink-400">Ask about your customers, sales & profit</p>
               </div>
               {messages.length > 0 && (
                 <button
