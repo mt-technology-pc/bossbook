@@ -5639,3 +5639,468 @@ grant execute on function public.delete_app_secret(text) to service_role;
 -- nothing to run manually for those. Each company's own text.lk
 -- credentials are entered directly in their Settings page (sms_settings
 -- table above), not via Vault/SQL.
+
+-- Admin panel: mark payments paid on behalf of any company -----------------
+--
+-- Re-declare the balance views to add company_id (appended as a trailing
+-- column, same technique already used for account_balances' `code` column
+-- above — create or replace view can add trailing columns without needing
+-- drop+recreate). None of these exposed company_id before, even though
+-- their base tables all have it — the admin panel needs to filter by a
+-- target company, which these views couldn't do until now. Purely
+-- additive: security_invoker = true means RLS on the underlying tables
+-- still fully applies for normal (non-service-role) callers, so every
+-- existing owner/staff-facing page using these views is unaffected.
+
+create or replace view public.customer_balances
+with (security_invoker = true) as
+select
+  c.id as customer_id,
+  c.owner_id,
+  c.name,
+  coalesce(sum(case when t.type = 'charge' then t.amount else 0 end), 0) as total_charged,
+  coalesce(sum(case when t.type = 'payment' then t.amount else 0 end), 0) as total_paid,
+  coalesce(sum(case when t.type = 'charge' then t.amount else -t.amount end), 0) as balance,
+  c.company_id
+from public.customers c
+left join public.customer_transactions t on t.customer_id = c.id
+group by c.id, c.owner_id, c.name, c.company_id;
+
+create or replace view public.supplier_balances
+with (security_invoker = true) as
+select
+  s.id as supplier_id,
+  s.owner_id,
+  s.name,
+  coalesce(billed.total, 0) as total_billed,
+  coalesce(paid.total, 0) as total_paid,
+  coalesce(billed.total, 0) - coalesce(paid.total, 0) as balance,
+  s.company_id
+from public.suppliers s
+left join (
+  select supplier_id, sum(total_amount) as total
+  from public.purchases
+  where supplier_id is not null
+  group by supplier_id
+) billed on billed.supplier_id = s.id
+left join (
+  select supplier_id, sum(amount) as total
+  from public.supplier_payments
+  group by supplier_id
+) paid on paid.supplier_id = s.id;
+
+create or replace view public.sale_balances
+with (security_invoker = true) as
+select
+  s.id as sale_id,
+  s.owner_id,
+  s.customer_id,
+  s.type,
+  s.reference,
+  s.sale_date,
+  s.due_date,
+  s.total_amount,
+  coalesce(paid.total, 0) as paid_amount,
+  s.total_amount - coalesce(paid.total, 0) as outstanding,
+  s.company_id,
+  c.name as customer_name
+from public.sales s
+left join public.customers c on c.id = s.customer_id
+left join (
+  select sale_id, sum(amount) as total
+  from public.customer_transactions
+  where type = 'payment' and sale_id is not null
+  group by sale_id
+) paid on paid.sale_id = s.id;
+
+create or replace view public.purchase_balances
+with (security_invoker = true) as
+select
+  p.id as purchase_id,
+  p.owner_id,
+  p.supplier_id,
+  p.reference,
+  p.bill_date,
+  p.due_date,
+  p.total_amount,
+  coalesce(paid.total, 0) as paid_amount,
+  p.total_amount - coalesce(paid.total, 0) as outstanding,
+  p.company_id,
+  sup.name as supplier_name
+from public.purchases p
+left join public.suppliers sup on sup.id = p.supplier_id
+left join (
+  select purchase_id, sum(amount) as total
+  from public.supplier_payments
+  where purchase_id is not null
+  group by purchase_id
+) paid on paid.purchase_id = p.id;
+
+-- Admin-parameterized mirrors of ensure_system_account / ensure_account_coa_row
+-- / post_journal_entry — the originals all internally derive
+-- current_company_id() from the CALLER's own session (auth.uid()), which
+-- for a platform admin would resolve to the admin's own company, not the
+-- target one being administered. Calling the originals from an admin
+-- action wouldn't fail (the admin has a real session) — it would silently
+-- post the journal entry against the wrong company's chart of accounts.
+-- These take company_id explicitly instead, gated by is_platform_admin()
+-- rather than relying on the caller's own current_company_id().
+
+create or replace function public.admin_ensure_system_account(
+  p_company_id uuid,
+  p_system_key text,
+  p_name text,
+  p_type text,
+  p_normal_balance text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_id uuid := auth.uid();
+  v_id uuid;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'Admin access required';
+  end if;
+
+  select id into v_id from public.chart_of_accounts
+  where company_id = p_company_id and system_key = p_system_key;
+
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  insert into public.chart_of_accounts (owner_id, company_id, name, type, normal_balance, system_key)
+  values (v_admin_id, p_company_id, p_name, p_type, p_normal_balance, p_system_key)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.admin_ensure_system_account(uuid, text, text, text, text) from public, authenticated, anon;
+grant execute on function public.admin_ensure_system_account(uuid, text, text, text, text) to authenticated;
+
+create or replace function public.admin_ensure_account_coa_row(p_company_id uuid, p_account_id uuid)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_id uuid := auth.uid();
+  v_id uuid;
+  v_name text;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'Admin access required';
+  end if;
+
+  select id into v_id from public.chart_of_accounts
+  where company_id = p_company_id and account_id = p_account_id;
+
+  if v_id is not null then
+    return v_id;
+  end if;
+
+  select name into v_name from public.accounts where id = p_account_id and company_id = p_company_id;
+  if v_name is null then
+    raise exception 'Invalid account';
+  end if;
+
+  insert into public.chart_of_accounts (owner_id, company_id, name, type, normal_balance, account_id)
+  values (v_admin_id, p_company_id, v_name, 'asset', 'debit', p_account_id)
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+revoke all on function public.admin_ensure_account_coa_row(uuid, uuid) from public, authenticated, anon;
+grant execute on function public.admin_ensure_account_coa_row(uuid, uuid) to authenticated;
+
+create or replace function public.admin_post_journal_entry(
+  p_company_id uuid,
+  p_entry_date date,
+  p_memo text,
+  p_source_table text,
+  p_source_id uuid,
+  p_lines jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_id uuid := auth.uid();
+  v_entry_id uuid;
+  v_line jsonb;
+  v_total_debit numeric(12,2) := 0;
+  v_total_credit numeric(12,2) := 0;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'Admin access required';
+  end if;
+
+  if p_lines is null or jsonb_array_length(p_lines) < 2 then
+    raise exception 'A journal entry needs at least two lines';
+  end if;
+
+  select
+    coalesce(sum((line->>'debit')::numeric), 0),
+    coalesce(sum((line->>'credit')::numeric), 0)
+  into v_total_debit, v_total_credit
+  from jsonb_array_elements(p_lines) as line;
+
+  if round(v_total_debit, 2) <> round(v_total_credit, 2) then
+    raise exception 'Journal entry is not balanced: debits % vs credits %', v_total_debit, v_total_credit;
+  end if;
+
+  insert into public.journal_entries (owner_id, company_id, entry_date, memo, source_table, source_id)
+  values (v_admin_id, p_company_id, coalesce(p_entry_date, current_date), p_memo, p_source_table, p_source_id)
+  returning id into v_entry_id;
+
+  for v_line in select * from jsonb_array_elements(p_lines)
+  loop
+    insert into public.journal_entry_lines (owner_id, company_id, entry_id, account_id, debit, credit)
+    values (
+      v_admin_id, p_company_id, v_entry_id, (v_line->>'account_id')::uuid,
+      coalesce((v_line->>'debit')::numeric, 0), coalesce((v_line->>'credit')::numeric, 0)
+    );
+  end loop;
+
+  return v_entry_id;
+end;
+$$;
+
+revoke all on function public.admin_post_journal_entry(uuid, date, text, text, uuid, jsonb) from public, authenticated, anon;
+grant execute on function public.admin_post_journal_entry(uuid, date, text, text, uuid, jsonb) to authenticated;
+
+-- Admin-parameterized mirrors of receive_payment / pay_bill — same
+-- validation/insert/journal-entry shape as the originals, company passed
+-- explicitly and gated by is_platform_admin() instead of the caller's own
+-- current_company_id(). Notes are prefixed "[Admin] " so the business
+-- owner can tell these apart from their own activity in their normal
+-- transaction history.
+
+create or replace function public.admin_receive_payment(
+  p_company_id uuid,
+  p_customer_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date default current_date,
+  p_sale_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_id uuid := auth.uid();
+  v_customer_company uuid;
+  v_account_company uuid;
+  v_transaction_id uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ar_coa uuid;
+  v_code text;
+  v_note text;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'Admin access required';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select company_id into v_customer_company from public.customers where id = p_customer_id;
+  if v_customer_company is null or v_customer_company <> p_company_id then
+    raise exception 'Invalid customer';
+  end if;
+
+  select company_id into v_account_company from public.accounts where id = p_account_id;
+  if v_account_company is null or v_account_company <> p_company_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_sale_id is not null then
+    if not exists (
+      select 1 from public.sales where id = p_sale_id and company_id = p_company_id and customer_id = p_customer_id
+    ) then
+      raise exception 'Invalid invoice for this customer';
+    end if;
+  end if;
+
+  v_code := public.next_sequence_code(p_company_id, 'customer_payment', 'RCPT');
+  v_note := '[Admin] ' || coalesce(p_note, 'Payment received');
+
+  insert into public.customer_transactions (owner_id, company_id, customer_id, type, amount, note, sale_id, created_at, code)
+  values (v_admin_id, p_company_id, p_customer_id, 'payment', p_amount, v_note, p_sale_id, v_when, v_code)
+  returning id into v_transaction_id;
+
+  insert into public.account_transactions (owner_id, company_id, account_id, type, amount, note, customer_transaction_id, created_at)
+  values (v_admin_id, p_company_id, p_account_id, 'deposit', p_amount, v_note, v_transaction_id, v_when);
+
+  v_cash_coa := public.admin_ensure_account_coa_row(p_company_id, p_account_id);
+  v_ar_coa := public.admin_ensure_system_account(p_company_id, 'accounts_receivable', 'Accounts Receivable', 'asset', 'debit');
+  perform public.admin_post_journal_entry(
+    p_company_id, coalesce(p_payment_date, current_date), v_note, 'customer_transactions', v_transaction_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_cash_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_ar_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
+
+  return v_transaction_id;
+end;
+$$;
+
+revoke all on function public.admin_receive_payment(uuid, uuid, uuid, numeric, text, date, uuid) from public, authenticated, anon;
+grant execute on function public.admin_receive_payment(uuid, uuid, uuid, numeric, text, date, uuid) to authenticated;
+
+create or replace function public.admin_pay_bill(
+  p_company_id uuid,
+  p_supplier_id uuid,
+  p_account_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_payment_date date default current_date,
+  p_purchase_id uuid default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_admin_id uuid := auth.uid();
+  v_supplier_company uuid;
+  v_account_company uuid;
+  v_payment_id uuid;
+  v_when timestamptz := coalesce(p_payment_date, current_date);
+  v_cash_coa uuid;
+  v_ap_coa uuid;
+  v_code text;
+  v_note text;
+begin
+  if not public.is_platform_admin() then
+    raise exception 'Admin access required';
+  end if;
+
+  if p_amount is null or p_amount <= 0 then
+    raise exception 'Enter an amount greater than 0';
+  end if;
+
+  select company_id into v_supplier_company from public.suppliers where id = p_supplier_id;
+  if v_supplier_company is null or v_supplier_company <> p_company_id then
+    raise exception 'Invalid supplier';
+  end if;
+
+  select company_id into v_account_company from public.accounts where id = p_account_id;
+  if v_account_company is null or v_account_company <> p_company_id then
+    raise exception 'Invalid account';
+  end if;
+
+  if p_purchase_id is not null then
+    if not exists (
+      select 1 from public.purchases where id = p_purchase_id and company_id = p_company_id and supplier_id = p_supplier_id
+    ) then
+      raise exception 'Invalid bill for this supplier';
+    end if;
+  end if;
+
+  v_code := public.next_sequence_code(p_company_id, 'supplier_payment', 'PAY');
+  v_note := '[Admin] ' || coalesce(p_note, 'Bill payment');
+
+  insert into public.supplier_payments (owner_id, company_id, supplier_id, amount, note, purchase_id, created_at, code)
+  values (v_admin_id, p_company_id, p_supplier_id, p_amount, v_note, p_purchase_id, v_when, v_code)
+  returning id into v_payment_id;
+
+  insert into public.account_transactions (owner_id, company_id, account_id, type, amount, note, supplier_payment_id, created_at)
+  values (v_admin_id, p_company_id, p_account_id, 'withdrawal', p_amount, v_note, v_payment_id, v_when);
+
+  v_cash_coa := public.admin_ensure_account_coa_row(p_company_id, p_account_id);
+  v_ap_coa := public.admin_ensure_system_account(p_company_id, 'accounts_payable', 'Accounts Payable', 'liability', 'credit');
+  perform public.admin_post_journal_entry(
+    p_company_id, coalesce(p_payment_date, current_date), v_note, 'supplier_payments', v_payment_id,
+    jsonb_build_array(
+      jsonb_build_object('account_id', v_ap_coa, 'debit', p_amount, 'credit', 0),
+      jsonb_build_object('account_id', v_cash_coa, 'debit', 0, 'credit', p_amount)
+    )
+  );
+
+  return v_payment_id;
+end;
+$$;
+
+revoke all on function public.admin_pay_bill(uuid, uuid, uuid, numeric, text, date, uuid) from public, authenticated, anon;
+grant execute on function public.admin_pay_bill(uuid, uuid, uuid, numeric, text, date, uuid) to authenticated;
+
+-- Pause a company (e.g. non-payment) --------------------------------------
+--
+-- current_company_id() is the one primitive nearly every RLS policy in
+-- this schema keys off — making IT pause-aware is a single point of
+-- enforcement: every table's policy that checks `company_id =
+-- current_company_id()` transparently starts denying access for a paused
+-- company's users, with no changes needed to any of those ~30 individual
+-- policies. current_company_id() returning null makes every such
+-- comparison false (null = anything is never true in SQL).
+--
+-- The one deliberate exception is companies' own SELECT policy, rewritten
+-- below to check membership directly instead of going through
+-- current_company_id() — a paused company's own users still need to be
+-- able to read their own company row (to see paused=true and show a
+-- clear message), even though every other table locks out. UPDATE stays
+-- gated by current_company_id() as before — a paused company can still
+-- be *read* (just its own row) but not written to at all.
+
+alter table public.companies add column if not exists paused boolean not null default false;
+
+create or replace function public.current_company_id()
+returns uuid
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select cu.company_id
+  from public.company_users cu
+  join public.companies c on c.id = cu.company_id
+  where cu.user_id = auth.uid() and c.paused = false
+  limit 1;
+$$;
+
+drop policy if exists "Users can view own company" on public.companies;
+create policy "Users can view own company"
+  on public.companies for select
+  using (id in (select company_id from public.company_users where user_id = auth.uid()));
+
+-- Only a platform admin can pause/unpause — company_users has no
+-- update policy of its own and current_company_id() is now pause-aware,
+-- so nothing else in the app can flip this bit. Explicit admin check +
+-- raise exception (not just a where-clause filter) so a non-admin caller
+-- gets a clear error instead of a silent no-op.
+create or replace function public.admin_set_company_paused(p_company_id uuid, p_paused boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_platform_admin() then
+    raise exception 'Admin access required';
+  end if;
+
+  update public.companies set paused = p_paused where id = p_company_id;
+end;
+$$;
+
+revoke all on function public.admin_set_company_paused(uuid, boolean) from public, authenticated, anon;
+grant execute on function public.admin_set_company_paused(uuid, boolean) to authenticated;
