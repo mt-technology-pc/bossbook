@@ -154,7 +154,9 @@ group by c.id, c.owner_id, c.name, c.company_id;
 grant select on public.customer_balances to authenticated;
 
 -- ── 8. Updated supplier_balances VIEW ───────────────────────
-create or replace view public.supplier_balances
+-- Must drop first — CREATE OR REPLACE cannot add new columns to an existing view.
+drop view if exists public.supplier_balances;
+create view public.supplier_balances
 with (security_invoker = true) as
 select
   s.id as supplier_id,
