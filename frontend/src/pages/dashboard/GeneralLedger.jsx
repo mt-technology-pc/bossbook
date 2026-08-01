@@ -14,6 +14,7 @@ const SOURCE_LABELS = {
   expenses: 'Expense',
   accounts: 'Opening balance',
   products: 'Opening stock',
+  manual: 'Journal entry',
 }
 
 function formatDate(dateStr) {

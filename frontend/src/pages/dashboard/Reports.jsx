@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
-  Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight, Landmark, BookMarked, Scale, TrendingUp,
+  Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight, Landmark, BookMarked, Scale, TrendingUp, PenLine,
 } from 'lucide-react'
 
 const reports = [
@@ -52,6 +52,12 @@ const reports = [
     title: 'Trial Balance',
     desc: 'Every account as of a chosen date, proving total debits equal total credits — real double-entry bookkeeping.',
     to: '/dashboard/reports/trial-balance',
+  },
+  {
+    icon: PenLine,
+    title: 'Journal Entries',
+    desc: 'All manual double-entry postings — adjustments, corrections, and opening balances — with memo and line detail.',
+    to: '/dashboard/journal-entries',
   },
 ]
 

@@ -2,7 +2,7 @@ import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
   Package, Receipt, ScanLine, BarChart3, Users, Settings, Truck, Contact,
-  ShoppingBag, Wallet,
+  ShoppingBag, Wallet, BookOpen,
 } from 'lucide-react'
 
 const links = [
@@ -10,6 +10,7 @@ const links = [
   { label: 'Inventory', icon: Package, to: '/dashboard/inventory' },
   { label: 'Purchases', icon: ShoppingBag, to: '/dashboard/purchases' },
   { label: 'Expenses', icon: Wallet, to: '/dashboard/expenses' },
+  { label: 'Journal Entries', icon: BookOpen, to: '/dashboard/journal-entries' },
   { label: 'Customers', icon: Contact, to: '/dashboard/customers' },
   { label: 'Suppliers', icon: Truck, to: '/dashboard/suppliers' },
   { label: 'Serial tracking', icon: ScanLine, to: '/dashboard/serial-tracking', soon: true },
