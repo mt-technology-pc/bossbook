@@ -6127,3 +6127,116 @@ $$;
 
 grant execute on function public.delete_manual_journal_entry(uuid) to authenticated;
 grant execute on function public.admin_set_company_paused(uuid, boolean) to authenticated;
+
+-- Fix: manual journal entries must also update bank/cash account balances.
+--
+-- account_transactions is the table that account_balances reads from, but
+-- post_journal_entry only wrote to journal_entry_lines.  When a user
+-- credits Cash or a Bank account via a manual journal entry the dashboard
+-- balance never changed.
+--
+-- Solution: add journal_entry_id to account_transactions (cascade-delete so
+-- deleting the journal_entry row also removes the side-effect transaction),
+-- then widen post_journal_entry to write the matching deposit/withdrawal
+-- whenever a manual-entry line targets a chart_of_accounts row that has a
+-- linked physical account (coa.account_id IS NOT NULL).
+
+alter table public.account_transactions
+  add column if not exists journal_entry_id uuid
+    references public.journal_entries(id) on delete cascade;
+
+create index if not exists account_transactions_journal_entry_id_idx
+  on public.account_transactions(journal_entry_id);
+
+create or replace function public.post_journal_entry(
+  p_entry_date date,
+  p_memo text,
+  p_source_table text,
+  p_source_id uuid,
+  p_lines jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_owner_id   uuid := auth.uid();
+  v_company_id uuid := public.current_company_id();
+  v_entry_id   uuid;
+  v_line       jsonb;
+  v_total_debit  numeric(12,2) := 0;
+  v_total_credit numeric(12,2) := 0;
+  v_debit      numeric(12,2);
+  v_credit     numeric(12,2);
+  v_linked_acct uuid;
+begin
+  if v_owner_id is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if p_lines is null or jsonb_array_length(p_lines) < 2 then
+    raise exception 'A journal entry needs at least two lines';
+  end if;
+
+  select
+    coalesce(sum((line->>'debit')::numeric),  0),
+    coalesce(sum((line->>'credit')::numeric), 0)
+  into v_total_debit, v_total_credit
+  from jsonb_array_elements(p_lines) as line;
+
+  if round(v_total_debit, 2) <> round(v_total_credit, 2) then
+    raise exception 'Journal entry is not balanced: debits % vs credits %',
+      v_total_debit, v_total_credit;
+  end if;
+
+  insert into public.journal_entries
+    (owner_id, company_id, entry_date, memo, source_table, source_id)
+  values
+    (v_owner_id, v_company_id, coalesce(p_entry_date, current_date),
+     p_memo, p_source_table, p_source_id)
+  returning id into v_entry_id;
+
+  for v_line in select * from jsonb_array_elements(p_lines) loop
+    v_debit  := coalesce((v_line->>'debit')::numeric,  0);
+    v_credit := coalesce((v_line->>'credit')::numeric, 0);
+
+    insert into public.journal_entry_lines
+      (owner_id, company_id, entry_id, account_id, debit, credit)
+    values
+      (v_owner_id, v_company_id, v_entry_id,
+       (v_line->>'account_id')::uuid, v_debit, v_credit);
+
+    -- For manual entries only: if this COA row is linked to a physical
+    -- bank/cash account, mirror the effect in account_transactions so
+    -- the dashboard balance updates immediately.
+    -- Debit on a normal-debit account (asset) = money IN  = deposit.
+    -- Credit on a normal-debit account (asset) = money OUT = withdrawal.
+    if p_source_table = 'manual' then
+      select coa.account_id into v_linked_acct
+      from public.chart_of_accounts coa
+      where coa.id = (v_line->>'account_id')::uuid
+        and coa.company_id = v_company_id
+        and coa.account_id is not null;
+
+      if v_linked_acct is not null then
+        if v_debit > 0 then
+          insert into public.account_transactions
+            (owner_id, company_id, account_id, type, amount, note, journal_entry_id)
+          values
+            (v_owner_id, v_company_id, v_linked_acct,
+             'deposit', v_debit, p_memo, v_entry_id);
+        elsif v_credit > 0 then
+          insert into public.account_transactions
+            (owner_id, company_id, account_id, type, amount, note, journal_entry_id)
+          values
+            (v_owner_id, v_company_id, v_linked_acct,
+             'withdrawal', v_credit, p_memo, v_entry_id);
+        end if;
+      end if;
+    end if;
+  end loop;
+
+  return v_entry_id;
+end;
+$$;
