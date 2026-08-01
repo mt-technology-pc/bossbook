@@ -123,7 +123,7 @@ export default function CreditNotes() {
                   <th className="pb-3 font-medium">Reference</th>
                   <th className="pb-3 font-medium">Date</th>
                   <th className="pb-3 font-medium">Customer</th>
-                  <th className="pb-3 font-medium">Against Invoice</th>
+                  <th className="pb-3 font-medium">Against Sale</th>
                   <th className="pb-3 pr-3 text-right font-medium">Amount</th>
                   <th className="pb-3 font-medium" />
                 </tr>
@@ -145,7 +145,18 @@ export default function CreditNotes() {
                       {cn.customers?.name || '—'}
                     </td>
                     <td className="py-3.5 pr-3 text-ink-500">
-                      {cn.sales?.reference || '—'}
+                      {cn.sales ? (
+                        <span className="flex items-center gap-1.5">
+                          {cn.sales.reference || '—'}
+                          <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                            cn.sales.type === 'receipt'
+                              ? 'bg-ink-400/10 text-ink-500'
+                              : 'bg-clay-500/10 text-clay-600'
+                          }`}>
+                            {cn.sales.type === 'receipt' ? 'Receipt' : 'Invoice'}
+                          </span>
+                        </span>
+                      ) : '—'}
                     </td>
                     <td className="py-3.5 pr-3 text-right font-semibold text-ink-900">
                       {formatCurrency(cn.total_amount)}

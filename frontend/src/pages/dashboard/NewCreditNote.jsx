@@ -52,13 +52,14 @@ export default function NewCreditNote() {
     return { id: data.id }
   }
 
-  const customerInvoices = sales.filter(
-    (s) => s.type === 'invoice' && (!customerId || s.customer_id === customerId),
+  const customerSales = sales.filter(
+    (s) => (s.type === 'invoice' || s.type === 'receipt') &&
+           (!customerId || s.customer_id === customerId),
   )
-  const invoiceOptions = customerInvoices.map((s) => ({
+  const saleOptions = customerSales.map((s) => ({
     id: s.id,
-    label: s.reference || 'Invoice',
-    sublabel: formatCurrency(s.total_amount),
+    label: s.reference || (s.type === 'invoice' ? 'Invoice' : 'Receipt'),
+    sublabel: `${s.type === 'invoice' ? 'Invoice' : 'Receipt'} · ${formatCurrency(s.total_amount)}`,
   }))
 
   const productMap = Object.fromEntries(products.map((p) => [p.id, p]))
@@ -187,18 +188,18 @@ export default function NewCreditNote() {
                 </div>
               </div>
               <div>
-                <span className="text-xs font-medium text-ink-500">Against Invoice</span>
+                <span className="text-xs font-medium text-ink-500">Against Invoice / Receipt</span>
                 <div className="mt-1.5">
                   <SearchSelect
                     value={saleId}
                     onChange={setSaleId}
-                    options={invoiceOptions}
-                    placeholder="Select invoice (optional)"
+                    options={saleOptions}
+                    placeholder="Select invoice or receipt (optional)"
                   />
                 </div>
                 {saleId && (
                   <p className="mt-1 text-xs text-ink-400">
-                    Items auto-filled from invoice. Adjust quantities for partial returns.
+                    Items auto-filled from sale. Adjust quantities for partial returns.
                   </p>
                 )}
               </div>
