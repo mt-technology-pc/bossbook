@@ -32,6 +32,9 @@ export default function NewJournalEntry() {
     sublabel: a.type,
   }))
 
+  // coa_id → { normal_balance, type } for per-line increase/decrease hints
+  const accountMap = Object.fromEntries(accounts.map((a) => [a.coa_id, a]))
+
   const updateLine = (key, field, value) => {
     setLines((prev) =>
       prev.map((l) => {
@@ -137,47 +140,79 @@ export default function NewJournalEntry() {
             </div>
 
             <div className="space-y-2">
-              {lines.map((line) => (
-                <motion.div
-                  key={line.key}
-                  initial={{ opacity: 0, y: -6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="grid grid-cols-[1fr_120px_120px_36px] items-center gap-3"
-                >
-                  <SearchSelect
-                    value={line.accountId}
-                    onChange={(val) => updateLine(line.key, 'accountId', val)}
-                    options={accountOptions}
-                    placeholder={accountsLoading ? 'Loading…' : 'Select account…'}
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={line.debit}
-                    onChange={(e) => updateLine(line.key, 'debit', e.target.value)}
-                    placeholder="0.00"
-                    className="w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3 py-2.5 text-right text-sm text-ink-900 placeholder:text-ink-300 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
-                  />
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={line.credit}
-                    onChange={(e) => updateLine(line.key, 'credit', e.target.value)}
-                    placeholder="0.00"
-                    className="w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3 py-2.5 text-right text-sm text-ink-900 placeholder:text-ink-300 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeLine(line.key)}
-                    disabled={lines.length <= 2}
-                    className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+              {lines.map((line) => {
+                const acct = accountMap[line.accountId]
+                const nb = acct?.normal_balance // 'debit' | 'credit' | undefined
+                const debitEffect = nb === 'debit' ? '+' : nb === 'credit' ? '−' : null
+                const creditEffect = nb === 'credit' ? '+' : nb === 'debit' ? '−' : null
+                return (
+                  <motion.div
+                    key={line.key}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="grid grid-cols-[1fr_120px_120px_36px] items-center gap-3"
                   >
-                    <Trash2 size={15} />
-                  </button>
-                </motion.div>
-              ))}
+                    <SearchSelect
+                      value={line.accountId}
+                      onChange={(val) => updateLine(line.key, 'accountId', val)}
+                      options={accountOptions}
+                      placeholder={accountsLoading ? 'Loading…' : 'Select account…'}
+                    />
+                    <div className="relative">
+                      {debitEffect && (
+                        <span className={`pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold ${
+                          debitEffect === '+' ? 'text-emerald-500' : 'text-ink-300'
+                        }`}>
+                          {debitEffect}
+                        </span>
+                      )}
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={line.debit}
+                        onChange={(e) => updateLine(line.key, 'debit', e.target.value)}
+                        placeholder="0.00"
+                        className={`w-full rounded-xl border bg-cream-50 py-2.5 text-right text-sm text-ink-900 placeholder:text-ink-300 outline-none focus:ring-2 focus:ring-clay-500/20 ${
+                          debitEffect ? 'pl-6 pr-3' : 'px-3'
+                        } ${
+                          debitEffect === '+' ? 'border-emerald-200 focus:border-emerald-400' : 'border-ink-400/20 focus:border-clay-500'
+                        }`}
+                      />
+                    </div>
+                    <div className="relative">
+                      {creditEffect && (
+                        <span className={`pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold ${
+                          creditEffect === '+' ? 'text-emerald-500' : 'text-ink-300'
+                        }`}>
+                          {creditEffect}
+                        </span>
+                      )}
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={line.credit}
+                        onChange={(e) => updateLine(line.key, 'credit', e.target.value)}
+                        placeholder="0.00"
+                        className={`w-full rounded-xl border bg-cream-50 py-2.5 text-right text-sm text-ink-900 placeholder:text-ink-300 outline-none focus:ring-2 focus:ring-clay-500/20 ${
+                          creditEffect ? 'pl-6 pr-3' : 'px-3'
+                        } ${
+                          creditEffect === '+' ? 'border-emerald-200 focus:border-emerald-400' : 'border-ink-400/20 focus:border-clay-500'
+                        }`}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeLine(line.key)}
+                      disabled={lines.length <= 2}
+                      className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </motion.div>
+                )
+              })}
             </div>
 
             <button
