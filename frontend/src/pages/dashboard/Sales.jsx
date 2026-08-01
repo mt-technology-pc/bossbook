@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Plus, FileText, Receipt, TrendingUp, AlertCircle, ChevronDown, Wallet, Landmark, HandCoins,
-  Pencil, Trash2, ListChecks, Search, Printer,
+  Pencil, Trash2, ListChecks, Search, Printer, RotateCcw,
 } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
 import { useCustomers } from '../../hooks/useCustomers'
@@ -120,6 +120,9 @@ export default function Sales() {
               </Button>
             </>
           )}
+          <Button onClick={() => navigate('/dashboard/sales/credit-notes')} variant="ghost">
+            <RotateCcw size={16} /> Credit Notes
+          </Button>
           <Button onClick={() => navigate('/dashboard/sales/payments-received')} variant="ghost">
             <ListChecks size={16} /> Payments received
           </Button>

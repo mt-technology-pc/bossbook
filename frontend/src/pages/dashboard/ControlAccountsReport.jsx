@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, Printer } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Printer, CheckCircle2, XCircle } from 'lucide-react'
 import { useControlAccountsReport } from '../../hooks/useControlAccountsReport'
 import { formatCurrency } from '../../lib/currency'
 import PrintFrame from '../../components/print/PrintFrame'
@@ -117,11 +117,45 @@ function TAccountTable({ title, data }) {
   )
 }
 
+function ReconciliationPanel({ label, recon }) {
+  if (!recon) return null
+  const { glBalance, subsidiaryBalance, difference, isReconciled } = recon
+  return (
+    <div className={`rounded-2xl border px-5 py-4 print:border-black ${isReconciled ? 'border-green-500/30 bg-green-500/5' : 'border-red-500/30 bg-red-500/5'}`}>
+      <div className="flex items-center gap-2">
+        {isReconciled
+          ? <CheckCircle2 size={17} className="text-green-600 shrink-0" />
+          : <XCircle size={17} className="text-red-500 shrink-0" />}
+        <p className="font-medium text-ink-900 text-sm">{label}</p>
+        <span className={`ml-auto text-xs font-semibold px-2 py-0.5 rounded-full ${isReconciled ? 'bg-green-500/15 text-green-700' : 'bg-red-500/15 text-red-700'}`}>
+          {isReconciled ? 'Reconciled' : 'Difference'}
+        </span>
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        <div>
+          <p className="text-xs text-ink-400">GL Control Balance</p>
+          <p className="mt-0.5 font-semibold text-ink-900">{formatCurrency(glBalance)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-ink-400">Subsidiary Total</p>
+          <p className="mt-0.5 font-semibold text-ink-900">{formatCurrency(subsidiaryBalance)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-ink-400">Difference</p>
+          <p className={`mt-0.5 font-semibold ${isReconciled ? 'text-green-700' : 'text-red-600'}`}>
+            {isReconciled ? 'Nil' : formatCurrency(Math.abs(difference))}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ControlAccountsReport() {
   const navigate = useNavigate()
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const { ar, ap, loading, error } = useControlAccountsReport(
+  const { ar, ap, arRecon, apRecon, loading, error } = useControlAccountsReport(
     startDate || undefined,
     endDate || undefined,
   )
@@ -200,6 +234,20 @@ export default function ControlAccountsReport() {
           <div className="mt-6 space-y-6">
             <TAccountTable title="Trade Receivables Control Account" data={ar} />
             <TAccountTable title="Trade Payables Control Account" data={ap} />
+
+            <div className="space-y-3 print:mt-6">
+              <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-ink-400 print:text-black">
+                Control Account Reconciliation
+              </h2>
+              <ReconciliationPanel
+                label="AR Control vs Customer Balances"
+                recon={arRecon}
+              />
+              <ReconciliationPanel
+                label="AP Control vs Supplier Balances"
+                recon={apRecon}
+              />
+            </div>
           </div>
         </PrintFrame>
       )}

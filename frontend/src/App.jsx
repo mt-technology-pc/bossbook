@@ -39,6 +39,10 @@ import Expenses from './pages/dashboard/Expenses'
 import JournalEntries from './pages/dashboard/JournalEntries'
 import NewJournalEntry from './pages/dashboard/NewJournalEntry'
 import SerialTracking from './pages/dashboard/SerialTracking'
+import CreditNotes from './pages/dashboard/CreditNotes'
+import NewCreditNote from './pages/dashboard/NewCreditNote'
+import PurchaseReturns from './pages/dashboard/PurchaseReturns'
+import NewPurchaseReturn from './pages/dashboard/NewPurchaseReturn'
 import Backup from './pages/dashboard/Backup'
 import Settings from './pages/dashboard/Settings'
 import ComingSoon from './pages/dashboard/ComingSoon'
@@ -202,6 +206,22 @@ function App() {
           }
         />
         <Route
+          path="/dashboard/sales/credit-notes/new"
+          element={
+            <ProtectedRoute>
+              <NewCreditNote />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/purchases/purchase-returns/new"
+          element={
+            <ProtectedRoute>
+              <NewPurchaseReturn />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard/journal-entries/new"
           element={
             <ProtectedRoute>
@@ -229,8 +249,10 @@ function App() {
           <Route path="payables" element={<AccountsPayable />} />
           <Route path="purchases" element={<Purchases />} />
           <Route path="purchases/payments-made" element={<SupplierPayments />} />
+          <Route path="purchases/purchase-returns" element={<PurchaseReturns />} />
           <Route path="sales" element={<Sales />} />
           <Route path="sales/payments-received" element={<CustomerPayments />} />
+          <Route path="sales/credit-notes" element={<CreditNotes />} />
           <Route path="sales-reps" element={<SalesReps />} />
           <Route path="sales-reps/:id" element={<SalesRepDetail />} />
           <Route path="expenses" element={<Expenses />} />

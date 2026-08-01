@@ -26,7 +26,7 @@ export function useCustomerTransactions(customerId) {
     else {
       const withBalance = withRunningBalance(data ?? [], {
         debit: (t) => (t.type === 'charge' ? t.amount : 0),
-        credit: (t) => (t.type === 'payment' ? t.amount : 0),
+        credit: (t) => (t.type === 'payment' || t.type === 'credit_note' ? t.amount : 0),
       })
       setTransactions(withBalance.reverse())
       setError(null)
@@ -53,7 +53,7 @@ export function useCustomerTransactions(customerId) {
 
   const balance = transactions[0]?.balance ?? 0
   const totalCharged = transactions.reduce((sum, t) => sum + (t.type === 'charge' ? Number(t.amount) : 0), 0)
-  const totalPaid = transactions.reduce((sum, t) => sum + (t.type === 'payment' ? Number(t.amount) : 0), 0)
+  const totalPaid = transactions.reduce((sum, t) => sum + ((t.type === 'payment' || t.type === 'credit_note') ? Number(t.amount) : 0), 0)
 
   return {
     transactions, balance, totalCharged, totalPaid, loading, error, addTransaction, refetch: fetchTransactions,

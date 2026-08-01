@@ -7,8 +7,10 @@ function descFor(sourceTable, memo) {
   const labels = {
     sales: 'Credit sales',
     customer_transactions: 'Cash and bank',
+    credit_notes: 'Sales returns',
     purchases: 'Credit purchases',
     supplier_payments: 'Cash and bank',
+    purchase_returns: 'Purchase returns',
     expenses: 'Expense',
     accounts: 'Balance b/d',
     products: 'Opening stock',
@@ -54,6 +56,8 @@ export function useControlAccountsReport(startDate, endDate) {
   const { user } = useAuth()
   const [ar, setAr] = useState(null)
   const [ap, setAp] = useState(null)
+  const [arRecon, setArRecon] = useState(null)
+  const [apRecon, setApRecon] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -122,10 +126,27 @@ export function useControlAccountsReport(startDate, endDate) {
 
     setAr(buildFor(arCoa?.id))
     setAp(buildFor(apCoa?.id))
+
+    // Reconciliation: GL control balances vs subsidiary totals
+    const [coaBalRes, custBalRes, suppBalRes] = await Promise.all([
+      supabase.from('chart_of_accounts_balances').select('system_key,balance')
+        .in('system_key', ['accounts_receivable', 'accounts_payable']),
+      supabase.from('customer_balances').select('balance'),
+      supabase.from('supplier_balances').select('balance'),
+    ])
+
+    const glAr = Number(coaBalRes.data?.find(r => r.system_key === 'accounts_receivable')?.balance ?? 0)
+    const glAp = Number(coaBalRes.data?.find(r => r.system_key === 'accounts_payable')?.balance ?? 0)
+    const subAr = (custBalRes.data ?? []).reduce((s, r) => s + Number(r.balance), 0)
+    const subAp = (suppBalRes.data ?? []).reduce((s, r) => s + Number(r.balance), 0)
+
+    setArRecon({ glBalance: glAr, subsidiaryBalance: subAr, difference: glAr - subAr, isReconciled: Math.abs(glAr - subAr) < 0.01 })
+    setApRecon({ glBalance: glAp, subsidiaryBalance: subAp, difference: glAp - subAp, isReconciled: Math.abs(glAp - subAp) < 0.01 })
+
     setLoading(false)
   }, [user, startDate, endDate])
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  return { ar, ap, loading, error, refetch: fetchData }
+  return { ar, ap, arRecon, apRecon, loading, error, refetch: fetchData }
 }

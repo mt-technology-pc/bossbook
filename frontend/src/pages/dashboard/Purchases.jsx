@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Plus, Receipt, ScanLine, Layers, AlertCircle, ChevronDown, HandCoins, Pencil, Trash2, ListChecks,
-  Search,
+  Search, PackageX,
 } from 'lucide-react'
 import { usePurchases } from '../../hooks/usePurchases'
 import { formatCurrency } from '../../lib/currency'
@@ -58,6 +58,9 @@ export default function Purchases() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button onClick={() => navigate('/dashboard/purchases/purchase-returns')} variant="ghost">
+            <PackageX size={16} /> Returns
+          </Button>
           <Button onClick={() => navigate('/dashboard/purchases/payments-made')} variant="ghost">
             <ListChecks size={16} /> Payments made
           </Button>
