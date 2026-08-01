@@ -62,7 +62,7 @@ const reports = [
   {
     icon: ShieldCheck,
     title: 'Control Accounts',
-    desc: 'Reconciles GL control accounts (Receivables, Payables, Inventory, Cash) against their subsidiary ledgers — instantly highlights any posting discrepancy.',
+    desc: 'T-account ledger view of Trade Receivables and Trade Payables — every posting shown Dr/Cr with opening Balance b/d and closing Balance c/d.',
     to: '/dashboard/reports/control-accounts',
   },
 ]

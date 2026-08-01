@@ -1,71 +1,116 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { AlertCircle, ArrowLeft, Printer, ShieldCheck, ShieldAlert } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Printer } from 'lucide-react'
 import { useControlAccountsReport } from '../../hooks/useControlAccountsReport'
 import { formatCurrency } from '../../lib/currency'
 import PrintFrame from '../../components/print/PrintFrame'
 
-function StatusBadge({ reconciled }) {
-  return (
-    <span className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-      reconciled ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'
-    }`}>
-      {reconciled
-        ? <><ShieldCheck size={11} /> Reconciled</>
-        : <><ShieldAlert size={11} /> Discrepancy</>}
-    </span>
-  )
+function fmtDate(dateStr) {
+  if (!dateStr) return ''
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-LK', {
+    day: 'numeric',
+    month: 'short',
+  })
 }
 
-function DiffCell({ diff }) {
-  if (diff === null || diff < 0.01) {
-    return <span className="text-ink-300">—</span>
-  }
-  return <span className="font-semibold text-red-600">{formatCurrency(diff)}</span>
-}
-
-function ControlCell({ control }) {
-  if (control === null) {
-    return <span className="text-ink-400 italic">Not set up</span>
-  }
-  return <span>{formatCurrency(control)}</span>
-}
-
-function Section({ title, reconciled, rows }) {
-  return (
-    <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6 print:border-0 print:p-0 print:mb-8">
-      <div className="flex items-center justify-between gap-2 print:mb-3">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wide text-ink-400">{title}</h2>
-        <span className="print:hidden"><StatusBadge reconciled={reconciled} /></span>
-        <span className="hidden print:inline text-xs font-semibold text-ink-500">
-          {reconciled ? '✓ Reconciled' : '! Discrepancy'}
-        </span>
+function TAccountTable({ title, data }) {
+  if (!data) {
+    return (
+      <div className="rounded-2xl border border-dashed border-ink-400/20 bg-cream-50 py-10 text-center print:border-black">
+        <p className="text-sm font-medium text-ink-500">{title}</p>
+        <p className="mt-1 text-xs text-ink-400">No journal entries posted to this account yet.</p>
       </div>
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full min-w-[520px] text-left text-sm">
+    )
+  }
+
+  const { drEntries, crEntries, grandTotal, closingBalance } = data
+  const len = Math.max(drEntries.length, crEntries.length, 1)
+  const dr = [...drEntries, ...Array(len - drEntries.length).fill(null)]
+  const cr = [...crEntries, ...Array(len - crEntries.length).fill(null)]
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 print:border-black">
+      {/* Title bar */}
+      <div className="border-b border-ink-400/15 bg-cream-100 py-3 text-center print:bg-white">
+        <h3 className="font-heading text-base font-semibold text-ink-900">{title}</h3>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[600px] text-sm">
           <thead>
-            <tr className="border-b border-ink-400/10 text-xs text-ink-400">
-              <th className="pb-2.5 font-medium">Account</th>
-              <th className="pb-2.5 text-right font-medium">GL Control</th>
-              <th className="pb-2.5 text-right font-medium">Subsidiary Ledger</th>
-              <th className="pb-2.5 text-right font-medium">Difference</th>
+            <tr className="border-b border-ink-400/10 text-xs font-medium">
+              <th className="w-[11%] py-2.5 pl-4 text-left text-clay-600">Dr</th>
+              <th className="py-2.5 text-left text-ink-400">Details</th>
+              <th className="py-2.5 pr-3 text-right text-ink-400">LKR</th>
+              <th className="w-px bg-ink-400/20 p-0" />
+              <th className="w-[11%] py-2.5 pl-4 text-left text-clay-600">Cr</th>
+              <th className="py-2.5 text-left text-ink-400">Details</th>
+              <th className="py-2.5 pr-4 text-right text-ink-400">LKR</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
-              <tr key={i} className="border-b border-ink-400/10 last:border-0">
-                <td className="py-2.5 pr-3 text-ink-900">{row.name}</td>
-                <td className="py-2.5 pr-3 text-right text-ink-700">
-                  <ControlCell control={row.control} />
+            {dr.map((drRow, i) => {
+              const crRow = cr[i]
+              return (
+                <tr key={i} className="border-b border-ink-400/10 last:border-0">
+                  {/* Dr side */}
+                  <td className="py-2.5 pl-4 text-xs text-ink-400">
+                    {drRow ? fmtDate(drRow.date) : ''}
+                  </td>
+                  <td className={`py-2.5 pr-2 ${drRow?.isBalance || drRow?.isClosing ? 'font-semibold text-ink-900' : 'text-ink-700'}`}>
+                    {drRow?.desc ?? ''}
+                  </td>
+                  <td className="py-2.5 pr-3 text-right text-ink-700">
+                    {drRow ? formatCurrency(drRow.amount) : ''}
+                  </td>
+                  {/* Vertical rule */}
+                  <td className="w-px bg-ink-400/20 p-0" />
+                  {/* Cr side */}
+                  <td className="py-2.5 pl-4 text-xs text-ink-400">
+                    {crRow ? fmtDate(crRow.date) : ''}
+                  </td>
+                  <td className={`py-2.5 pr-2 ${crRow?.isBalance || crRow?.isClosing ? 'font-semibold text-ink-900' : 'text-ink-700'}`}>
+                    {crRow?.desc ?? ''}
+                  </td>
+                  <td className="py-2.5 pr-4 text-right text-ink-700">
+                    {crRow ? formatCurrency(crRow.amount) : ''}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+          <tfoot>
+            {/* Totals row — double-underline on both sides */}
+            <tr className="border-t-2 border-ink-900/20 font-semibold text-ink-900">
+              <td className="py-2.5 pl-4 text-xs text-ink-400" />
+              <td className="py-2.5">Total</td>
+              <td className="border-b-2 border-ink-900/20 py-2.5 pr-3 text-right">{formatCurrency(grandTotal)}</td>
+              <td className="w-px bg-ink-400/20 p-0" />
+              <td className="py-2.5 pl-4 text-xs text-ink-400" />
+              <td className="py-2.5">Total</td>
+              <td className="border-b-2 border-ink-900/20 py-2.5 pr-4 text-right">{formatCurrency(grandTotal)}</td>
+            </tr>
+            {/* Balance b/d carried forward */}
+            {Math.abs(closingBalance) > 0.005 && (
+              <tr className="border-t border-ink-400/10 text-ink-700">
+                <td className="py-2.5 pl-4 text-xs text-ink-400" />
+                <td className="py-2.5 font-semibold text-ink-900">
+                  {closingBalance > 0 ? 'Balance b/d' : ''}
                 </td>
-                <td className="py-2.5 pr-3 text-right text-ink-700">
-                  {formatCurrency(row.subsidiary)}
+                <td className="py-2.5 pr-3 text-right font-semibold text-ink-900">
+                  {closingBalance > 0 ? formatCurrency(closingBalance) : ''}
                 </td>
-                <td className="py-2.5 text-right">
-                  <DiffCell diff={row.diff} />
+                <td className="w-px bg-ink-400/20 p-0" />
+                <td className="py-2.5 pl-4 text-xs text-ink-400" />
+                <td className="py-2.5 font-semibold text-ink-900">
+                  {closingBalance < 0 ? 'Balance b/d' : ''}
+                </td>
+                <td className="py-2.5 pr-4 text-right font-semibold text-ink-900">
+                  {closingBalance < 0 ? formatCurrency(Math.abs(closingBalance)) : ''}
                 </td>
               </tr>
-            ))}
-          </tbody>
+            )}
+          </tfoot>
         </table>
       </div>
     </div>
@@ -74,15 +119,16 @@ function Section({ title, reconciled, rows }) {
 
 export default function ControlAccountsReport() {
   const navigate = useNavigate()
-  const { data, loading, error } = useControlAccountsReport()
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const { ar, ap, loading, error } = useControlAccountsReport(
+    startDate || undefined,
+    endDate || undefined,
+  )
 
-  const allReconciled = data
-    ? data.ar.reconciled && data.ap.reconciled && data.inventory.reconciled && data.cashAccounts.every(a => a.reconciled)
-    : true
-
-  const discrepancyCount = data
-    ? [data.ar, data.ap, data.inventory, ...data.cashAccounts].filter(a => !a.reconciled).length
-    : 0
+  const periodLabel = startDate || endDate
+    ? `${startDate || 'Start'} to ${endDate || 'End'}`
+    : 'All transactions'
 
   return (
     <div>
@@ -105,8 +151,38 @@ export default function ControlAccountsReport() {
         Control Accounts
       </h1>
       <p className="mt-1 text-sm text-ink-500 print:hidden">
-        Reconciles General Ledger control accounts against their subsidiary ledgers — highlights any posting discrepancy.
+        T-account ledger view of Trade Receivables and Trade Payables — showing every posting with opening and closing balances.
       </p>
+
+      {/* Date filter */}
+      <div className="mt-5 flex flex-wrap items-end gap-3 print:hidden">
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-500">From</label>
+          <input
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            className="rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-ink-500">To</label>
+          <input
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            className="rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+          />
+        </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={() => { setStartDate(''); setEndDate('') }}
+            className="text-xs text-ink-400 hover:text-ink-700"
+          >
+            Clear (show all)
+          </button>
+        )}
+      </div>
 
       {error && (
         <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
@@ -119,65 +195,11 @@ export default function ControlAccountsReport() {
         <div className="flex justify-center py-24">
           <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
         </div>
-      ) : data && (
-        <PrintFrame title="Control Accounts" subtitle="General Ledger vs Subsidiary Ledger Reconciliation">
-          <div className="mt-6 space-y-4">
-            {/* Summary banner */}
-            <div className={`flex items-center gap-2.5 rounded-xl border px-4 py-3 text-sm font-medium print:hidden ${
-              allReconciled
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                : 'border-red-200 bg-red-50 text-red-700'
-            }`}>
-              {allReconciled
-                ? <><ShieldCheck size={16} /> All control accounts reconcile — no discrepancies found.</>
-                : <><ShieldAlert size={16} /> {discrepancyCount} {discrepancyCount === 1 ? 'discrepancy' : 'discrepancies'} found — review the highlighted section{discrepancyCount > 1 ? 's' : ''} below.</>}
-            </div>
-
-            <Section
-              title="Accounts Receivable"
-              reconciled={data.ar.reconciled}
-              rows={[{
-                name: 'Accounts Receivable',
-                control: data.ar.control,
-                subsidiary: data.ar.subsidiary,
-                diff: data.ar.diff,
-              }]}
-            />
-
-            <Section
-              title="Accounts Payable"
-              reconciled={data.ap.reconciled}
-              rows={[{
-                name: 'Accounts Payable',
-                control: data.ap.control,
-                subsidiary: data.ap.subsidiary,
-                diff: data.ap.diff,
-              }]}
-            />
-
-            <Section
-              title="Inventory"
-              reconciled={data.inventory.reconciled}
-              rows={[{
-                name: 'Inventory',
-                control: data.inventory.control,
-                subsidiary: data.inventory.subsidiary,
-                diff: data.inventory.diff,
-              }]}
-            />
-
-            {data.cashAccounts.length > 0 && (
-              <Section
-                title="Cash & Bank Accounts"
-                reconciled={data.cashAccounts.every(a => a.reconciled)}
-                rows={data.cashAccounts.map(a => ({
-                  name: a.name + (a.type === 'bank' ? ' (Bank)' : ' (Cash)'),
-                  control: a.control,
-                  subsidiary: a.subsidiary,
-                  diff: a.diff,
-                }))}
-              />
-            )}
+      ) : (
+        <PrintFrame title="Control Accounts" subtitle={periodLabel}>
+          <div className="mt-6 space-y-6">
+            <TAccountTable title="Trade Receivables Control Account" data={ar} />
+            <TAccountTable title="Trade Payables Control Account" data={ap} />
           </div>
         </PrintFrame>
       )}

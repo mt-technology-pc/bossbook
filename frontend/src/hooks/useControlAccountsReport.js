@@ -2,103 +2,130 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
-function sum(arr) {
-  return arr.reduce((s, v) => s + (Number(v) || 0), 0)
+function descFor(sourceTable, memo) {
+  if (sourceTable === 'manual') return memo || 'Journal entry'
+  const labels = {
+    sales: 'Credit sales',
+    customer_transactions: 'Cash and bank',
+    purchases: 'Credit purchases',
+    supplier_payments: 'Cash and bank',
+    expenses: 'Expense',
+    accounts: 'Balance b/d',
+    products: 'Opening stock',
+  }
+  return labels[sourceTable] ?? memo ?? '—'
 }
 
-function isReconciled(control, subsidiary) {
-  if (control === null) return subsidiary < 0.01
-  return Math.abs(control - subsidiary) < 0.01
+function buildTAccount(openingBalance, periodDrLines, periodCrLines) {
+  const drList = []
+  const crList = []
+
+  if (openingBalance > 0.005) {
+    drList.push({ date: '', desc: 'Balance b/d', amount: openingBalance, isBalance: true })
+  } else if (openingBalance < -0.005) {
+    crList.push({ date: '', desc: 'Balance b/d', amount: Math.abs(openingBalance), isBalance: true })
+  }
+
+  drList.push(...periodDrLines)
+  crList.push(...periodCrLines)
+
+  const totalDr = drList.reduce((s, e) => s + e.amount, 0)
+  const totalCr = crList.reduce((s, e) => s + e.amount, 0)
+  const closingBalance = totalDr - totalCr // positive = debit balance
+
+  const drFinal = [...drList]
+  const crFinal = [...crList]
+
+  if (closingBalance > 0.005) {
+    crFinal.push({ date: '', desc: 'Balance c/d', amount: closingBalance, isClosing: true })
+  } else if (closingBalance < -0.005) {
+    drFinal.push({ date: '', desc: 'Balance c/d', amount: Math.abs(closingBalance), isClosing: true })
+  }
+
+  const grandTotal = Math.max(
+    drFinal.reduce((s, e) => s + e.amount, 0),
+    crFinal.reduce((s, e) => s + e.amount, 0),
+  )
+
+  return { drEntries: drFinal, crEntries: crFinal, grandTotal, closingBalance }
 }
 
-export function useControlAccountsReport() {
+export function useControlAccountsReport(startDate, endDate) {
   const { user } = useAuth()
-  const [data, setData] = useState(null)
+  const [ar, setAr] = useState(null)
+  const [ap, setAp] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
   const fetchData = useCallback(async () => {
-    if (!user) {
-      setData(null)
-      setLoading(false)
-      return
-    }
+    if (!user) { setAr(null); setAp(null); setLoading(false); return }
     setLoading(true)
     setError(null)
 
-    const [coaRes, customersRes, suppliersRes, productsRes, accountsRes] = await Promise.all([
-      supabase.from('chart_of_accounts_balances').select('coa_id,name,system_key,account_id,balance'),
-      supabase.from('customer_balances').select('balance'),
-      supabase.from('supplier_balances').select('balance'),
-      supabase.from('products').select('stock_quantity,cost'),
-      supabase.from('account_balances').select('account_id,name,balance,type'),
-    ])
+    const { data: coaRows, error: coaErr } = await supabase
+      .from('chart_of_accounts')
+      .select('id, system_key')
+      .in('system_key', ['accounts_receivable', 'accounts_payable'])
 
-    const firstError = [coaRes, customersRes, suppliersRes, productsRes, accountsRes].find(r => r.error)
-    if (firstError) {
-      setError(firstError.error.message)
-      setLoading(false)
-      return
+    if (coaErr) { setError(coaErr.message); setLoading(false); return }
+
+    const arCoa = coaRows?.find(r => r.system_key === 'accounts_receivable')
+    const apCoa = coaRows?.find(r => r.system_key === 'accounts_payable')
+    const accountIds = [arCoa?.id, apCoa?.id].filter(Boolean)
+
+    if (accountIds.length === 0) {
+      setAr(null); setAp(null); setLoading(false); return
     }
 
-    const coaData      = coaRes.data ?? []
-    const customersData = customersRes.data ?? []
-    const suppliersData = suppliersRes.data ?? []
-    const productsData  = productsRes.data ?? []
-    const accountsData  = accountsRes.data ?? []
+    const { data: lines, error: linesErr } = await supabase
+      .from('journal_entry_lines')
+      .select('account_id, debit, credit, journal_entries(entry_date, memo, source_table)')
+      .in('account_id', accountIds)
 
-    const coaByKey  = Object.fromEntries(coaData.filter(a => a.system_key).map(a => [a.system_key, a]))
-    const coaByAcct = Object.fromEntries(coaData.filter(a => a.account_id).map(a => [a.account_id, a]))
+    if (linesErr) { setError(linesErr.message); setLoading(false); return }
 
-    const arControl    = coaByKey['accounts_receivable']?.balance ?? null
-    const arSubsidiary = sum(customersData.map(c => c.balance))
+    function buildFor(coaId) {
+      if (!coaId) return null
+      const allLines = (lines ?? []).filter(l => l.account_id === coaId)
 
-    const apControl    = coaByKey['accounts_payable']?.balance ?? null
-    const apSubsidiary = sum(suppliersData.map(s => s.balance))
+      const preLines = startDate
+        ? allLines.filter(l => l.journal_entries?.entry_date < startDate)
+        : []
+      const openingBalance = preLines.reduce((s, l) => s + Number(l.debit) - Number(l.credit), 0)
 
-    const inventoryControl    = coaByKey['inventory']?.balance ?? null
-    const inventorySubsidiary = sum(productsData.map(p => (p.stock_quantity ?? 0) * (p.cost ?? 0)))
+      const periodLines = allLines.filter(l => {
+        const d = l.journal_entries?.entry_date
+        if (!d) return false
+        if (startDate && d < startDate) return false
+        if (endDate && d > endDate) return false
+        return true
+      })
 
-    const cashAccounts = accountsData.map(acct => {
-      const control = coaByAcct[acct.account_id]?.balance ?? null
-      const subsidiary = Number(acct.balance) || 0
-      return {
-        name:       acct.name,
-        type:       acct.type,
-        subsidiary,
-        control,
-        diff:       control !== null ? Math.abs(control - subsidiary) : null,
-        reconciled: isReconciled(control, subsidiary),
-      }
-    })
+      const drLines = periodLines
+        .filter(l => Number(l.debit) > 0.005)
+        .map(l => ({
+          date: l.journal_entries?.entry_date ?? '',
+          desc: descFor(l.journal_entries?.source_table, l.journal_entries?.memo),
+          amount: Number(l.debit),
+        }))
 
-    setData({
-      ar: {
-        control:    arControl,
-        subsidiary: arSubsidiary,
-        diff:       arControl !== null ? Math.abs(arControl - arSubsidiary) : null,
-        reconciled: isReconciled(arControl, arSubsidiary),
-      },
-      ap: {
-        control:    apControl,
-        subsidiary: apSubsidiary,
-        diff:       apControl !== null ? Math.abs(apControl - apSubsidiary) : null,
-        reconciled: isReconciled(apControl, apSubsidiary),
-      },
-      inventory: {
-        control:    inventoryControl,
-        subsidiary: inventorySubsidiary,
-        diff:       inventoryControl !== null ? Math.abs(inventoryControl - inventorySubsidiary) : null,
-        reconciled: isReconciled(inventoryControl, inventorySubsidiary),
-      },
-      cashAccounts,
-    })
+      const crLines = periodLines
+        .filter(l => Number(l.credit) > 0.005)
+        .map(l => ({
+          date: l.journal_entries?.entry_date ?? '',
+          desc: descFor(l.journal_entries?.source_table, l.journal_entries?.memo),
+          amount: Number(l.credit),
+        }))
+
+      return buildTAccount(openingBalance, drLines, crLines)
+    }
+
+    setAr(buildFor(arCoa?.id))
+    setAp(buildFor(apCoa?.id))
     setLoading(false)
-  }, [user])
+  }, [user, startDate, endDate])
 
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
+  useEffect(() => { fetchData() }, [fetchData])
 
-  return { data, loading, error, refetch: fetchData }
+  return { ar, ap, loading, error, refetch: fetchData }
 }
