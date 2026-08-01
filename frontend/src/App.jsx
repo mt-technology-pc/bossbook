@@ -35,6 +35,8 @@ import ChartOfAccounts from './pages/dashboard/ChartOfAccounts'
 import GeneralLedger from './pages/dashboard/GeneralLedger'
 import TrialBalance from './pages/dashboard/TrialBalance'
 import Expenses from './pages/dashboard/Expenses'
+import JournalEntries from './pages/dashboard/JournalEntries'
+import NewJournalEntry from './pages/dashboard/NewJournalEntry'
 import SerialTracking from './pages/dashboard/SerialTracking'
 import Backup from './pages/dashboard/Backup'
 import Settings from './pages/dashboard/Settings'
@@ -198,6 +200,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/journal-entries/new"
+          element={
+            <ProtectedRoute>
+              <NewJournalEntry />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/dashboard"
@@ -223,6 +233,7 @@ function App() {
           <Route path="sales-reps" element={<SalesReps />} />
           <Route path="sales-reps/:id" element={<SalesRepDetail />} />
           <Route path="expenses" element={<Expenses />} />
+          <Route path="journal-entries" element={<JournalEntries />} />
           <Route path="accounts/:id" element={<AccountDetail />} />
           <Route path="serial-tracking" element={<SerialTracking />} />
           <Route path="reports" element={<Reports />} />

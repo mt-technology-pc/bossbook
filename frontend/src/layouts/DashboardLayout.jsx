@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
   Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
-  ArrowDownToLine, ArrowUpFromLine, UserRound, DatabaseBackup,
+  ArrowDownToLine, ArrowUpFromLine, UserRound, DatabaseBackup, BookOpen,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
@@ -21,6 +21,7 @@ const nav = [
   { label: 'Inventory', to: '/dashboard/inventory', icon: Package },
   { label: 'Purchases', to: '/dashboard/purchases', icon: ShoppingBag },
   { label: 'Expenses', to: '/dashboard/expenses', icon: Wallet },
+  { label: 'Journal Entries', to: '/dashboard/journal-entries', icon: BookOpen },
   { label: 'Customers', to: '/dashboard/customers', icon: Contact },
   { label: 'Receivables', to: '/dashboard/receivables', icon: ArrowDownToLine },
   { label: 'Suppliers', to: '/dashboard/suppliers', icon: Truck },

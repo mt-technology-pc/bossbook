@@ -6103,4 +6103,27 @@ end;
 $$;
 
 revoke all on function public.admin_set_company_paused(uuid, boolean) from public, authenticated, anon;
+
+-- Manual journal entry deletion (targeted by entry id, restricted to manual source)
+create or replace function public.delete_manual_journal_entry(p_entry_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_company_id uuid := public.current_company_id();
+begin
+  if auth.uid() is null or v_company_id is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  delete from public.journal_entries
+  where id = p_entry_id
+    and source_table = 'manual'
+    and company_id = v_company_id;
+end;
+$$;
+
+grant execute on function public.delete_manual_journal_entry(uuid) to authenticated;
 grant execute on function public.admin_set_company_paused(uuid, boolean) to authenticated;
