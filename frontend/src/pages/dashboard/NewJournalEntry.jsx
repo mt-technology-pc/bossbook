@@ -27,7 +27,7 @@ export default function NewJournalEntry() {
   const [saving, setSaving] = useState(false)
 
   const accountOptions = accounts.map((a) => ({
-    id: a.id,
+    id: a.coa_id,
     label: a.name,
     sublabel: a.type,
   }))
