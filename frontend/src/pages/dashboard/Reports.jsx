@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
-  Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight, Landmark, BookMarked, Scale, TrendingUp, PenLine,
+  Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight, Landmark, BookMarked, Scale, TrendingUp, PenLine, ShieldCheck,
 } from 'lucide-react'
 
 const reports = [
@@ -58,6 +58,12 @@ const reports = [
     title: 'Journal Entries',
     desc: 'All manual double-entry postings — adjustments, corrections, and opening balances — with memo and line detail.',
     to: '/dashboard/journal-entries',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Control Accounts',
+    desc: 'Reconciles GL control accounts (Receivables, Payables, Inventory, Cash) against their subsidiary ledgers — instantly highlights any posting discrepancy.',
+    to: '/dashboard/reports/control-accounts',
   },
 ]
 

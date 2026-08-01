@@ -34,6 +34,7 @@ import AccountsPayable from './pages/dashboard/AccountsPayable'
 import ChartOfAccounts from './pages/dashboard/ChartOfAccounts'
 import GeneralLedger from './pages/dashboard/GeneralLedger'
 import TrialBalance from './pages/dashboard/TrialBalance'
+import ControlAccountsReport from './pages/dashboard/ControlAccountsReport'
 import Expenses from './pages/dashboard/Expenses'
 import JournalEntries from './pages/dashboard/JournalEntries'
 import NewJournalEntry from './pages/dashboard/NewJournalEntry'
@@ -247,6 +248,7 @@ function App() {
           <Route path="reports/general-ledger" element={<GeneralLedger />} />
           <Route path="reports/general-ledger/:coaId" element={<GeneralLedger />} />
           <Route path="reports/trial-balance" element={<TrialBalance />} />
+          <Route path="reports/control-accounts" element={<ControlAccountsReport />} />
           <Route path="team" element={<ComingSoon title="Team" />} />
           <Route path="settings" element={<Settings />} />
           <Route path="backup" element={<Backup />} />
