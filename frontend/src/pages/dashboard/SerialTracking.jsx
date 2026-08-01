@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  Search, ScanLine, PackageCheck, PackageX, AlertCircle, Download,
+  Search, ScanLine, PackageCheck, PackageX, AlertCircle, Download, History,
+  RotateCcw, ArchiveRestore,
 } from 'lucide-react'
 import { useProductUnits } from '../../hooks/useProductUnits'
 import { exportToCsv } from '../../lib/exportTable'
@@ -10,7 +12,23 @@ const STATUS_FILTERS = [
   { value: '', label: 'All' },
   { value: 'in_stock', label: 'In stock' },
   { value: 'sold', label: 'Sold' },
+  { value: 'returned_by_customer', label: 'Returned by customer' },
+  { value: 'returned_to_supplier', label: 'Returned to supplier' },
 ]
+
+const STATUS_BADGE = {
+  in_stock: { label: 'In stock', cls: 'bg-clay-500/10 text-clay-600' },
+  sold: { label: 'Sold', cls: 'bg-ink-400/10 text-ink-500' },
+  returned_by_customer: { label: 'Returned by customer', cls: 'bg-amber-500/10 text-amber-700' },
+  returned_to_supplier: { label: 'Returned to supplier', cls: 'bg-slate-500/10 text-slate-600' },
+}
+
+const STATUS_CSV_LABEL = {
+  in_stock: 'In stock',
+  sold: 'Sold',
+  returned_by_customer: 'Returned by customer',
+  returned_to_supplier: 'Returned to supplier',
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
@@ -18,6 +36,7 @@ function formatDate(dateStr) {
 }
 
 export default function SerialTracking() {
+  const navigate = useNavigate()
   const { units, loading, error } = useProductUnits()
   const [query, setQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
@@ -46,11 +65,15 @@ export default function SerialTracking() {
 
   const inStockCount = units.filter((u) => u.status === 'in_stock').length
   const soldCount = units.filter((u) => u.status === 'sold').length
+  const returnedByCustomerCount = units.filter((u) => u.status === 'returned_by_customer').length
+  const returnedToSupplierCount = units.filter((u) => u.status === 'returned_to_supplier').length
 
   const stats = [
-    { icon: ScanLine, label: 'Total units tracked', value: units.length },
+    { icon: ScanLine, label: 'Total tracked', value: units.length },
     { icon: PackageCheck, label: 'In stock', value: inStockCount },
     { icon: PackageX, label: 'Sold', value: soldCount },
+    { icon: RotateCcw, label: 'Returned by customer', value: returnedByCustomerCount },
+    { icon: ArchiveRestore, label: 'Returned to supplier', value: returnedToSupplierCount },
   ]
 
   const handleExportCsv = () => {
@@ -69,7 +92,7 @@ export default function SerialTracking() {
       rows: filtered.map((u) => ({
         serial: u.serial_number,
         product: u.products?.name ?? '',
-        status: u.status === 'in_stock' ? 'In stock' : 'Sold',
+        status: STATUS_CSV_LABEL[u.status] ?? u.status,
         purchaseRef: u.purchases?.reference ?? '',
         purchaseDate: u.purchases?.bill_date ?? '',
         supplier: u.purchases?.suppliers?.name ?? '',
@@ -83,7 +106,7 @@ export default function SerialTracking() {
 
   return (
     <div>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
             Serial / IMEI Tracking
@@ -92,16 +115,24 @@ export default function SerialTracking() {
             Every individually tracked unit, where it came from, and where it went.
           </p>
         </div>
-        <button
-          onClick={handleExportCsv}
-          disabled={filtered.length === 0}
-          className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600 disabled:opacity-40"
-        >
-          <Download size={13} /> Export CSV
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => navigate('/dashboard/serial-tracking/history')}
+            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600"
+          >
+            <History size={13} /> IMEI History
+          </button>
+          <button
+            onClick={handleExportCsv}
+            disabled={filtered.length === 0}
+            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600 disabled:opacity-40"
+          >
+            <Download size={13} /> Export CSV
+          </button>
+        </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((s, i) => (
           <motion.div
             key={s.label}
@@ -149,7 +180,7 @@ export default function SerialTracking() {
         </label>
         <div>
           <span className="text-xs font-medium text-ink-500">Status</span>
-          <div className="mt-1.5 flex gap-1.5">
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
             {STATUS_FILTERS.map((s) => (
               <button
                 key={s.value}
@@ -207,7 +238,7 @@ export default function SerialTracking() {
               </thead>
               <tbody>
                 {filtered.map((u, i) => {
-                  const inStock = u.status === 'in_stock'
+                  const badge = STATUS_BADGE[u.status] ?? { label: u.status, cls: 'bg-ink-400/10 text-ink-500' }
                   return (
                     <motion.tr
                       key={u.id}
@@ -219,15 +250,9 @@ export default function SerialTracking() {
                       <td className="py-2.5 pr-3 font-mono text-xs text-ink-700">{u.serial_number}</td>
                       <td className="py-2.5 pr-3 font-medium text-ink-900">{u.products?.name ?? '—'}</td>
                       <td className="py-2.5 pr-3">
-                        {inStock ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-clay-500/10 px-2.5 py-1 text-xs font-medium text-clay-600">
-                            In stock
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-ink-400/10 px-2.5 py-1 text-xs font-medium text-ink-500">
-                            Sold
-                          </span>
-                        )}
+                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${badge.cls}`}>
+                          {badge.label}
+                        </span>
                       </td>
                       <td className="py-2.5 pr-3 text-ink-500">
                         {u.purchases ? (

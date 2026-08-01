@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, Plus, Trash2, AlertCircle, PackageX } from 'lucide-react'
 import { usePurchaseReturns } from '../../hooks/usePurchaseReturns'
@@ -8,6 +8,7 @@ import { usePurchases } from '../../hooks/usePurchases'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
+import ImeiPicker from '../../components/dashboard/ImeiPicker'
 
 let localId = 0
 const newLine = () => ({
@@ -15,6 +16,7 @@ const newLine = () => ({
   productId: '',
   quantity: '1',
   cost: '',
+  unit_ids: [],
 })
 
 function todayISO() {
@@ -59,15 +61,33 @@ export default function NewPurchaseReturn() {
   }))
 
   const productMap = Object.fromEntries(products.map((p) => [p.id, p]))
+  const selectedPurchase = purchases.find(p => p.id === purchaseId)
+
+  // Auto-populate lines when a purchase bill is selected
+  useEffect(() => {
+    if (!purchaseId || !selectedPurchase?.purchase_items?.length) return
+    const autoLines = selectedPurchase.purchase_items.map(item => ({
+      key: `line-${++localId}`,
+      productId: item.product_id || '',
+      quantity: String(item.quantity),
+      cost: String(item.unit_cost ?? ''),
+      unit_ids: [],
+    }))
+    setLines(autoLines.length > 0 ? autoLines : [newLine()])
+  }, [purchaseId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateLine = (key, patch) => {
     setLines((prev) =>
       prev.map((l) => {
         if (l.key !== key) return l
         const next = { ...l, ...patch }
-        if (patch.productId && productMap[patch.productId]) {
-          next.cost = String(productMap[patch.productId].cost ?? '')
+        if (patch.productId !== undefined) {
+          next.unit_ids = []
+          if (patch.productId && productMap[patch.productId]) {
+            next.cost = String(productMap[patch.productId].cost ?? '')
+          }
         }
+        if (patch.quantity !== undefined) next.unit_ids = []
         return next
       }),
     )
@@ -86,7 +106,12 @@ export default function NewPurchaseReturn() {
       if (!(Number(l.quantity) > 0)) return 'Enter a valid quantity for every line.'
       if (!(Number(l.cost) >= 0)) return 'Enter a unit cost for every line.'
       const prod = productMap[l.productId]
-      if (prod && Number(l.quantity) > Number(prod.stock_quantity)) {
+      if (prod?.tracks_serial && purchaseId) {
+        const qty = Math.round(Number(l.quantity))
+        if (l.unit_ids.length !== qty) {
+          return `${prod.name}: select exactly ${qty} IMEI unit${qty !== 1 ? 's' : ''} to return.`
+        }
+      } else if (prod && Number(l.quantity) > Number(prod.stock_quantity)) {
         return `${prod.name}: return quantity (${l.quantity}) exceeds stock on hand (${prod.stock_quantity}).`
       }
     }
@@ -104,6 +129,7 @@ export default function NewPurchaseReturn() {
       quantity: Number(l.quantity),
       cost: Number(l.cost),
       amount: lineAmount(l),
+      unit_ids: l.unit_ids,
     }))
 
     const { error: submitError } = await createPurchaseReturn({
@@ -165,6 +191,11 @@ export default function NewPurchaseReturn() {
                     placeholder="Select bill (optional)"
                   />
                 </div>
+                {purchaseId && (
+                  <p className="mt-1 text-xs text-ink-400">
+                    Items auto-filled from bill. Adjust quantities for partial returns.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -196,84 +227,88 @@ export default function NewPurchaseReturn() {
           </div>
 
           {/* Line items */}
-          <div className="mt-8">
-            <div className="overflow-x-auto rounded-2xl border border-ink-400/15 bg-cream-50">
-              <table className="w-full min-w-[520px] text-sm">
-                <thead>
-                  <tr className="border-b border-ink-400/10 text-xs text-ink-400">
-                    <th className="py-3 pl-4 text-left font-medium">Product</th>
-                    <th className="py-3 px-2 text-right font-medium w-24">Qty</th>
-                    <th className="py-3 px-2 text-right font-medium w-28">Unit Cost</th>
-                    <th className="py-3 pr-4 text-right font-medium w-28">Amount</th>
-                    <th className="py-3 pr-3 w-10" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((l) => {
-                    const prod = productMap[l.productId]
-                    return (
-                      <tr key={l.key} className="border-b border-ink-400/10 last:border-0">
-                        <td className="py-2.5 pl-4 pr-2">
-                          <SearchSelect
-                            value={l.productId}
-                            onChange={(val) => updateLine(l.key, { productId: val })}
-                            options={products.map((p) => ({
-                              id: p.id,
-                              label: p.name,
-                              sublabel: `${p.stock_quantity} in stock`,
-                            }))}
-                            placeholder="Select product"
-                          />
-                          {prod && (
-                            <p className="mt-1 text-xs text-ink-400">
-                              {prod.stock_quantity} available
-                            </p>
-                          )}
-                        </td>
-                        <td className="py-2.5 px-2">
-                          <input
-                            type="number"
-                            value={l.quantity}
-                            onChange={(e) => updateLine(l.key, { quantity: e.target.value })}
-                            min="0.0001"
-                            step="1"
-                            className="w-full rounded-lg border border-ink-400/15 bg-cream-100 px-2 py-1.5 text-right text-xs text-ink-900 outline-none focus:border-clay-500"
-                          />
-                        </td>
-                        <td className="py-2.5 px-2">
-                          <input
-                            type="number"
-                            value={l.cost}
-                            onChange={(e) => updateLine(l.key, { cost: e.target.value })}
-                            min="0"
-                            step="0.01"
-                            placeholder="0.00"
-                            className="w-full rounded-lg border border-ink-400/15 bg-cream-100 px-2 py-1.5 text-right text-xs text-ink-900 outline-none focus:border-clay-500"
-                          />
-                        </td>
-                        <td className="py-2.5 px-2 text-right font-medium text-ink-900">
-                          {formatCurrency(lineAmount(l))}
-                        </td>
-                        <td className="py-2.5 pr-3 text-right">
-                          {lines.length > 1 && (
-                            <button
-                              onClick={() => removeLine(l.key)}
-                              className="rounded p-1 text-ink-300 hover:text-red-500"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <div className="mt-8 space-y-3">
+            {lines.map((l) => {
+              const prod = productMap[l.productId]
+              const showImei = prod?.tracks_serial && purchaseId
+              return (
+                <div key={l.key} className="rounded-2xl border border-ink-400/15 bg-cream-50 p-4">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-start gap-2">
+                    {/* Product */}
+                    <div>
+                      <SearchSelect
+                        value={l.productId}
+                        onChange={(val) => updateLine(l.key, { productId: val })}
+                        options={products.map((p) => ({
+                          id: p.id,
+                          label: p.name,
+                          sublabel: `${p.stock_quantity} in stock`,
+                        }))}
+                        placeholder="Select product"
+                      />
+                      {prod && !prod.tracks_serial && (
+                        <p className="mt-1 text-xs text-ink-400">{prod.stock_quantity} available</p>
+                      )}
+                      {showImei && (
+                        <ImeiPicker
+                          mode="purchase_return"
+                          productId={l.productId}
+                          purchaseId={purchaseId}
+                          value={l.unit_ids}
+                          onChange={(ids) => updateLine(l.key, { unit_ids: ids })}
+                          requiredCount={Math.round(Number(l.quantity))}
+                        />
+                      )}
+                    </div>
+                    {/* Qty */}
+                    <div className="w-20">
+                      <label className="text-xs text-ink-400">Qty</label>
+                      <input
+                        type="number"
+                        value={l.quantity}
+                        onChange={(e) => updateLine(l.key, { quantity: e.target.value })}
+                        min="0.0001"
+                        step="1"
+                        className="w-full rounded-lg border border-ink-400/15 bg-cream-100 px-2 py-1.5 text-right text-xs text-ink-900 outline-none focus:border-clay-500"
+                      />
+                    </div>
+                    {/* Unit Cost */}
+                    <div className="w-28">
+                      <label className="text-xs text-ink-400">Unit Cost</label>
+                      <input
+                        type="number"
+                        value={l.cost}
+                        onChange={(e) => updateLine(l.key, { cost: e.target.value })}
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="w-full rounded-lg border border-ink-400/15 bg-cream-100 px-2 py-1.5 text-right text-xs text-ink-900 outline-none focus:border-clay-500"
+                      />
+                    </div>
+                    {/* Amount */}
+                    <div className="w-28 text-right">
+                      <label className="text-xs text-ink-400">Amount</label>
+                      <p className="py-1.5 text-xs font-medium text-ink-900">{formatCurrency(lineAmount(l))}</p>
+                    </div>
+                    {/* Delete */}
+                    <div className="pt-5">
+                      {lines.length > 1 && (
+                        <button
+                          onClick={() => removeLine(l.key)}
+                          className="rounded p-1 text-ink-300 hover:text-red-500"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
 
             <button
               onClick={addLine}
-              className="mt-3 flex items-center gap-1.5 text-sm font-medium text-clay-600 hover:text-clay-700"
+              className="flex items-center gap-1.5 text-sm font-medium text-clay-600 hover:text-clay-700"
             >
               <Plus size={15} /> Add line
             </button>

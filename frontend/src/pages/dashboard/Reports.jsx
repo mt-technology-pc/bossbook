@@ -1,125 +1,228 @@
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
 import {
-  Boxes, FileBarChart, BookOpen, ClipboardList, ArrowRight, Landmark, BookMarked, Scale, TrendingUp, PenLine, ShieldCheck,
+  LayoutGrid, BarChart3, Receipt, ShoppingBag, Package, BookOpen,
+  Search, Star, ArrowRight,
+  Boxes, FileBarChart, ClipboardList, Landmark, BookMarked,
+  Scale, TrendingUp, PenLine, ShieldCheck, ScanLine,
 } from 'lucide-react'
 
-const reports = [
+const FAVORITES_KEY = 'bossbooks_report_favorites'
+
+const CATEGORIES = [
+  { key: 'all', label: 'All Reports', icon: LayoutGrid },
   {
-    icon: BookOpen,
-    title: 'Sales Day Book',
-    desc: 'Every sale line item, chronologically, with cash vs. credit position and running totals.',
-    to: '/dashboard/reports/sales-day-book',
+    key: 'overview', label: 'Business Overview', icon: BarChart3,
+    reports: [
+      { label: 'Income Statement', path: '/dashboard/reports/income-statement', desc: 'Revenue, cost of goods and gross profit over any date range', icon: FileBarChart },
+      { label: 'Gain & Loss', path: '/dashboard/reports/gain-and-loss', desc: 'Realized profit per product — sold quantity, cost, and margin', icon: TrendingUp },
+      { label: 'Trial Balance', path: '/dashboard/reports/trial-balance', desc: 'Every account as of a chosen date — proves debits equal credits', icon: Scale },
+      { label: 'Control Accounts', path: '/dashboard/reports/control-accounts', desc: 'T-account view of Trade Receivables and Trade Payables', icon: ShieldCheck },
+    ],
   },
   {
-    icon: ClipboardList,
-    title: 'Purchase Day Book',
-    desc: 'Every bill line item, chronologically, with supplier payments made in the same period.',
-    to: '/dashboard/reports/purchase-day-book',
+    key: 'sales', label: 'Sales', icon: Receipt,
+    reports: [
+      { label: 'Sales Day Book', path: '/dashboard/reports/sales-day-book', desc: 'Every sale line item, chronologically, with running totals', icon: Receipt },
+      { label: 'Accounts Receivable', path: '/dashboard/receivables', desc: 'Outstanding customer balances and payment history', icon: BookOpen },
+    ],
   },
   {
-    icon: Boxes,
-    title: 'Inventory Valuation Summary',
-    desc: 'Quantity on hand and inventory value by FIFO, weighted average, or standard cost, as of any date.',
-    to: '/dashboard/reports/inventory-valuation',
+    key: 'purchases', label: 'Purchases', icon: ShoppingBag,
+    reports: [
+      { label: 'Purchase Day Book', path: '/dashboard/reports/purchase-day-book', desc: 'Every bill line item, chronologically, with supplier payments', icon: ClipboardList },
+      { label: 'Accounts Payable', path: '/dashboard/payables', desc: 'Outstanding supplier balances and payments made', icon: Landmark },
+    ],
   },
   {
-    icon: FileBarChart,
-    title: 'Income Statement',
-    desc: 'Revenue, cost of goods sold and gross profit by category, over any date range.',
-    to: '/dashboard/reports/income-statement',
+    key: 'inventory', label: 'Inventory', icon: Package,
+    reports: [
+      { label: 'Inventory Valuation', path: '/dashboard/reports/inventory-valuation', desc: 'Quantity on hand and value — FIFO, weighted average, or standard cost', icon: Boxes },
+      { label: 'IMEI Tracking', path: '/dashboard/serial-tracking', desc: 'Every individually tracked unit — where it came from and where it went', icon: ScanLine },
+      { label: 'IMEI History', path: '/dashboard/serial-tracking/history', desc: 'Immutable event log for every serial number movement', icon: ScanLine },
+    ],
   },
   {
-    icon: TrendingUp,
-    title: 'Gain and Loss Report',
-    desc: 'Realized profit per product, grouped by category, over any date range — sold quantity, cost, and margin.',
-    to: '/dashboard/reports/gain-and-loss',
-  },
-  {
-    icon: Landmark,
-    title: 'Chart of Accounts',
-    desc: 'Every account your books post to — assets, liabilities, equity, income, and expenses — with current balances.',
-    to: '/dashboard/reports/chart-of-accounts',
-  },
-  {
-    icon: BookMarked,
-    title: 'General Ledger',
-    desc: 'The real T-account for any account: every journal entry line, debit and credit, with a running balance.',
-    to: '/dashboard/reports/general-ledger',
-  },
-  {
-    icon: Scale,
-    title: 'Trial Balance',
-    desc: 'Every account as of a chosen date, proving total debits equal total credits — real double-entry bookkeeping.',
-    to: '/dashboard/reports/trial-balance',
-  },
-  {
-    icon: PenLine,
-    title: 'Journal Entries',
-    desc: 'All manual double-entry postings — adjustments, corrections, and opening balances — with memo and line detail.',
-    to: '/dashboard/journal-entries',
-  },
-  {
-    icon: ShieldCheck,
-    title: 'Control Accounts',
-    desc: 'T-account ledger view of Trade Receivables and Trade Payables — every posting shown Dr/Cr with opening Balance b/d and closing Balance c/d.',
-    to: '/dashboard/reports/control-accounts',
+    key: 'accounting', label: 'Accounting', icon: BookOpen,
+    reports: [
+      { label: 'Chart of Accounts', path: '/dashboard/reports/chart-of-accounts', desc: 'All accounts with current balances — assets, liabilities, equity, income, expenses', icon: Landmark },
+      { label: 'General Ledger', path: '/dashboard/reports/general-ledger', desc: 'Every journal entry line for any account, with running balance', icon: BookMarked },
+      { label: 'Journal Entries', path: '/dashboard/journal-entries', desc: 'Manual double-entry postings — adjustments, corrections, opening balances', icon: PenLine },
+    ],
   },
 ]
 
-export default function Reports() {
-  return (
-    <div>
-      <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
-        Reports
-      </h1>
-      <p className="mt-1 text-sm text-ink-500">
-        Real numbers computed from what you&apos;ve actually recorded — no placeholders.
-      </p>
+const ALL_REPORTS = CATEGORIES.slice(1).flatMap((c) => c.reports)
 
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {reports.map((r, i) => {
-          const Card = (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: i * 0.06 }}
-              className={`group h-full rounded-2xl border border-ink-400/15 bg-cream-50 p-6 ${
-                r.soon ? 'opacity-60' : 'transition-shadow hover:shadow-lg hover:shadow-clay-500/10'
+function ReportCard({ report, starred, onToggleFavorite }) {
+  const navigate = useNavigate()
+  const Icon = report.icon
+  return (
+    <div
+      className="group relative h-full cursor-pointer rounded-2xl border border-ink-400/15 bg-cream-50 p-5 transition-all hover:border-clay-500/30 hover:shadow-md hover:shadow-clay-500/10"
+      onClick={() => navigate(report.path)}
+    >
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite(report.path) }}
+        className={`absolute right-3 top-3 rounded p-1 transition-opacity ${
+          starred ? 'text-clay-500' : 'text-ink-300 opacity-0 group-hover:opacity-100'
+        }`}
+      >
+        <Star size={13} fill={starred ? 'currentColor' : 'none'} />
+      </button>
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600">
+        <Icon size={18} />
+      </span>
+      <p className="mt-3 font-heading text-sm font-semibold text-ink-900">{report.label}</p>
+      <p className="mt-1 text-xs leading-relaxed text-ink-400">{report.desc}</p>
+      <span className="mt-3 flex items-center gap-1 text-xs font-medium text-clay-600">
+        Open <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </div>
+  )
+}
+
+export default function Reports() {
+  const [activeCategory, setActiveCategory] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [favorites, setFavorites] = useState(() => {
+    try { return JSON.parse(localStorage.getItem(FAVORITES_KEY) || '[]') } catch { return [] }
+  })
+
+  const toggleFavorite = (path) => {
+    setFavorites((prev) => {
+      const next = prev.includes(path) ? prev.filter((p) => p !== path) : [...prev, path]
+      localStorage.setItem(FAVORITES_KEY, JSON.stringify(next))
+      return next
+    })
+  }
+
+  const visibleReports = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (q) {
+      return ALL_REPORTS.filter(
+        (r) => r.label.toLowerCase().includes(q) || r.desc.toLowerCase().includes(q),
+      )
+    }
+    if (activeCategory === 'all') return ALL_REPORTS
+    return CATEGORIES.find((c) => c.key === activeCategory)?.reports ?? []
+  }, [activeCategory, searchQuery])
+
+  const favoriteReports = ALL_REPORTS.filter((r) => favorites.includes(r.path))
+  const showFavorites = favoriteReports.length > 0 && !searchQuery
+
+  const activeCategoryLabel = searchQuery
+    ? `Search results (${visibleReports.length})`
+    : CATEGORIES.find((c) => c.key === activeCategory)?.label ?? 'All Reports'
+
+  return (
+    <div className="-m-4 flex min-h-screen sm:-m-6 lg:-m-8">
+      {/* Dark left sidebar */}
+      <aside className="hidden w-52 shrink-0 flex-col border-r border-ink-800 bg-ink-900 md:flex">
+        <div className="px-4 py-5 text-[11px] font-semibold uppercase tracking-widest text-ink-500">
+          Reports
+        </div>
+        <nav className="flex flex-col">
+          {CATEGORIES.map((cat) => {
+            const Icon = cat.icon
+            const active = activeCategory === cat.key && !searchQuery
+            return (
+              <button
+                key={cat.key}
+                onClick={() => { setActiveCategory(cat.key); setSearchQuery('') }}
+                className={`flex items-center gap-2.5 px-4 py-2.5 text-sm font-medium transition-colors ${
+                  active
+                    ? 'bg-clay-600/25 text-cream-50'
+                    : 'text-ink-400 hover:bg-ink-800 hover:text-ink-200'
+                }`}
+              >
+                <Icon size={14} className="shrink-0" />
+                {cat.label}
+              </button>
+            )
+          })}
+        </nav>
+      </aside>
+
+      {/* Main content */}
+      <div className="flex-1 overflow-y-auto p-5 sm:p-6 lg:p-8">
+        {/* Mobile category pills */}
+        <div className="mb-5 flex gap-2 overflow-x-auto pb-1 md:hidden">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.key}
+              onClick={() => { setActiveCategory(cat.key); setSearchQuery('') }}
+              className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                activeCategory === cat.key && !searchQuery
+                  ? 'border-clay-500 bg-clay-500/10 text-clay-600'
+                  : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40'
               }`}
             >
-              <div className="flex items-start justify-between">
-                <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-clay-500/10 text-clay-600">
-                  <r.icon size={20} />
-                </span>
-                {r.soon && (
-                  <span className="rounded-full bg-ink-400/10 px-2 py-0.5 text-[10px] font-semibold text-ink-400">
-                    Soon
-                  </span>
-                )}
-              </div>
-              <h2 className="mt-4 font-heading text-base font-semibold text-ink-900">
-                {r.title}
-              </h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
-                {r.desc}
-              </p>
-              {!r.soon && (
-                <span className="mt-4 flex items-center gap-1 text-sm font-medium text-clay-600">
-                  Open report <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
-                </span>
-              )}
-            </motion.div>
-          )
+              {cat.label}
+            </button>
+          ))}
+        </div>
 
-          return r.soon ? (
-            <div key={r.title}>{Card}</div>
+        {/* Search bar */}
+        <div className="relative max-w-sm">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search reports…"
+            className="w-full rounded-xl border border-ink-400/20 bg-cream-50 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+          />
+        </div>
+
+        {/* Favorites section */}
+        {showFavorites && (
+          <section className="mt-8">
+            <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-ink-400">
+              Favorites
+            </h2>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {favoriteReports.map((r) => (
+                <ReportCard
+                  key={r.path}
+                  report={r}
+                  starred
+                  onToggleFavorite={toggleFavorite}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Category / search results */}
+        <section className="mt-8">
+          <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-ink-400">
+            {activeCategoryLabel}
+          </h2>
+          {visibleReports.length === 0 ? (
+            <p className="py-10 text-center text-sm text-ink-400">
+              No reports match &ldquo;{searchQuery}&rdquo;
+            </p>
           ) : (
-            <Link key={r.title} to={r.to}>
-              {Card}
-            </Link>
-          )
-        })}
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleReports.map((r, i) => (
+                <motion.div
+                  key={r.path}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.25, delay: Math.min(i * 0.04, 0.3) }}
+                >
+                  <ReportCard
+                    report={r}
+                    starred={favorites.includes(r.path)}
+                    onToggleFavorite={toggleFavorite}
+                  />
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

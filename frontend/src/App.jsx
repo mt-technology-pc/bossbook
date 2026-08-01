@@ -39,6 +39,7 @@ import Expenses from './pages/dashboard/Expenses'
 import JournalEntries from './pages/dashboard/JournalEntries'
 import NewJournalEntry from './pages/dashboard/NewJournalEntry'
 import SerialTracking from './pages/dashboard/SerialTracking'
+import ImeiHistory from './pages/dashboard/ImeiHistory'
 import CreditNotes from './pages/dashboard/CreditNotes'
 import NewCreditNote from './pages/dashboard/NewCreditNote'
 import PurchaseReturns from './pages/dashboard/PurchaseReturns'
@@ -259,6 +260,7 @@ function App() {
           <Route path="journal-entries" element={<JournalEntries />} />
           <Route path="accounts/:id" element={<AccountDetail />} />
           <Route path="serial-tracking" element={<SerialTracking />} />
+          <Route path="serial-tracking/history" element={<ImeiHistory />} />
           <Route path="reports" element={<Reports />} />
           <Route path="reports/inventory-valuation" element={<InventoryValuationReport />} />
           <Route path="reports/inventory-valuation/:id" element={<ProductLedger />} />

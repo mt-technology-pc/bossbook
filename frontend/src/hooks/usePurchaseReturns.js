@@ -38,7 +38,13 @@ export function usePurchaseReturns() {
       p_reference: reference || null,
       p_return_date: returnDate || null,
       p_notes: notes || null,
-      p_items: items,
+      p_items: items.map(i => ({
+        product_id: i.product_id,
+        quantity: Number(i.quantity),
+        cost: Number(i.cost),
+        amount: Number(i.amount),
+        unit_ids: i.unit_ids || [],
+      })),
     })
     if (rpcError) return { error: rpcError }
     await fetchPurchaseReturns()

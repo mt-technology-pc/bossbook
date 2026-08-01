@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { X, Plus, Trash2, AlertCircle, RotateCcw } from 'lucide-react'
 import { useCreditNotes } from '../../hooks/useCreditNotes'
@@ -8,6 +8,7 @@ import { useSales } from '../../hooks/useSales'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
+import ImeiPicker from '../../components/dashboard/ImeiPicker'
 
 let localId = 0
 const newLine = () => ({
@@ -16,6 +17,7 @@ const newLine = () => ({
   description: '',
   quantity: '1',
   unitPrice: '',
+  unit_ids: [],
 })
 
 function todayISO() {
@@ -60,16 +62,38 @@ export default function NewCreditNote() {
   }))
 
   const productMap = Object.fromEntries(products.map((p) => [p.id, p]))
+  const selectedSale = sales.find(s => s.id === saleId)
+
+  // Auto-populate lines when a sale is selected
+  useEffect(() => {
+    if (!saleId || !selectedSale?.sale_items?.length) return
+    const autoLines = selectedSale.sale_items.map(item => {
+      const prod = productMap[item.product_id]
+      return {
+        key: `line-${++localId}`,
+        productId: item.product_id || '',
+        description: prod?.name || '',
+        quantity: String(item.quantity),
+        unitPrice: String(item.unit_price ?? ''),
+        unit_ids: [],
+      }
+    })
+    setLines(autoLines.length > 0 ? autoLines : [newLine()])
+  }, [saleId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const updateLine = (key, patch) => {
     setLines((prev) =>
       prev.map((l) => {
         if (l.key !== key) return l
         const next = { ...l, ...patch }
-        if (patch.productId && productMap[patch.productId]) {
-          next.description = productMap[patch.productId].name
-          next.unitPrice = String(productMap[patch.productId].selling_price ?? '')
+        if (patch.productId !== undefined) {
+          next.unit_ids = []
+          if (patch.productId && productMap[patch.productId]) {
+            next.description = productMap[patch.productId].name
+            next.unitPrice = String(productMap[patch.productId].selling_price ?? '')
+          }
         }
+        if (patch.quantity !== undefined) next.unit_ids = []
         return next
       }),
     )
@@ -87,6 +111,13 @@ export default function NewCreditNote() {
       if (!l.description.trim() && !l.productId) return 'Enter a description or select a product for every line.'
       if (!(Number(l.quantity) > 0)) return 'Enter a valid quantity for every line.'
       if (!(Number(l.unitPrice) >= 0)) return 'Enter a unit price for every line.'
+      const prod = productMap[l.productId]
+      if (prod?.tracks_serial && saleId) {
+        const qty = Math.round(Number(l.quantity))
+        if (l.unit_ids.length !== qty) {
+          return `${prod.name}: select exactly ${qty} IMEI unit${qty !== 1 ? 's' : ''} to return.`
+        }
+      }
     }
     return null
   }
@@ -103,6 +134,7 @@ export default function NewCreditNote() {
       quantity: Number(l.quantity),
       unit_price: Number(l.unitPrice),
       amount: lineAmount(l),
+      unit_ids: l.unit_ids,
     }))
 
     const { error: submitError } = await createCreditNote({
@@ -164,6 +196,11 @@ export default function NewCreditNote() {
                     placeholder="Select invoice (optional)"
                   />
                 </div>
+                {saleId && (
+                  <p className="mt-1 text-xs text-ink-400">
+                    Items auto-filled from invoice. Adjust quantities for partial returns.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -195,84 +232,91 @@ export default function NewCreditNote() {
           </div>
 
           {/* Line items */}
-          <div className="mt-8">
-            <div className="overflow-x-auto rounded-2xl border border-ink-400/15 bg-cream-50">
-              <table className="w-full min-w-[560px] text-sm">
-                <thead>
-                  <tr className="border-b border-ink-400/10 text-xs text-ink-400">
-                    <th className="py-3 pl-4 text-left font-medium">Item / Description</th>
-                    <th className="py-3 px-2 text-right font-medium w-20">Qty</th>
-                    <th className="py-3 px-2 text-right font-medium w-28">Unit Price</th>
-                    <th className="py-3 pr-4 text-right font-medium w-28">Amount</th>
-                    <th className="py-3 pr-3 w-10" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((l) => (
-                    <tr key={l.key} className="border-b border-ink-400/10 last:border-0">
-                      <td className="py-2.5 pl-4 pr-2">
-                        <div className="space-y-1">
-                          <SearchSelect
-                            value={l.productId}
-                            onChange={(val) => updateLine(l.key, { productId: val })}
-                            options={products.map((p) => ({
-                              id: p.id,
-                              label: p.name,
-                              sublabel: `${p.stock_quantity} in stock`,
-                            }))}
-                            placeholder="Product (optional)"
-                          />
-                          <input
-                            value={l.description}
-                            onChange={(e) => updateLine(l.key, { description: e.target.value })}
-                            placeholder="Description"
-                            className="w-full rounded-lg border border-ink-400/15 bg-cream-100 px-3 py-1.5 text-xs text-ink-900 outline-none focus:border-clay-500"
-                          />
-                        </div>
-                      </td>
-                      <td className="py-2.5 px-2">
-                        <input
-                          type="number"
-                          value={l.quantity}
-                          onChange={(e) => updateLine(l.key, { quantity: e.target.value })}
-                          min="0.0001"
-                          step="1"
-                          className="w-full rounded-lg border border-ink-400/15 bg-cream-100 px-2 py-1.5 text-right text-xs text-ink-900 outline-none focus:border-clay-500"
+          <div className="mt-8 space-y-3">
+            {lines.map((l) => {
+              const prod = productMap[l.productId]
+              const showImei = prod?.tracks_serial && saleId
+              return (
+                <div key={l.key} className="rounded-2xl border border-ink-400/15 bg-cream-50 p-4">
+                  <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-start gap-2">
+                    {/* Product / Description */}
+                    <div>
+                      <SearchSelect
+                        value={l.productId}
+                        onChange={(val) => updateLine(l.key, { productId: val })}
+                        options={products.map((p) => ({
+                          id: p.id,
+                          label: p.name,
+                          sublabel: `${p.stock_quantity} in stock`,
+                        }))}
+                        placeholder="Product (optional)"
+                      />
+                      <input
+                        value={l.description}
+                        onChange={(e) => updateLine(l.key, { description: e.target.value })}
+                        placeholder="Description"
+                        className="mt-1.5 w-full rounded-lg border border-ink-400/15 bg-cream-100 px-3 py-1.5 text-xs text-ink-900 outline-none focus:border-clay-500"
+                      />
+                      {showImei && (
+                        <ImeiPicker
+                          mode="credit_note"
+                          productId={l.productId}
+                          saleId={saleId}
+                          value={l.unit_ids}
+                          onChange={(ids) => updateLine(l.key, { unit_ids: ids })}
+                          requiredCount={Math.round(Number(l.quantity))}
                         />
-                      </td>
-                      <td className="py-2.5 px-2">
-                        <input
-                          type="number"
-                          value={l.unitPrice}
-                          onChange={(e) => updateLine(l.key, { unitPrice: e.target.value })}
-                          min="0"
-                          step="0.01"
-                          placeholder="0.00"
-                          className="w-full rounded-lg border border-ink-400/15 bg-cream-100 px-2 py-1.5 text-right text-xs text-ink-900 outline-none focus:border-clay-500"
-                        />
-                      </td>
-                      <td className="py-2.5 px-2 text-right font-medium text-ink-900">
-                        {formatCurrency(lineAmount(l))}
-                      </td>
-                      <td className="py-2.5 pr-3 text-right">
-                        {lines.length > 1 && (
-                          <button
-                            onClick={() => removeLine(l.key)}
-                            className="rounded p-1 text-ink-300 hover:text-red-500"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      )}
+                    </div>
+                    {/* Qty */}
+                    <div className="w-20">
+                      <label className="text-xs text-ink-400">Qty</label>
+                      <input
+                        type="number"
+                        value={l.quantity}
+                        onChange={(e) => updateLine(l.key, { quantity: e.target.value })}
+                        min="0.0001"
+                        step="1"
+                        className="w-full rounded-lg border border-ink-400/15 bg-cream-100 px-2 py-1.5 text-right text-xs text-ink-900 outline-none focus:border-clay-500"
+                      />
+                    </div>
+                    {/* Unit Price */}
+                    <div className="w-28">
+                      <label className="text-xs text-ink-400">Unit Price</label>
+                      <input
+                        type="number"
+                        value={l.unitPrice}
+                        onChange={(e) => updateLine(l.key, { unitPrice: e.target.value })}
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="w-full rounded-lg border border-ink-400/15 bg-cream-100 px-2 py-1.5 text-right text-xs text-ink-900 outline-none focus:border-clay-500"
+                      />
+                    </div>
+                    {/* Amount */}
+                    <div className="w-28 text-right">
+                      <label className="text-xs text-ink-400">Amount</label>
+                      <p className="py-1.5 text-xs font-medium text-ink-900">{formatCurrency(lineAmount(l))}</p>
+                    </div>
+                    {/* Delete */}
+                    <div className="pt-5">
+                      {lines.length > 1 && (
+                        <button
+                          onClick={() => removeLine(l.key)}
+                          className="rounded p-1 text-ink-300 hover:text-red-500"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
 
             <button
               onClick={addLine}
-              className="mt-3 flex items-center gap-1.5 text-sm font-medium text-clay-600 hover:text-clay-700"
+              className="flex items-center gap-1.5 text-sm font-medium text-clay-600 hover:text-clay-700"
             >
               <Plus size={15} /> Add line
             </button>

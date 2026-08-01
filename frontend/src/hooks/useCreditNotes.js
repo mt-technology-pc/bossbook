@@ -38,7 +38,14 @@ export function useCreditNotes() {
       p_reference: reference || null,
       p_credit_date: creditDate || null,
       p_notes: notes || null,
-      p_items: items,
+      p_items: items.map(i => ({
+        product_id: i.product_id || null,
+        description: i.description || null,
+        quantity: Number(i.quantity),
+        unit_price: Number(i.unit_price),
+        amount: Number(i.amount),
+        unit_ids: i.unit_ids || [],
+      })),
     })
     if (rpcError) return { error: rpcError }
     await fetchCreditNotes()
