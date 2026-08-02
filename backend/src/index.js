@@ -47,6 +47,16 @@ app.use(rateLimit({
   legacyHeaders: false,
 }))
 
+// A friendly response for anyone hitting the bare domain directly (this is
+// an API-only service, not a website) — replaces what would otherwise be
+// an unhelpful bare 404 on GET /.
+app.get('/', (req, res) => {
+  res.json({ status: 'BossBooks API', health: '/api/health' })
+})
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end()
+})
+
 app.use('/api/health', healthRouter)
 app.use('/api/me', meRouter)
 app.use('/api/assistant', assistantRouter)
