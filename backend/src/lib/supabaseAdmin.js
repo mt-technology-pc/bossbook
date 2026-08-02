@@ -9,6 +9,13 @@ if (!supabaseUrl || !serviceRoleKey) {
   )
 }
 
-export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
-  auth: { autoRefreshToken: false, persistSession: false },
-})
+// Placeholders when unset (rather than leaving these undefined) are
+// deliberate: createClient() throws synchronously if supabaseUrl is falsy,
+// which would crash the whole server on import — every unrelated route,
+// not just the ones touching Supabase — the moment these env vars are
+// missing. Calls still fail cleanly once actually used unset.
+export const supabaseAdmin = createClient(
+  supabaseUrl || 'https://missing-supabase-url.supabase.co',
+  serviceRoleKey || 'missing-supabase-service-role-key',
+  { auth: { autoRefreshToken: false, persistSession: false } },
+)
