@@ -57,8 +57,14 @@ begin
     into v_transformed
     from jsonb_array_elements(v_rows) as elem;
 
+    -- ON CONFLICT DO NOTHING: the preceding delete already clears every
+    -- pre-existing row for this company, so a unique-constraint hit here
+    -- can only mean the uploaded file itself has two colliding rows (same
+    -- product id, or two chart_of_accounts rows sharing a system_key).
+    -- Skip the second one rather than aborting — and rolling back — the
+    -- entire restore over one bad row in an otherwise-good file.
     execute format(
-      'insert into public.%I select * from jsonb_populate_recordset(null::public.%I, $1)',
+      'insert into public.%I select * from jsonb_populate_recordset(null::public.%I, $1) on conflict do nothing',
       v_table, v_table
     ) using v_transformed;
   end loop;
