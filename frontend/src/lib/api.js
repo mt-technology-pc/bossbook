@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000'
+const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/+$/, '')
 
 export async function apiFetch(path, options = {}) {
   const { data } = await supabase.auth.getSession()
