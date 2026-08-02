@@ -192,7 +192,7 @@ export default function DashboardLayout() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute left-0 mt-2 w-64 overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 p-2 shadow-xl"
+                    className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 p-2 shadow-xl"
                   >
                     {topBarShortcuts.map((item) => (
                       <NavLink
