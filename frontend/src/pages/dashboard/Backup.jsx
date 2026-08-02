@@ -1,9 +1,38 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { DatabaseBackup, Download, Upload, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react'
+import { Server, Download, Upload, AlertCircle, CheckCircle2, ArrowLeft } from 'lucide-react'
 import { apiFetchBlob, apiUploadFile } from '../../lib/api'
 import { downloadBlob } from '../../lib/exportTable'
-import Button from '../../components/ui/Button'
+
+const ACCENT = '#2f6fed'
+const ACCENT_HOVER = '#2559c9'
+
+function PanelButton({ children, onClick, disabled }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className="mb-2.5 flex w-full items-center justify-center gap-2 rounded-sm border-none px-3.5 py-2.5 text-xs font-semibold tracking-wide text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+      style={{ background: ACCENT }}
+      onMouseEnter={(e) => { if (!disabled) e.currentTarget.style.background = ACCENT_HOVER }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = ACCENT }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Panel({ icon: Icon, title, flex, children }) {
+  return (
+    <div className={`rounded-sm border border-[#e3e6ea] bg-white ${flex}`}>
+      <div className="flex items-center gap-2 border-b border-[#e3e6ea] px-4.5 py-3.5 text-[13px] font-semibold tracking-wide text-[#4a5568]">
+        <Icon size={14} style={{ color: ACCENT }} />
+        {title}
+      </div>
+      <div className="p-4.5">{children}</div>
+    </div>
+  )
+}
 
 export default function Backup() {
   const navigate = useNavigate()
@@ -59,65 +88,48 @@ export default function Backup() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-cream-100 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen w-full bg-[#eef1f5] p-4 sm:p-6 lg:p-8">
       <button
         onClick={() => navigate('/dashboard')}
-        className="mb-4 flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600"
+        className="mb-4 flex items-center gap-1.5 border-b-2 border-transparent pb-0.5 text-sm font-medium text-[#9aa2ad] transition-colors hover:text-[#2f6fed]"
       >
-        <ArrowLeft size={15} /> Dashboard
+        <ArrowLeft size={14} /> Dashboard
       </button>
 
-      <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">Backup</h1>
-      <p className="mt-1 text-sm text-ink-500">
-        Download a full copy of your business data, or restore it from a previous backup.
-      </p>
+      <h1 className="text-[22px] font-bold text-[#2b3648]">Backup</h1>
 
-      <div className="mt-6 flex max-w-xl flex-col gap-6">
-        <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5">
-          <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
-              <DatabaseBackup size={18} />
-            </span>
-            <h2 className="font-heading text-base font-semibold text-ink-900">Download backup</h2>
-          </div>
-          <p className="mt-3 text-sm text-ink-500">
-            Bundles all of your customers, suppliers, products, sales, purchases, payments, and
-            accounting records into a single zip file — a SQL file (<code className="font-mono text-xs">backup.sql</code>) and
-            an Excel workbook (<code className="font-mono text-xs">backup.xlsx</code>), one sheet per table.
+      <div className="mt-5 flex flex-col gap-5 lg:flex-row">
+        <Panel icon={Server} title="DATABASE OPERATION" flex="flex-1">
+          <p className="mb-3.5 text-[13px] leading-relaxed text-[#6b7280]">
+            Bundles all customers, suppliers, products, sales, purchases, payments, and
+            accounting records into a zip file — <code className="font-mono text-xs">backup.sql</code> and{' '}
+            <code className="font-mono text-xs">backup.xlsx</code>.
           </p>
 
           {error && (
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <div className="mb-3.5 flex items-start gap-2 rounded-sm border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-600">
+              <AlertCircle size={15} className="mt-0.5 shrink-0" />
               {error}
             </div>
           )}
 
-          <div className="mt-4">
-            <Button variant="primary" disabled={downloading} onClick={handleDownload}>
-              <Download size={15} /> {downloading ? 'Preparing…' : 'Download backup'}
-            </Button>
-          </div>
-        </div>
+          <PanelButton onClick={handleDownload} disabled={downloading}>
+            <Download size={14} /> {downloading ? 'PREPARING…' : 'DOWNLOAD BACKUP'}
+          </PanelButton>
+        </Panel>
 
-        <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5">
-          <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
-              <Upload size={18} />
-            </span>
-            <h2 className="font-heading text-base font-semibold text-ink-900">Import backup</h2>
-          </div>
-          <p className="mt-3 text-sm text-ink-500">
+        <Panel icon={Upload} title="IMPORT BACKUP" flex="flex-[2.2]">
+          <p className="mb-3.5 text-[13px] leading-relaxed text-[#6b7280]">
             Restore your data from a <code className="font-mono text-xs">backup.xlsx</code> or{' '}
             <code className="font-mono text-xs">backup.sql</code> file downloaded from this page.
           </p>
 
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
-            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <div className="mb-3.5 flex items-start gap-2 rounded-sm border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-600">
+            <AlertCircle size={15} className="mt-0.5 shrink-0" />
             This permanently replaces all of your current data and cannot be undone.
           </div>
 
-          <label className="mt-4 flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-dashed border-ink-400/25 px-3.5 py-2.5 text-sm text-ink-500 transition-colors hover:border-clay-500 hover:text-clay-600">
+          <label className="mb-3.5 flex cursor-pointer items-center justify-between gap-3 rounded-sm border border-dashed border-[#cfd4da] px-3.5 py-2.5 text-[13px] text-[#6b7280] transition-colors hover:border-[#2f6fed]">
             <span className="truncate">{file ? file.name : 'Choose a .xlsx or .sql file…'}</span>
             <input
               ref={fileInputRef}
@@ -129,15 +141,15 @@ export default function Backup() {
           </label>
 
           {importError && (
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
-              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+            <div className="mb-3.5 flex items-start gap-2 rounded-sm border border-red-200 bg-red-50 px-3 py-2.5 text-[13px] text-red-600">
+              <AlertCircle size={15} className="mt-0.5 shrink-0" />
               {importError}
             </div>
           )}
 
           {importResult && (
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2.5 text-sm text-emerald-700">
-              <CheckCircle2 size={16} className="mt-0.5 shrink-0" />
+            <div className="mb-3.5 flex items-start gap-2 rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-[13px] text-emerald-700">
+              <CheckCircle2 size={15} className="mt-0.5 shrink-0" />
               <span>
                 Backup restored —{' '}
                 {Object.entries(importResult.counts || {})
@@ -149,12 +161,10 @@ export default function Backup() {
             </div>
           )}
 
-          <div className="mt-4">
-            <Button variant="primary" disabled={!file || importing} onClick={handleImport}>
-              <Upload size={15} /> {importing ? 'Restoring…' : 'Import backup'}
-            </Button>
-          </div>
-        </div>
+          <PanelButton onClick={handleImport} disabled={!file || importing}>
+            <Upload size={14} /> {importing ? 'RESTORING…' : 'IMPORT BACKUP'}
+          </PanelButton>
+        </Panel>
       </div>
     </div>
   )
