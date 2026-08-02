@@ -35,9 +35,18 @@ const nav = [
   { label: 'Backup', to: '/dashboard/backup', icon: DatabaseBackup },
 ]
 
+// Shortcuts shown in the top bar's apps launcher (the grid icon).
+// Add more entries here to add more icons — each just needs a label,
+// a short description, a route, and a lucide icon.
+const topBarShortcuts = [
+  { label: 'Reports', desc: 'View business reports', to: '/dashboard/reports', icon: BarChart3 },
+  { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup },
+]
+
 export default function DashboardLayout() {
   const [open, setOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [appsOpen, setAppsOpen] = useState(false)
   const { user, fullName, signOut } = useAuth()
   const { company } = useCompany()
   const navigate = useNavigate()
@@ -45,7 +54,10 @@ export default function DashboardLayout() {
 
   useBrandTheme(company?.brand_color)
 
-  useEffect(() => setOpen(false), [location.pathname])
+  useEffect(() => {
+    setOpen(false)
+    setAppsOpen(false)
+  }, [location.pathname])
 
   const displayName = fullName || user?.email?.split('@')[0] || 'there'
   const initial = displayName.charAt(0).toUpperCase()
@@ -160,20 +172,53 @@ export default function DashboardLayout() {
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 items-center justify-end border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
-          <div className="flex items-center gap-3">
-            <NavLink
-              to="/dashboard/reports"
-              aria-label="Reports"
-              title="Reports"
-              className={({ isActive }) =>
-                `flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-                  isActive ? 'bg-clay-500/10 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
-                }`
-              }
-            >
-              <Grid3x3 size={18} />
-            </NavLink>
+          <div className="flex items-center gap-1">
             <div className="relative">
+              <button
+                onClick={() => setAppsOpen((a) => !a)}
+                aria-label="Apps"
+                title="Apps"
+                className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                  appsOpen ? 'bg-cream-200 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
+                }`}
+              >
+                <Grid3x3 size={18} />
+              </button>
+
+              <AnimatePresence>
+                {appsOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute left-0 mt-2 w-64 overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 p-2 shadow-xl"
+                  >
+                    {topBarShortcuts.map((item) => (
+                      <NavLink
+                        key={item.label}
+                        to={item.to}
+                        onClick={() => setAppsOpen(false)}
+                        className={({ isActive }) =>
+                          `flex items-center gap-3 rounded-xl p-2.5 transition-colors ${
+                            isActive ? 'bg-clay-500/10' : 'hover:bg-cream-200'
+                          }`
+                        }
+                      >
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
+                          <item.icon size={16} />
+                        </span>
+                        <span className="min-w-0">
+                          <p className="truncate text-sm font-medium text-ink-900">{item.label}</p>
+                          <p className="truncate text-xs text-ink-400">{item.desc}</p>
+                        </span>
+                      </NavLink>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <div className="relative ml-2">
               <button
                 onClick={() => setMenuOpen((m) => !m)}
                 className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-cream-200"
