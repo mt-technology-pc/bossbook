@@ -15,7 +15,10 @@ import googleDriveRouter from './routes/googleDrive.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
-const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
+// Stripped of any trailing slash: browsers send the Origin header without
+// one, so a trailing slash in the env var (an easy copy-paste mistake)
+// would make cors()'s exact-match check reject every real request.
+const allowedOrigin = (process.env.CLIENT_ORIGIN || 'http://localhost:5173').replace(/\/+$/, '')
 
 // Vercel (and most PaaS hosts) sit in front of this app as a reverse
 // proxy, setting X-Forwarded-For to the real client IP. Without this,
