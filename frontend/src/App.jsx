@@ -238,6 +238,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/backup"
+          element={
+            <ProtectedRoute>
+              <Backup />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/dashboard"
@@ -282,7 +290,6 @@ function App() {
           <Route path="reports/control-accounts" element={<ControlAccountsReport />} />
           <Route path="team" element={<ComingSoon title="Team" />} />
           <Route path="settings" element={<Settings />} />
-          <Route path="backup" element={<Backup />} />
           <Route path="*" element={<ComingSoon />} />
         </Route>
       </Routes>

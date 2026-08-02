@@ -1,12 +1,15 @@
 import { Router } from 'express'
+import multer from 'multer'
 import { ZipArchive } from 'archiver'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
 import { BACKUP_TABLES } from '../lib/backupTables.js'
 import { buildBackupSql } from '../lib/buildBackupSql.js'
 import { buildBackupWorkbook } from '../lib/buildBackupWorkbook.js'
+import { parseBackupSql, parseBackupWorkbook } from '../lib/parseBackupFile.js'
 
 const router = Router()
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } })
 
 router.get('/download', requireAuth, async (req, res, next) => {
   try {
@@ -37,6 +40,49 @@ router.get('/download', requireAuth, async (req, res, next) => {
     archive.append(sql, { name: 'backup.sql' })
     archive.append(xlsxBuffer, { name: 'backup.xlsx' })
     await archive.finalize()
+  } catch (err) {
+    next(err)
+  }
+})
+
+router.post('/import', requireAuth, upload.single('file'), async (req, res, next) => {
+  try {
+    const file = req.file
+    if (!file) {
+      res.status(400).json({ error: 'No file was uploaded.' })
+      return
+    }
+
+    const name = file.originalname.toLowerCase()
+    let payload
+    try {
+      if (name.endsWith('.xlsx')) {
+        payload = await parseBackupWorkbook(file.buffer)
+      } else if (name.endsWith('.sql')) {
+        payload = parseBackupSql(file.buffer.toString('utf8'))
+      } else {
+        res.status(400).json({ error: 'Only .xlsx or .sql backup files are supported.' })
+        return
+      }
+    } catch (err) {
+      res.status(400).json({ error: `Could not read this backup file: ${err.message}` })
+      return
+    }
+
+    const totalRows = Object.values(payload).reduce((sum, rows) => sum + rows.length, 0)
+    if (totalRows === 0) {
+      res.status(400).json({ error: 'This backup file has no data to restore.' })
+      return
+    }
+
+    const supabase = supabaseForUser(req.accessToken)
+    const { data, error } = await supabase.rpc('restore_company_backup', { p_payload: payload })
+    if (error) {
+      res.status(400).json({ error: error.message })
+      return
+    }
+
+    res.json(data)
   } catch (err) {
     next(err)
   }

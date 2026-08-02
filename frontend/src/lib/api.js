@@ -23,6 +23,29 @@ export async function apiFetch(path, options = {}) {
   return res.json()
 }
 
+export async function apiUploadFile(path, file) {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'POST',
+    headers: {
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: formData,
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || `Request failed with ${res.status}`)
+  }
+
+  return res.json()
+}
+
 export async function apiFetchBlob(path, options = {}) {
   const { data } = await supabase.auth.getSession()
   const token = data.session?.access_token
