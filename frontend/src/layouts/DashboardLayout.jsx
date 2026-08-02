@@ -171,53 +171,18 @@ export default function DashboardLayout() {
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-16 items-center justify-end border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
+        <header className="relative flex h-16 items-center justify-end border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
           <div className="flex items-center gap-1">
-            <div className="relative">
-              <button
-                onClick={() => setAppsOpen((a) => !a)}
-                aria-label="Apps"
-                title="Apps"
-                className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
-                  appsOpen ? 'bg-cream-200 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
-                }`}
-              >
-                <Grid3x3 size={18} />
-              </button>
-
-              <AnimatePresence>
-                {appsOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 mt-2 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 p-2 shadow-xl"
-                  >
-                    {topBarShortcuts.map((item) => (
-                      <NavLink
-                        key={item.label}
-                        to={item.to}
-                        onClick={() => setAppsOpen(false)}
-                        className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-xl p-2.5 transition-colors ${
-                            isActive ? 'bg-clay-500/10' : 'hover:bg-cream-200'
-                          }`
-                        }
-                      >
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
-                          <item.icon size={16} />
-                        </span>
-                        <span className="min-w-0">
-                          <p className="truncate text-sm font-medium text-ink-900">{item.label}</p>
-                          <p className="truncate text-xs text-ink-400">{item.desc}</p>
-                        </span>
-                      </NavLink>
-                    ))}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+            <button
+              onClick={() => setAppsOpen((a) => !a)}
+              aria-label="Apps"
+              title="Apps"
+              className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                appsOpen ? 'bg-cream-200 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
+              }`}
+            >
+              <Grid3x3 size={18} />
+            </button>
             <div className="relative ml-2">
               <button
                 onClick={() => setMenuOpen((m) => !m)}
@@ -260,6 +225,42 @@ export default function DashboardLayout() {
               </AnimatePresence>
             </div>
           </div>
+
+          {/* Anchored to <header> (not the button's own tiny wrapper) so its
+              right edge always lines up with the header's own edge, no
+              matter where the apps button itself sits in the button row. */}
+          <AnimatePresence>
+            {appsOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-4 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 p-2 shadow-xl sm:right-6"
+              >
+                {topBarShortcuts.map((item) => (
+                  <NavLink
+                    key={item.label}
+                    to={item.to}
+                    onClick={() => setAppsOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-xl p-2.5 transition-colors ${
+                        isActive ? 'bg-clay-500/10' : 'hover:bg-cream-200'
+                      }`
+                    }
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
+                      <item.icon size={16} />
+                    </span>
+                    <span className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink-900">{item.label}</p>
+                      <p className="truncate text-xs text-ink-400">{item.desc}</p>
+                    </span>
+                  </NavLink>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </header>
 
         <main className="flex-1 p-4 pb-24 sm:p-6 lg:p-8 lg:pb-8">
