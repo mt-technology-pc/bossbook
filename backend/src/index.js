@@ -17,6 +17,15 @@ const app = express()
 const PORT = process.env.PORT || 4000
 const allowedOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173'
 
+// Vercel (and most PaaS hosts) sit in front of this app as a reverse
+// proxy, setting X-Forwarded-For to the real client IP. Without this,
+// Express's default (untrusted proxy) makes express-rate-limit refuse to
+// key off that header — logging a ValidationError on every request and
+// falling back to a shared/incorrect IP for rate limiting.
+if (process.env.VERCEL) {
+  app.set('trust proxy', 1)
+}
+
 // Pure JSON API, no HTML views — helmet's defaults (CSP, X-Frame-Options,
 // X-Content-Type-Options, disabling X-Powered-By, etc.) apply cleanly
 // with no route-specific tuning needed.
