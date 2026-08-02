@@ -11,7 +11,13 @@ if (!process.env.OPENROUTER_API_KEY) {
 // attribute usage to this app on their dashboard/leaderboards, no functional
 // effect on responses.
 export const ai = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
+  // A placeholder when unset (rather than leaving this undefined) is
+  // deliberate: the OpenAI SDK throws synchronously at construction time
+  // if no apiKey/adminAPIKey/workloadIdentity is present at all, which
+  // would crash the whole server on import — every unrelated route, not
+  // just the assistant — the moment this one env var is missing. Calls
+  // still fail cleanly (401) if it's ever actually used unset.
+  apiKey: process.env.OPENROUTER_API_KEY || 'missing-openrouter-api-key',
   baseURL: 'https://openrouter.ai/api/v1',
   // The SDK's own default (10 minutes) is far too long for a chat UI —
   // without this, a hung free-tier model blocks the whole fallback chain

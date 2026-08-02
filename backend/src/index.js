@@ -56,6 +56,15 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ error: err.message || 'Server error' })
 })
 
-app.listen(PORT, () => {
-  console.log(`API listening on http://localhost:${PORT}`)
-})
+// Vercel imports this module and calls the exported app directly as the
+// request handler for every invocation — it never runs this file as a
+// script, so app.listen() would just bind a port nothing ever connects
+// to. Only listen when actually running as a long-lived server (local
+// dev, or a host like Render/Railway that runs `node src/index.js`).
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`API listening on http://localhost:${PORT}`)
+  })
+}
+
+export default app
