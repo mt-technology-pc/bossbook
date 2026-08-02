@@ -96,7 +96,7 @@ export default function Backup() {
         <ArrowLeft size={14} /> Dashboard
       </button>
 
-      <h1 className="text-[22px] font-bold text-[#2b3648]">Backup</h1>
+      <h1 className="text-[22px] font-bold text-[#2b3648]">Momoco(Backup)</h1>
 
       <div className="mt-5 flex flex-col gap-5 lg:flex-row">
         <Panel icon={Server} title="DATABASE OPERATION" flex="flex-1">
