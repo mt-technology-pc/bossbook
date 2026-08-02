@@ -29,17 +29,16 @@ const nav = [
   { label: 'Receivables', to: '/dashboard/receivables', icon: ArrowDownToLine },
   { label: 'Suppliers', to: '/dashboard/suppliers', icon: Truck },
   { label: 'Payables', to: '/dashboard/payables', icon: ArrowUpFromLine },
-  { label: 'Serial tracking', to: '/dashboard/serial-tracking', icon: ScanLine },
-  { label: 'Reports', to: '/dashboard/reports', icon: BarChart3 },
   { label: 'Settings', to: '/dashboard/settings', icon: Settings },
-  { label: 'Backup', to: '/dashboard/backup', icon: DatabaseBackup },
 ]
 
-// Shortcuts shown in the top bar's apps launcher (the grid icon).
+// Shortcuts shown in the top bar's apps launcher (the grid icon), kept out
+// of the sidebar so they're not duplicated in both places.
 // Add more entries here to add more icons — each just needs a label,
 // a short description, a route, and a lucide icon.
 const topBarShortcuts = [
   { label: 'Reports', desc: 'View business reports', to: '/dashboard/reports', icon: BarChart3 },
+  { label: 'Serial tracking', desc: 'Track items by serial number', to: '/dashboard/serial-tracking', icon: ScanLine },
   { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup },
 ]
 
