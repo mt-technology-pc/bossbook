@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
   Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
   ArrowDownToLine, ArrowUpFromLine, UserRound, DatabaseBackup, BookOpen,
-  RotateCcw, PackageX,
+  RotateCcw, PackageX, Grid3x3,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
@@ -161,6 +161,18 @@ export default function DashboardLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-16 items-center justify-end border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
           <div className="flex items-center gap-3">
+            <NavLink
+              to="/dashboard/reports"
+              aria-label="Reports"
+              title="Reports"
+              className={({ isActive }) =>
+                `flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                  isActive ? 'bg-clay-500/10 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
+                }`
+              }
+            >
+              <Grid3x3 size={18} />
+            </NavLink>
             <div className="relative">
               <button
                 onClick={() => setMenuOpen((m) => !m)}

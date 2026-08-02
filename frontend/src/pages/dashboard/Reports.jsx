@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   LayoutGrid, BarChart3, Receipt, ShoppingBag, Package, BookOpen,
-  Search, Star, ArrowRight,
+  Search, Star, ArrowRight, ArrowLeft,
   Boxes, FileBarChart, ClipboardList, Landmark, BookMarked,
   Scale, TrendingUp, PenLine, ShieldCheck, ScanLine,
 } from 'lucide-react'
@@ -85,6 +85,7 @@ function ReportCard({ report, starred, onToggleFavorite }) {
 }
 
 export default function Reports() {
+  const navigate = useNavigate()
   const [activeCategory, setActiveCategory] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [favorites, setFavorites] = useState(() => {
@@ -118,10 +119,16 @@ export default function Reports() {
     : CATEGORIES.find((c) => c.key === activeCategory)?.label ?? 'All Reports'
 
   return (
-    <div className="-m-4 flex min-h-screen sm:-m-6 lg:-m-8">
+    <div className="flex min-h-screen w-full bg-cream-100">
       {/* Dark left sidebar */}
       <aside className="hidden w-52 shrink-0 flex-col border-r border-ink-800 bg-ink-900 md:flex">
-        <div className="px-4 py-5 text-[11px] font-semibold uppercase tracking-widest text-ink-500">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-2 px-4 py-5 text-sm font-medium text-ink-300 transition-colors hover:text-cream-50"
+        >
+          <ArrowLeft size={15} /> Dashboard
+        </button>
+        <div className="px-4 pb-2 text-[11px] font-semibold uppercase tracking-widest text-ink-500">
           Reports
         </div>
         <nav className="flex flex-col">
@@ -148,6 +155,14 @@ export default function Reports() {
 
       {/* Main content */}
       <div className="flex-1 overflow-y-auto p-5 sm:p-6 lg:p-8">
+        {/* Mobile back link */}
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="mb-4 flex items-center gap-1.5 text-sm font-medium text-ink-500 hover:text-clay-600 md:hidden"
+        >
+          <ArrowLeft size={15} /> Dashboard
+        </button>
+
         {/* Mobile category pills */}
         <div className="mb-5 flex gap-2 overflow-x-auto pb-1 md:hidden">
           {CATEGORIES.map((cat) => (
