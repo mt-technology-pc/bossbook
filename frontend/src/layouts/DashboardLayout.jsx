@@ -180,7 +180,7 @@ export default function DashboardLayout() {
       </AnimatePresence>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="relative flex h-16 items-center justify-end border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
+        <header className="relative z-20 flex h-16 items-center justify-end border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
           <div className="flex items-center gap-1">
             {canAccess('settings') && (
             <NavLink
