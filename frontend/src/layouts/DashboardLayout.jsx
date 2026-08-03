@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
   Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
   ArrowDownToLine, ArrowUpFromLine, UserRound, DatabaseBackup, BookOpen,
-  RotateCcw, PackageX, Grid3x3,
+  RotateCcw, PackageX, Ellipsis,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
@@ -180,7 +180,7 @@ export default function DashboardLayout() {
                 appsOpen ? 'bg-cream-200 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
               }`}
             >
-              <Grid3x3 size={18} />
+              <Ellipsis size={18} />
             </button>
             <div className="relative ml-2">
               <button
