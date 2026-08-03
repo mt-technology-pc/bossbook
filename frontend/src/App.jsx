@@ -246,6 +246,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/serial-tracking"
+          element={
+            <ProtectedRoute>
+              <SerialTracking />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/dashboard"
@@ -275,7 +283,6 @@ function App() {
           <Route path="expenses" element={<Expenses />} />
           <Route path="journal-entries" element={<JournalEntries />} />
           <Route path="accounts/:id" element={<AccountDetail />} />
-          <Route path="serial-tracking" element={<SerialTracking />} />
           <Route path="serial-tracking/history" element={<ImeiHistory />} />
           <Route path="reports/inventory-valuation" element={<InventoryValuationReport />} />
           <Route path="reports/inventory-valuation/:id" element={<ProductLedger />} />

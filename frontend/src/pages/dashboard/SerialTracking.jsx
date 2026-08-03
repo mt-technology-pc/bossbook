@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import {
   Search, ScanLine, PackageCheck, PackageX, AlertCircle, Download, History,
-  RotateCcw, ArchiveRestore,
+  RotateCcw, ArchiveRestore, ArrowLeft,
 } from 'lucide-react'
 import { useProductUnits } from '../../hooks/useProductUnits'
 import { exportToCsv } from '../../lib/exportTable'
+
+const ACCENT = '#2f6fed'
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
@@ -17,10 +18,10 @@ const STATUS_FILTERS = [
 ]
 
 const STATUS_BADGE = {
-  in_stock: { label: 'In stock', cls: 'bg-clay-500/10 text-clay-600' },
-  sold: { label: 'Sold', cls: 'bg-ink-400/10 text-ink-500' },
-  returned_by_customer: { label: 'Returned by customer', cls: 'bg-amber-500/10 text-amber-700' },
-  returned_to_supplier: { label: 'Returned to supplier', cls: 'bg-slate-500/10 text-slate-600' },
+  in_stock: { label: 'In stock', bg: '#eaf1ff', color: '#2f6fed' },
+  sold: { label: 'Sold', bg: '#eef0f3', color: '#6b7280' },
+  returned_by_customer: { label: 'Returned by customer', bg: '#fdeee3', color: '#d9772f' },
+  returned_to_supplier: { label: 'Returned to supplier', bg: '#e9f7ee', color: '#2b9e5c' },
 }
 
 const STATUS_CSV_LABEL = {
@@ -33,6 +34,21 @@ const STATUS_CSV_LABEL = {
 function formatDate(dateStr) {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
+}
+
+function StatCard({ icon: Icon, value, label }) {
+  return (
+    <div className="rounded-lg border border-[#e3e6ea] bg-white p-4.5">
+      <span
+        className="mb-3.5 flex h-9.5 w-9.5 items-center justify-center rounded-lg"
+        style={{ background: '#eaf1ff', color: ACCENT }}
+      >
+        <Icon size={16} />
+      </span>
+      <p className="text-[26px] font-bold leading-none text-[#2b3648]">{value}</p>
+      <p className="mt-1.5 text-[13px] text-[#8b93a1]">{label}</p>
+    </div>
+  )
 }
 
 export default function SerialTracking() {
@@ -105,72 +121,63 @@ export default function SerialTracking() {
   }
 
   return (
-    <div>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+    <div className="min-h-screen w-full bg-[#eef1f5] p-4 sm:p-6 lg:p-8">
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="mb-4 flex items-center gap-1.5 border-b-2 border-transparent pb-0.5 text-sm font-medium text-[#9aa2ad] transition-colors hover:text-[#2f6fed]"
+      >
+        <ArrowLeft size={14} /> Dashboard
+      </button>
+
+      <div className="flex flex-wrap items-start justify-between gap-3.5">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
-            Serial / IMEI Tracking
-          </h1>
-          <p className="mt-1 text-sm text-ink-500">
+          <h1 className="text-[22px] font-bold text-[#2b3648]">Serial / IMEI Tracking</h1>
+          <p className="mt-1 text-[13px] text-[#8b93a1]">
             Every individually tracked unit, where it came from, and where it went.
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex gap-2.5">
           <button
             onClick={() => navigate('/dashboard/serial-tracking/history')}
-            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600"
+            className="flex items-center gap-2 rounded-md border border-[#dfe3e8] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#4a5568] transition-colors hover:border-[#2f6fed] hover:text-[#2f6fed]"
           >
-            <History size={13} /> IMEI History
+            <History size={14} /> IMEI History
           </button>
           <button
             onClick={handleExportCsv}
             disabled={filtered.length === 0}
-            className="flex items-center gap-1.5 rounded-lg border border-ink-400/20 px-3 py-2 text-xs font-medium text-ink-600 transition-colors hover:border-clay-500 hover:text-clay-600 disabled:opacity-40"
+            className="flex items-center gap-2 rounded-md border border-[#dfe3e8] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#4a5568] transition-colors hover:border-[#2f6fed] hover:text-[#2f6fed] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Download size={13} /> Export CSV
+            <Download size={14} /> Export CSV
           </button>
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        {stats.map((s, i) => (
-          <motion.div
-            key={s.label}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: i * 0.05 }}
-            className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5"
-          >
-            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
-              <s.icon size={17} />
-            </span>
-            <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">
-              {s.value}
-            </p>
-            <p className="mt-0.5 text-xs text-ink-400">{s.label}</p>
-          </motion.div>
+      <div className="mt-4.5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+        {stats.map((s) => (
+          <StatCard key={s.label} icon={s.icon} value={s.value} label={s.label} />
         ))}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-end gap-3">
+      <div className="mt-5 flex flex-wrap items-end gap-4">
         <label className="block">
-          <span className="text-xs font-medium text-ink-500">Search</span>
-          <div className="relative mt-1.5">
-            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+          <span className="block text-xs font-semibold text-[#4a5568]">Search</span>
+          <div className="mt-1.5 flex min-w-[280px] items-center gap-2 rounded-md border border-[#dfe3e8] bg-white px-3.5 py-2.5">
+            <Search size={14} className="shrink-0 text-[#9aa2ad]" />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Serial/IMEI, product, customer or supplier…"
-              className="w-72 max-w-full rounded-xl border border-ink-400/20 bg-cream-50 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+              placeholder="Serial/IMEI, product, customer or supplier"
+              className="w-full border-none bg-transparent text-[13px] text-[#333] outline-none placeholder:text-[#9aa2ad]"
             />
           </div>
         </label>
         <label className="block">
-          <span className="text-xs font-medium text-ink-500">Product</span>
+          <span className="block text-xs font-semibold text-[#4a5568]">Product</span>
           <select
             value={productFilter}
             onChange={(e) => setProductFilter(e.target.value)}
-            className="mt-1.5 rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+            className="mt-1.5 min-w-[150px] rounded-md border border-[#dfe3e8] bg-white px-3 py-2.5 text-[13px] text-[#333] outline-none"
           >
             <option value="">All products</option>
             {products.map(([id, name]) => (
@@ -179,105 +186,116 @@ export default function SerialTracking() {
           </select>
         </label>
         <div>
-          <span className="text-xs font-medium text-ink-500">Status</span>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {STATUS_FILTERS.map((s) => (
-              <button
-                key={s.value}
-                onClick={() => setStatusFilter(s.value)}
-                className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
-                  statusFilter === s.value
-                    ? 'border-clay-500 bg-clay-500/10 text-clay-600'
-                    : 'border-ink-400/20 text-ink-500 hover:border-ink-400/40'
-                }`}
-              >
-                {s.label}
-              </button>
-            ))}
+          <span className="block text-xs font-semibold text-[#4a5568]">Status</span>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {STATUS_FILTERS.map((s) => {
+              const active = statusFilter === s.value
+              return (
+                <button
+                  key={s.value}
+                  onClick={() => setStatusFilter(s.value)}
+                  className="rounded-full border px-4 py-2.5 text-[13px] font-semibold transition-colors"
+                  style={
+                    active
+                      ? { borderColor: ACCENT, color: ACCENT, background: '#eaf1ff' }
+                      : { borderColor: '#dfe3e8', color: '#4a5568' }
+                  }
+                >
+                  {s.label}
+                </button>
+              )
+            })}
           </div>
         </div>
       </div>
 
-      <div className="mt-4 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
+      <div className="mt-4.5 overflow-x-auto rounded-lg border border-[#e3e6ea] bg-white">
         {error && (
-          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
-            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <div className="m-4.5 flex items-start gap-2 rounded-sm border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-600">
+            <AlertCircle size={15} className="mt-0.5 shrink-0" />
             {error}
           </div>
         )}
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
+            <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#2f6fed]/30 border-t-[#2f6fed]" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: '#eaf1ff', color: ACCENT }}>
               <ScanLine size={20} />
             </span>
-            <p className="mt-4 text-sm font-medium text-ink-600">
+            <p className="mt-4 text-sm font-medium text-[#4a5568]">
               {units.length === 0 ? 'No serial/IMEI units tracked yet' : 'No matches'}
             </p>
-            <p className="mt-1 max-w-xs text-xs text-ink-400">
+            <p className="mt-1 max-w-xs text-xs text-[#8b93a1]">
               {units.length === 0
                 ? 'Turn on serial/IMEI tracking for a product, then enter serials when you record a bill for it.'
                 : 'Try a different search term or filter.'}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left text-sm">
-              <thead>
-                <tr className="border-b border-ink-400/10 text-xs text-ink-400">
-                  <th className="pb-3 font-medium">Serial / IMEI</th>
-                  <th className="pb-3 font-medium">Product</th>
-                  <th className="pb-3 font-medium">Status</th>
-                  <th className="pb-3 font-medium">Purchased</th>
-                  <th className="pb-3 font-medium">Sold to</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((u, i) => {
-                  const badge = STATUS_BADGE[u.status] ?? { label: u.status, cls: 'bg-ink-400/10 text-ink-500' }
-                  return (
-                    <motion.tr
-                      key={u.id}
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.25, delay: Math.min(i * 0.02, 0.3) }}
-                      className="border-b border-ink-400/5 last:border-0"
-                    >
-                      <td className="py-2.5 pr-3 font-mono text-xs text-ink-700">{u.serial_number}</td>
-                      <td className="py-2.5 pr-3 font-medium text-ink-900">{u.products?.name ?? '—'}</td>
-                      <td className="py-2.5 pr-3">
-                        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${badge.cls}`}>
-                          {badge.label}
-                        </span>
-                      </td>
-                      <td className="py-2.5 pr-3 text-ink-500">
-                        {u.purchases ? (
-                          <>
-                            <span className="text-ink-700">{u.purchases.reference || 'Bill'}</span>
-                            {' · '}{formatDate(u.purchases.bill_date)}
-                            {u.purchases.suppliers?.name && <> · {u.purchases.suppliers.name}</>}
-                          </>
-                        ) : '—'}
-                      </td>
-                      <td className="py-2.5 text-ink-500">
-                        {u.sales ? (
-                          <>
-                            <span className="text-ink-700">{u.sales.reference || (u.sales.type === 'invoice' ? 'Invoice' : 'Receipt')}</span>
-                            {' · '}{formatDate(u.sales.sale_date)}
-                            {u.sales.customers?.name && <> · {u.sales.customers.name}</>}
-                          </>
-                        ) : '—'}
-                      </td>
-                    </motion.tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <table className="w-full min-w-[820px] text-left text-[13.5px]">
+            <thead>
+              <tr className="border-b border-[#eef0f3]">
+                <th className="whitespace-nowrap px-5 py-3.5 text-xs font-semibold text-[#8b93a1]">Serial / IMEI</th>
+                <th className="whitespace-nowrap px-5 py-3.5 text-xs font-semibold text-[#8b93a1]">Product</th>
+                <th className="whitespace-nowrap px-5 py-3.5 text-xs font-semibold text-[#8b93a1]">Status</th>
+                <th className="whitespace-nowrap px-5 py-3.5 text-xs font-semibold text-[#8b93a1]">Purchased</th>
+                <th className="whitespace-nowrap px-5 py-3.5 text-xs font-semibold text-[#8b93a1]">Sold to</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((u) => {
+                const badge = STATUS_BADGE[u.status] ?? { label: u.status, bg: '#eef0f3', color: '#6b7280' }
+                return (
+                  <tr key={u.id} className="border-b border-[#f1f3f6] last:border-0 hover:bg-[#fafbfc]">
+                    <td className="whitespace-nowrap px-5 py-4 font-mono text-[13px] tracking-wide text-[#4a5568]">
+                      {u.serial_number}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 font-bold text-[#2b3648]">
+                      {u.products?.name ?? '—'}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4">
+                      <span
+                        className="inline-block rounded-full px-3 py-1 text-xs font-semibold"
+                        style={{ background: badge.bg, color: badge.color }}
+                      >
+                        {badge.label}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-[#333]">
+                      {u.purchases ? (
+                        <>
+                          {u.purchases.reference || 'Bill'}
+                          <span className="text-[#8b93a1]"> · {formatDate(u.purchases.bill_date)}</span>
+                          {u.purchases.suppliers?.name && (
+                            <span className="text-[#8b93a1]"> · {u.purchases.suppliers.name}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-[#c3c9d1]">—</span>
+                      )}
+                    </td>
+                    <td className="whitespace-nowrap px-5 py-4 text-[#333]">
+                      {u.sales ? (
+                        <>
+                          {u.sales.reference || (u.sales.type === 'invoice' ? 'Invoice' : 'Receipt')}
+                          <span className="text-[#8b93a1]"> · {formatDate(u.sales.sale_date)}</span>
+                          {u.sales.customers?.name && (
+                            <span className="text-[#8b93a1]"> · {u.sales.customers.name}</span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-[#c3c9d1]">—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )}
       </div>
     </div>
