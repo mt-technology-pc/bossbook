@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
   Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
   ArrowDownToLine, ArrowUpFromLine, UserRound, DatabaseBackup, BookOpen,
-  RotateCcw, PackageX, DatabaseZap, Users,
+  RotateCcw, PackageX, LibraryBig, Users,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
@@ -213,7 +213,7 @@ export default function DashboardLayout() {
                   transition={{ duration: 0.18 }}
                   className="flex items-center justify-center"
                 >
-                  {appsOpen ? <X size={18} /> : <DatabaseZap size={18} />}
+                  {appsOpen ? <X size={18} /> : <LibraryBig size={18} />}
                 </motion.span>
               </AnimatePresence>
             </button>
