@@ -1,3 +1,6 @@
 {
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/db-api/:path*", "destination": "https://trgdrracbywhcauodwms.supabase.co/:path*" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
