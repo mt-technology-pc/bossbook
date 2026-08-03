@@ -262,6 +262,22 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/receivables"
+          element={
+            <ProtectedRoute>
+              <AccountsReceivable />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/payables"
+          element={
+            <ProtectedRoute>
+              <AccountsPayable />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/dashboard"
@@ -276,10 +292,8 @@ function App() {
           <Route path="inventory/labels" element={<LabelGenerator />} />
           <Route path="customers" element={<Customers />} />
           <Route path="customers/:id" element={<CustomerDetail />} />
-          <Route path="receivables" element={<AccountsReceivable />} />
           <Route path="suppliers" element={<Suppliers />} />
           <Route path="suppliers/:id" element={<SupplierDetail />} />
-          <Route path="payables" element={<AccountsPayable />} />
           <Route path="purchases" element={<Purchases />} />
           <Route path="purchases/payments-made" element={<SupplierPayments />} />
           <Route path="purchases/purchase-returns" element={<PurchaseReturns />} />

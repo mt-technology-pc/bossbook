@@ -25,9 +25,7 @@ const nav = [
   { label: 'Expenses', to: '/dashboard/expenses', icon: Wallet },
   { label: 'Journal Entries', to: '/dashboard/journal-entries', icon: BookOpen },
   { label: 'Customers', to: '/dashboard/customers', icon: Contact },
-  { label: 'Receivables', to: '/dashboard/receivables', icon: ArrowDownToLine },
   { label: 'Suppliers', to: '/dashboard/suppliers', icon: Truck },
-  { label: 'Payables', to: '/dashboard/payables', icon: ArrowUpFromLine },
   { label: 'Settings', to: '/dashboard/settings', icon: Settings },
 ]
 
@@ -39,6 +37,8 @@ const topBarShortcuts = [
   { label: 'Reports', desc: 'View business reports', to: '/dashboard/reports', icon: BarChart3 },
   { label: 'Serial tracking', desc: 'Track items by serial number', to: '/dashboard/serial-tracking', icon: ScanLine },
   { label: 'Sales Reps', desc: 'Manage your sales team', to: '/dashboard/sales-reps', icon: UserRound },
+  { label: 'Receivables', desc: 'Who currently owes you money', to: '/dashboard/receivables', icon: ArrowDownToLine },
+  { label: 'Payables', desc: 'Who you currently owe money to', to: '/dashboard/payables', icon: ArrowUpFromLine },
   { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup },
 ]
 

@@ -1,12 +1,42 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
 import {
-  Search, Wallet, Users, HandCoins, AlertCircle, ChevronRight,
+  Search, Wallet, Users, HandCoins, AlertCircle, ChevronRight, ArrowLeft,
 } from 'lucide-react'
 import { useCustomerBalances } from '../../hooks/useCustomerBalances'
 import { formatCurrency } from '../../lib/currency'
-import Button from '../../components/ui/Button'
+
+const ACCENT = '#2f6fed'
+const ACCENT_HOVER = '#2559c9'
+
+function ActionButton({ children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-colors"
+      style={{ background: ACCENT }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = ACCENT_HOVER }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = ACCENT }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function StatCard({ icon: Icon, value, label }) {
+  return (
+    <div className="rounded-lg border border-[#e3e6ea] bg-white p-4.5">
+      <span
+        className="mb-3.5 flex h-9.5 w-9.5 items-center justify-center rounded-lg"
+        style={{ background: '#eaf1ff', color: ACCENT }}
+      >
+        <Icon size={16} />
+      </span>
+      <p className="text-[26px] font-bold leading-none text-[#2b3648]">{value}</p>
+      <p className="mt-1.5 text-[13px] text-[#8b93a1]">{label}</p>
+    </div>
+  )
+}
 
 export default function AccountsReceivable() {
   const { balances, loading, error } = useCustomerBalances()
@@ -27,83 +57,62 @@ export default function AccountsReceivable() {
   }
 
   return (
-    <div>
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="min-h-screen w-full bg-[#eef1f5] p-4 sm:p-6 lg:p-8">
+      <button
+        onClick={() => navigate('/dashboard')}
+        className="mb-4 flex items-center gap-1.5 border-b-2 border-transparent pb-0.5 text-sm font-medium text-[#9aa2ad] transition-colors hover:text-[#2f6fed]"
+      >
+        <ArrowLeft size={14} /> Dashboard
+      </button>
+
+      <div className="flex flex-wrap items-start justify-between gap-3.5">
         <div>
-          <h1 className="font-heading text-2xl font-semibold text-ink-900 sm:text-3xl">
-            Accounts Receivable
-          </h1>
-          <p className="mt-1 text-sm text-ink-500">
+          <h1 className="text-[22px] font-bold text-[#2b3648]">Accounts Receivable</h1>
+          <p className="mt-1 text-[13px] text-[#8b93a1]">
             Every customer who currently owes you money, and how much.
           </p>
         </div>
-        <Button onClick={() => navigate('/dashboard/sales/receive-payment')} variant="primary">
+        <ActionButton onClick={() => navigate('/dashboard/sales/receive-payment')}>
           <HandCoins size={16} /> Receive payment
-        </Button>
+        </ActionButton>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5"
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
-            <Users size={17} />
-          </span>
-          <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">
-            {owing.length}
-          </p>
-          <p className="mt-0.5 text-xs text-ink-400">Customers who owe you</p>
-        </motion.div>
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, delay: 0.05 }}
-          className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5"
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
-            <Wallet size={17} />
-          </span>
-          <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">
-            {formatCurrency(totalReceivable)}
-          </p>
-          <p className="mt-0.5 text-xs text-ink-400">Total receivable</p>
-        </motion.div>
+      <div className="mt-4.5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <StatCard icon={Users} value={owing.length} label="Customers who owe you" />
+        <StatCard icon={Wallet} value={formatCurrency(totalReceivable)} label="Total receivable" />
       </div>
 
-      <div className="mt-6 rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
-        <div className="relative max-w-xs">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+      <div className="mt-5 rounded-lg border border-[#e3e6ea] bg-white p-4.5 sm:p-6">
+        <div className="flex min-w-[280px] max-w-xs items-center gap-2 rounded-md border border-[#dfe3e8] bg-white px-3.5 py-2.5">
+          <Search size={14} className="shrink-0 text-[#9aa2ad]" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by customer name…"
-            className="w-full rounded-xl border border-ink-400/20 bg-cream-100 py-2.5 pl-9 pr-3.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none transition-colors focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+            placeholder="Search by customer name"
+            className="w-full border-none bg-transparent text-[13px] text-[#333] outline-none placeholder:text-[#9aa2ad]"
           />
         </div>
 
         {error && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
-            <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <div className="mt-4 flex items-start gap-2 rounded-sm border border-red-200 bg-red-50 px-3.5 py-2.5 text-[13px] text-red-600">
+            <AlertCircle size={15} className="mt-0.5 shrink-0" />
             {error}
           </div>
         )}
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <span className="h-7 w-7 animate-spin rounded-full border-2 border-clay-500/30 border-t-clay-500" />
+            <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#2f6fed]/30 border-t-[#2f6fed]" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-clay-500/10 text-clay-600">
+            <span className="flex h-12 w-12 items-center justify-center rounded-full" style={{ background: '#eaf1ff', color: ACCENT }}>
               <Wallet size={20} />
             </span>
-            <p className="mt-4 text-sm font-medium text-ink-600">
+            <p className="mt-4 text-sm font-medium text-[#2b3648]">
               {owing.length === 0 ? 'Nobody owes you right now' : 'No matches'}
             </p>
-            <p className="mt-1 max-w-xs text-xs text-ink-400">
+            <p className="mt-1 max-w-xs text-xs text-[#8b93a1]">
               {owing.length === 0
                 ? 'Every customer is settled — invoice a credit sale to see it appear here.'
                 : 'Try a different search term.'}
@@ -111,48 +120,47 @@ export default function AccountsReceivable() {
           </div>
         ) : (
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-sm">
+            <table className="w-full min-w-[560px] text-left text-[13.5px]">
               <thead>
-                <tr className="border-b border-ink-400/10 text-xs text-ink-400">
-                  <th className="pb-3 font-medium">Customer</th>
-                  <th className="pb-3 text-right font-medium">Balance owed</th>
-                  <th className="pb-3 font-medium" />
+                <tr className="border-b border-[#eef0f3]">
+                  <th className="whitespace-nowrap px-0 py-3.5 text-xs font-semibold text-[#8b93a1]">Customer</th>
+                  <th className="whitespace-nowrap px-3 py-3.5 text-right text-xs font-semibold text-[#8b93a1]">Balance owed</th>
+                  <th className="px-3 py-3.5" />
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((b, i) => (
-                  <motion.tr
+                {filtered.map((b) => (
+                  <tr
                     key={b.customer_id}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
                     onClick={() => navigate(`/dashboard/customers/${b.customer_id}`)}
-                    className="cursor-pointer border-b border-ink-400/10 last:border-0 hover:bg-cream-100"
+                    className="cursor-pointer border-b border-[#f1f3f6] last:border-0 hover:bg-[#fafbfc]"
                   >
-                    <td className="py-3.5 pr-3">
+                    <td className="py-4 pr-3">
                       <div className="flex items-center gap-2.5">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-clay-400 to-clay-600 text-xs font-semibold text-cream-50">
+                        <span
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold text-white"
+                          style={{ background: ACCENT }}
+                        >
                           {b.name.charAt(0).toUpperCase()}
                         </span>
-                        <p className="font-medium text-ink-900">{b.name}</p>
+                        <p className="font-bold text-[#2b3648]">{b.name}</p>
                       </div>
                     </td>
-                    <td className="py-3.5 pr-3 text-right font-semibold text-clay-600">
+                    <td className="whitespace-nowrap px-3 py-4 text-right font-bold" style={{ color: ACCENT }}>
                       {formatCurrency(b.balance)}
                     </td>
-                    <td className="py-3.5 text-right">
+                    <td className="whitespace-nowrap px-3 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <Button
-                          size="sm"
-                          variant="outline"
+                        <button
                           onClick={(e) => receiveFrom(e, b.customer_id)}
+                          className="flex items-center gap-1.5 rounded-md border border-[#dfe3e8] bg-white px-3 py-1.5 text-xs font-semibold text-[#4a5568] transition-colors hover:border-[#2f6fed] hover:text-[#2f6fed]"
                         >
                           <HandCoins size={13} /> Receive
-                        </Button>
-                        <ChevronRight size={15} className="text-ink-300" />
+                        </button>
+                        <ChevronRight size={15} className="text-[#c3c9d1]" />
                       </div>
                     </td>
-                  </motion.tr>
+                  </tr>
                 ))}
               </tbody>
             </table>
