@@ -176,11 +176,22 @@ export default function DashboardLayout() {
               onClick={() => setAppsOpen((a) => !a)}
               aria-label="Apps"
               title="Apps"
-              className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+              className={`relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full transition-colors ${
                 appsOpen ? 'bg-cream-200 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
               }`}
             >
-              <Ellipsis size={18} />
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.span
+                  key={appsOpen ? 'close' : 'open'}
+                  initial={{ rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: 90, opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                  className="flex items-center justify-center"
+                >
+                  {appsOpen ? <X size={18} /> : <Ellipsis size={18} />}
+                </motion.span>
+              </AnimatePresence>
             </button>
             <div className="relative ml-2">
               <button
