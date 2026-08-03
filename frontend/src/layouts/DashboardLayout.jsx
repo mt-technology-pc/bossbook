@@ -19,7 +19,6 @@ const nav = [
   { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, end: true },
   { label: 'Sales', to: '/dashboard/sales', icon: Receipt },
   { label: 'Credit Notes', to: '/dashboard/sales/credit-notes', icon: RotateCcw },
-  { label: 'Sales Reps', to: '/dashboard/sales-reps', icon: UserRound },
   { label: 'Inventory', to: '/dashboard/inventory', icon: Package },
   { label: 'Purchases', to: '/dashboard/purchases', icon: ShoppingBag },
   { label: 'Purchase Returns', to: '/dashboard/purchases/purchase-returns', icon: PackageX },
@@ -39,6 +38,7 @@ const nav = [
 const topBarShortcuts = [
   { label: 'Reports', desc: 'View business reports', to: '/dashboard/reports', icon: BarChart3 },
   { label: 'Serial tracking', desc: 'Track items by serial number', to: '/dashboard/serial-tracking', icon: ScanLine },
+  { label: 'Sales Reps', desc: 'Manage your sales team', to: '/dashboard/sales-reps', icon: UserRound },
   { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup },
 ]
 
