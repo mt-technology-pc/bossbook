@@ -39,7 +39,6 @@ const topBarShortcuts = [
   { label: 'Receivables', desc: 'Who currently owes you money', to: '/dashboard/receivables', icon: ArrowDownToLine },
   { label: 'Payables', desc: 'Who you currently owe money to', to: '/dashboard/payables', icon: ArrowUpFromLine },
   { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup },
-  { label: 'Settings', desc: 'Company and account settings', to: '/dashboard/settings', icon: Settings },
 ]
 
 export default function DashboardLayout() {
@@ -172,6 +171,18 @@ export default function DashboardLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="relative flex h-16 items-center justify-end border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
           <div className="flex items-center gap-1">
+            <NavLink
+              to="/dashboard/settings"
+              aria-label="Settings"
+              title="Settings"
+              className={({ isActive }) =>
+                `flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                  isActive ? 'bg-cream-200 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
+                }`
+              }
+            >
+              <Settings size={18} />
+            </NavLink>
             <button
               onClick={() => setAppsOpen((a) => !a)}
               aria-label="Apps"
