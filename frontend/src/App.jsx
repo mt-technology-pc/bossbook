@@ -254,6 +254,14 @@ function App() {
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/dashboard/sales-reps"
+          element={
+            <ProtectedRoute>
+              <SalesReps />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/dashboard"
@@ -278,7 +286,6 @@ function App() {
           <Route path="sales" element={<Sales />} />
           <Route path="sales/payments-received" element={<CustomerPayments />} />
           <Route path="sales/credit-notes" element={<CreditNotes />} />
-          <Route path="sales-reps" element={<SalesReps />} />
           <Route path="sales-reps/:id" element={<SalesRepDetail />} />
           <Route path="expenses" element={<Expenses />} />
           <Route path="journal-entries" element={<JournalEntries />} />
