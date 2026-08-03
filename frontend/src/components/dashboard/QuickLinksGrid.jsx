@@ -2,22 +2,22 @@ import { useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
-  Package, Receipt, ScanLine, BarChart3, Users, Settings, Truck, Contact,
-  ShoppingBag, Wallet, BookOpen, ChevronRight,
+  Package, Receipt, Truck, Contact, ShoppingBag, Wallet, BookOpen,
+  RotateCcw, PackageX, ChevronRight,
 } from 'lucide-react'
 
+// Kept in sync with the sidebar nav in DashboardLayout.jsx — this is a
+// shortcut row to what's in the sidebar, not a second place to add pages.
 const links = [
   { label: 'Sales', icon: Receipt, to: '/dashboard/sales', color: '#10b981' },
+  { label: 'Credit Notes', icon: RotateCcw, to: '/dashboard/sales/credit-notes', color: '#f97316' },
   { label: 'Inventory', icon: Package, to: '/dashboard/inventory', color: '#3b82f6' },
   { label: 'Purchases', icon: ShoppingBag, to: '/dashboard/purchases', color: '#f59e0b' },
+  { label: 'Purchase Returns', icon: PackageX, to: '/dashboard/purchases/purchase-returns', color: '#dc2626' },
   { label: 'Expenses', icon: Wallet, to: '/dashboard/expenses', color: '#ef4444' },
   { label: 'Journal Entries', icon: BookOpen, to: '/dashboard/journal-entries', color: '#6366f1' },
   { label: 'Customers', icon: Contact, to: '/dashboard/customers', color: '#14b8a6' },
   { label: 'Suppliers', icon: Truck, to: '/dashboard/suppliers', color: '#06b6d4' },
-  { label: 'Serial tracking', icon: ScanLine, to: '/dashboard/serial-tracking', color: '#8b5cf6' },
-  { label: 'Reports', icon: BarChart3, to: '/dashboard/reports', color: '#0ea5e9' },
-  { label: 'Team', icon: Users, to: '/dashboard/team', color: '#a855f7', soon: true },
-  { label: 'Settings', icon: Settings, to: '/dashboard/settings', color: '#64748b' },
 ]
 
 export default function QuickLinksGrid() {
