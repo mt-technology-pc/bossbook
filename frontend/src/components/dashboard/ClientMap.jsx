@@ -47,24 +47,24 @@ export default function ClientMap() {
   const hoveredBucket = hovered ? byName.get(hovered) : null
 
   return (
-    <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-6">
+    <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-4.5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="font-heading text-lg font-semibold text-ink-900">
+          <h2 className="font-heading text-sm font-semibold text-ink-900">
             Nationwide Client Map
           </h2>
-          <p className="mt-0.5 text-sm text-ink-500">
+          <p className="mt-0.5 text-xs text-ink-500">
             Registered vs Active Clients (Last 90 Days)
           </p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-3">
           <div className="text-right">
-            <p className="font-heading text-xl font-semibold text-ink-900">{totalRegistered}</p>
-            <p className="text-xs text-ink-400">Registered</p>
+            <p className="font-heading text-base font-semibold text-ink-900">{totalRegistered}</p>
+            <p className="text-[11px] text-ink-400">Registered</p>
           </div>
           <div className="text-right">
-            <p className="font-heading text-xl font-semibold text-clay-600">{totalActive}</p>
-            <p className="text-xs text-ink-400">Active</p>
+            <p className="font-heading text-base font-semibold text-clay-600">{totalActive}</p>
+            <p className="text-[11px] text-ink-400">Active</p>
           </div>
         </div>
       </div>
@@ -82,7 +82,7 @@ export default function ClientMap() {
         </div>
       ) : (
         <div className="mt-5 flex flex-col items-center">
-          <div className="relative w-full max-w-md">
+          <div className="relative w-full max-w-[260px]">
             <svg viewBox={sriLanka.viewBox} className="w-full">
               {sriLanka.locations.map((loc) => (
                 <path
