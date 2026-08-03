@@ -1,59 +1,75 @@
+import { useRef } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
 import {
   Package, Receipt, ScanLine, BarChart3, Users, Settings, Truck, Contact,
-  ShoppingBag, Wallet, BookOpen,
+  ShoppingBag, Wallet, BookOpen, ChevronRight,
 } from 'lucide-react'
 
 const links = [
-  { label: 'Sales', icon: Receipt, to: '/dashboard/sales' },
-  { label: 'Inventory', icon: Package, to: '/dashboard/inventory' },
-  { label: 'Purchases', icon: ShoppingBag, to: '/dashboard/purchases' },
-  { label: 'Expenses', icon: Wallet, to: '/dashboard/expenses' },
-  { label: 'Journal Entries', icon: BookOpen, to: '/dashboard/journal-entries' },
-  { label: 'Customers', icon: Contact, to: '/dashboard/customers' },
-  { label: 'Suppliers', icon: Truck, to: '/dashboard/suppliers' },
-  { label: 'Serial tracking', icon: ScanLine, to: '/dashboard/serial-tracking', soon: true },
-  { label: 'Reports', icon: BarChart3, to: '/dashboard/reports' },
-  { label: 'Team', icon: Users, to: '/dashboard/team', soon: true },
-  { label: 'Settings', icon: Settings, to: '/dashboard/settings', soon: true },
+  { label: 'Sales', icon: Receipt, to: '/dashboard/sales', color: '#10b981' },
+  { label: 'Inventory', icon: Package, to: '/dashboard/inventory', color: '#3b82f6' },
+  { label: 'Purchases', icon: ShoppingBag, to: '/dashboard/purchases', color: '#f59e0b' },
+  { label: 'Expenses', icon: Wallet, to: '/dashboard/expenses', color: '#ef4444' },
+  { label: 'Journal Entries', icon: BookOpen, to: '/dashboard/journal-entries', color: '#6366f1' },
+  { label: 'Customers', icon: Contact, to: '/dashboard/customers', color: '#14b8a6' },
+  { label: 'Suppliers', icon: Truck, to: '/dashboard/suppliers', color: '#06b6d4' },
+  { label: 'Serial tracking', icon: ScanLine, to: '/dashboard/serial-tracking', color: '#8b5cf6' },
+  { label: 'Reports', icon: BarChart3, to: '/dashboard/reports', color: '#0ea5e9' },
+  { label: 'Team', icon: Users, to: '/dashboard/team', color: '#a855f7', soon: true },
+  { label: 'Settings', icon: Settings, to: '/dashboard/settings', color: '#64748b' },
 ]
 
 export default function QuickLinksGrid() {
-  return (
-    <div className="rounded-2xl border border-ink-400/15 bg-cream-50 p-6">
-      <h2 className="font-heading text-lg font-semibold text-ink-900">
-        Quick links
-      </h2>
-      <p className="mt-1 text-xs text-ink-400">Jump straight to a section</p>
+  const scrollerRef = useRef(null)
 
-      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+  const scrollNext = () => {
+    scrollerRef.current?.scrollBy({ left: 260, behavior: 'smooth' })
+  }
+
+  return (
+    <div className="relative">
+      <div
+        ref={scrollerRef}
+        className="flex gap-2.5 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         {links.map((l, i) => (
           <motion.div
             key={l.label}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: i * 0.04 }}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, delay: i * 0.03 }}
+            className="shrink-0"
           >
             <Link
               to={l.to}
-              className="relative flex flex-col items-center justify-center gap-2 rounded-xl border border-ink-400/15 bg-cream-100 px-3 py-4 text-center transition-colors hover:border-clay-500/40 hover:bg-clay-500/5"
+              className="flex items-center gap-2.5 rounded-full bg-ink-900 py-1.5 pl-1.5 pr-4 text-cream-50 transition-transform hover:scale-[1.03]"
             >
+              <span
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white"
+                style={{ background: l.color }}
+              >
+                <l.icon size={15} />
+              </span>
+              <span className="whitespace-nowrap text-sm font-medium">{l.label}</span>
               {l.soon && (
-                <span className="absolute right-1.5 top-1.5 rounded-full bg-ink-400/10 px-1.5 py-0.5 text-[9px] font-semibold text-ink-400">
+                <span className="rounded-full bg-cream-50/15 px-1.5 py-0.5 text-[9px] font-semibold text-cream-50/80">
                   Soon
                 </span>
               )}
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-cream-50 text-clay-600">
-                <l.icon size={16} />
-              </span>
-              <span className="text-xs font-medium text-ink-700">
-                {l.label}
-              </span>
             </Link>
           </motion.div>
         ))}
       </div>
+
+      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-14 bg-gradient-to-l from-cream-100 to-transparent sm:block" />
+      <button
+        onClick={scrollNext}
+        aria-label="Scroll for more"
+        className="absolute right-0 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border border-ink-400/15 bg-cream-50 text-ink-500 shadow-sm transition-colors hover:border-clay-500 hover:text-clay-600 sm:flex"
+      >
+        <ChevronRight size={15} />
+      </button>
     </div>
   )
 }
