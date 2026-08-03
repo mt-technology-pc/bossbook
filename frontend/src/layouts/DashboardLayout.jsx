@@ -26,7 +26,6 @@ const nav = [
   { label: 'Journal Entries', to: '/dashboard/journal-entries', icon: BookOpen },
   { label: 'Customers', to: '/dashboard/customers', icon: Contact },
   { label: 'Suppliers', to: '/dashboard/suppliers', icon: Truck },
-  { label: 'Settings', to: '/dashboard/settings', icon: Settings },
 ]
 
 // Shortcuts shown in the top bar's apps launcher (the grid icon), kept out
@@ -40,6 +39,7 @@ const topBarShortcuts = [
   { label: 'Receivables', desc: 'Who currently owes you money', to: '/dashboard/receivables', icon: ArrowDownToLine },
   { label: 'Payables', desc: 'Who you currently owe money to', to: '/dashboard/payables', icon: ArrowUpFromLine },
   { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup },
+  { label: 'Settings', desc: 'Company and account settings', to: '/dashboard/settings', icon: Settings },
 ]
 
 export default function DashboardLayout() {
