@@ -77,7 +77,14 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
   console.error(err)
-  res.status(err.status || 500).json({ error: err.message || 'Server error' })
+  const status = err.status || 500
+  // Routes that already validate and throw a specific 4xx (bad input, not
+  // found, etc.) keep their own message — that's always been intentional
+  // and user-facing. Anything reaching here as a genuine 5xx is by
+  // definition unexpected, so don't echo err.message (could be raw
+  // Postgres/library internals) straight to the client.
+  const message = status < 500 ? (err.message || 'Request failed') : 'Something went wrong on our end'
+  res.status(status).json({ error: message })
 })
 
 // Vercel imports this module and calls the exported app directly as the

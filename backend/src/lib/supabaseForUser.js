@@ -13,9 +13,21 @@ if (!supabaseUrl || !anonKey) {
 // call goes through the same row-level-security policies the frontend is
 // bound by — the assistant can never see or touch another user's data,
 // unlike supabaseAdmin which uses the service role and bypasses RLS.
+//
+// Placeholders when unset (rather than leaving these undefined) are
+// deliberate, same reasoning as supabaseAdmin.js: createClient() throws
+// synchronously if supabaseUrl is falsy — since this is called inside
+// request handlers (not at module scope), that would 500 every
+// authenticated request with an unhandled-looking error instead of the
+// clean, obviously-a-config-problem failure a real request against a fake
+// host produces.
 export function supabaseForUser(accessToken) {
-  return createClient(supabaseUrl, anonKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-    global: { headers: { Authorization: `Bearer ${accessToken}` } },
-  })
+  return createClient(
+    supabaseUrl || 'https://missing-supabase-url.supabase.co',
+    anonKey || 'missing-supabase-anon-key',
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    },
+  )
 }

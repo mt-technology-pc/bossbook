@@ -1,7 +1,17 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 
+if (!process.env.SUPABASE_URL) {
+  console.warn('Missing SUPABASE_URL in .env — every authenticated request will fail until it is set.')
+}
+
+// A placeholder when unset (rather than leaving this undefined) is
+// deliberate: `new URL(...)` throws synchronously if given "undefined/...",
+// which would crash the whole server on import — every route, not just
+// auth-gated ones, this file is imported almost everywhere. Requests still
+// fail cleanly (401, since JWKS lookup against a fake host errors inside
+// the try/catch below) if the env var is ever actually missing at runtime.
 const JWKS = createRemoteJWKSet(
-  new URL(`${process.env.SUPABASE_URL}/auth/v1/.well-known/jwks.json`),
+  new URL(`${process.env.SUPABASE_URL || 'https://missing-supabase-url.supabase.co'}/auth/v1/.well-known/jwks.json`),
 )
 
 export async function requireAuth(req, res, next) {
