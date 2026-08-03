@@ -20,6 +20,11 @@ export async function apiFetch(path, options = {}) {
     throw new Error(body.error || `Request failed with ${res.status}`)
   }
 
+  // res.json() throws on a body-less response (e.g. 204 No Content, which
+  // several routes return on a successful delete/update) — nothing to
+  // parse there, so just resolve to null instead of failing the call.
+  if (res.status === 204) return null
+
   return res.json()
 }
 

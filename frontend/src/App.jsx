@@ -45,9 +45,11 @@ import NewCreditNote from './pages/dashboard/NewCreditNote'
 import PurchaseReturns from './pages/dashboard/PurchaseReturns'
 import NewPurchaseReturn from './pages/dashboard/NewPurchaseReturn'
 import Backup from './pages/dashboard/Backup'
+import Team from './pages/dashboard/Team'
 import Settings from './pages/dashboard/Settings'
 import ComingSoon from './pages/dashboard/ComingSoon'
 import ProtectedRoute from './components/auth/ProtectedRoute'
+import RequirePagePermission from './components/auth/RequirePagePermission'
 import AdminRoute from './components/auth/AdminRoute'
 import DashboardLayout from './layouts/DashboardLayout'
 import AdminLayout from './layouts/AdminLayout'
@@ -234,7 +236,9 @@ function App() {
           path="/dashboard/reports"
           element={
             <ProtectedRoute>
-              <Reports />
+              <RequirePagePermission pageKey="reports">
+                <Reports />
+              </RequirePagePermission>
             </ProtectedRoute>
           }
         />
@@ -242,7 +246,9 @@ function App() {
           path="/dashboard/backup"
           element={
             <ProtectedRoute>
-              <Backup />
+              <RequirePagePermission pageKey="backup">
+                <Backup />
+              </RequirePagePermission>
             </ProtectedRoute>
           }
         />
@@ -250,7 +256,9 @@ function App() {
           path="/dashboard/serial-tracking"
           element={
             <ProtectedRoute>
-              <SerialTracking />
+              <RequirePagePermission pageKey="serial_tracking">
+                <SerialTracking />
+              </RequirePagePermission>
             </ProtectedRoute>
           }
         />
@@ -258,7 +266,9 @@ function App() {
           path="/dashboard/sales-reps"
           element={
             <ProtectedRoute>
-              <SalesReps />
+              <RequirePagePermission pageKey="sales_reps">
+                <SalesReps />
+              </RequirePagePermission>
             </ProtectedRoute>
           }
         />
@@ -266,7 +276,9 @@ function App() {
           path="/dashboard/receivables"
           element={
             <ProtectedRoute>
-              <AccountsReceivable />
+              <RequirePagePermission pageKey="receivables">
+                <AccountsReceivable />
+              </RequirePagePermission>
             </ProtectedRoute>
           }
         />
@@ -274,7 +286,19 @@ function App() {
           path="/dashboard/payables"
           element={
             <ProtectedRoute>
-              <AccountsPayable />
+              <RequirePagePermission pageKey="payables">
+                <AccountsPayable />
+              </RequirePagePermission>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/team"
+          element={
+            <ProtectedRoute>
+              <RequirePagePermission pageKey="team">
+                <Team />
+              </RequirePagePermission>
             </ProtectedRoute>
           }
         />
@@ -316,7 +340,6 @@ function App() {
           <Route path="reports/general-ledger/:coaId" element={<GeneralLedger />} />
           <Route path="reports/trial-balance" element={<TrialBalance />} />
           <Route path="reports/control-accounts" element={<ControlAccountsReport />} />
-          <Route path="team" element={<ComingSoon title="Team" />} />
           <Route path="settings" element={<Settings />} />
           <Route path="*" element={<ComingSoon />} />
         </Route>

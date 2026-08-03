@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
   Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
   ArrowDownToLine, ArrowUpFromLine, UserRound, DatabaseBackup, BookOpen,
-  RotateCcw, PackageX, DatabaseZap,
+  RotateCcw, PackageX, DatabaseZap, Users,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
 import CreateMenu from '../components/dashboard/CreateMenu'
@@ -14,31 +14,38 @@ import AccountStatusCard from '../components/dashboard/AccountStatusCard'
 import { useAuth } from '../context/AuthContext'
 import { useCompany } from '../hooks/useCompany'
 import { useBrandTheme, resetBrandTheme } from '../hooks/useBrandTheme'
+import { useMyPermissions } from '../hooks/useMyPermissions'
 
+// `key` matches a page_key a role's permissions are granted against (see
+// supabase/migrations/007_team_roles_permissions.sql and Team.jsx's role
+// editor) — every entry here needs one so useMyPermissions().canAccess can
+// filter this list for a restricted staff member. Overview has none: it's
+// always accessible (see useMyPermissions).
 const nav = [
   { label: 'Overview', to: '/dashboard', icon: LayoutDashboard, end: true },
-  { label: 'Sales', to: '/dashboard/sales', icon: Receipt },
-  { label: 'Credit Notes', to: '/dashboard/sales/credit-notes', icon: RotateCcw },
-  { label: 'Inventory', to: '/dashboard/inventory', icon: Package },
-  { label: 'Purchases', to: '/dashboard/purchases', icon: ShoppingBag },
-  { label: 'Purchase Returns', to: '/dashboard/purchases/purchase-returns', icon: PackageX },
-  { label: 'Expenses', to: '/dashboard/expenses', icon: Wallet },
-  { label: 'Journal Entries', to: '/dashboard/journal-entries', icon: BookOpen },
-  { label: 'Customers', to: '/dashboard/customers', icon: Contact },
-  { label: 'Suppliers', to: '/dashboard/suppliers', icon: Truck },
+  { label: 'Sales', to: '/dashboard/sales', icon: Receipt, key: 'sales' },
+  { label: 'Credit Notes', to: '/dashboard/sales/credit-notes', icon: RotateCcw, key: 'credit_notes' },
+  { label: 'Inventory', to: '/dashboard/inventory', icon: Package, key: 'inventory' },
+  { label: 'Purchases', to: '/dashboard/purchases', icon: ShoppingBag, key: 'purchases' },
+  { label: 'Purchase Returns', to: '/dashboard/purchases/purchase-returns', icon: PackageX, key: 'purchase_returns' },
+  { label: 'Expenses', to: '/dashboard/expenses', icon: Wallet, key: 'expenses' },
+  { label: 'Journal Entries', to: '/dashboard/journal-entries', icon: BookOpen, key: 'journal_entries' },
+  { label: 'Customers', to: '/dashboard/customers', icon: Contact, key: 'customers' },
+  { label: 'Suppliers', to: '/dashboard/suppliers', icon: Truck, key: 'suppliers' },
 ]
 
 // Shortcuts shown in the top bar's apps launcher (the grid icon), kept out
 // of the sidebar so they're not duplicated in both places.
 // Add more entries here to add more icons — each just needs a label,
-// a short description, a route, and a lucide icon.
+// a short description, a route, a lucide icon, and a permission key.
 const topBarShortcuts = [
-  { label: 'Reports', desc: 'View business reports', to: '/dashboard/reports', icon: BarChart3 },
-  { label: 'Serial tracking', desc: 'Track items by serial number', to: '/dashboard/serial-tracking', icon: ScanLine },
-  { label: 'Sales Reps', desc: 'Manage your sales team', to: '/dashboard/sales-reps', icon: UserRound },
-  { label: 'Receivables', desc: 'Who currently owes you money', to: '/dashboard/receivables', icon: ArrowDownToLine },
-  { label: 'Payables', desc: 'Who you currently owe money to', to: '/dashboard/payables', icon: ArrowUpFromLine },
-  { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup },
+  { label: 'Reports', desc: 'View business reports', to: '/dashboard/reports', icon: BarChart3, key: 'reports' },
+  { label: 'Serial tracking', desc: 'Track items by serial number', to: '/dashboard/serial-tracking', icon: ScanLine, key: 'serial_tracking' },
+  { label: 'Sales Reps', desc: 'Manage your sales team', to: '/dashboard/sales-reps', icon: UserRound, key: 'sales_reps' },
+  { label: 'Receivables', desc: 'Who currently owes you money', to: '/dashboard/receivables', icon: ArrowDownToLine, key: 'receivables' },
+  { label: 'Payables', desc: 'Who you currently owe money to', to: '/dashboard/payables', icon: ArrowUpFromLine, key: 'payables' },
+  { label: 'Team', desc: 'Manage users and roles', to: '/dashboard/team', icon: Users, key: 'team' },
+  { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup, key: 'backup' },
 ]
 
 export default function DashboardLayout() {
@@ -47,8 +54,12 @@ export default function DashboardLayout() {
   const [appsOpen, setAppsOpen] = useState(false)
   const { user, fullName, signOut } = useAuth()
   const { company } = useCompany()
+  const { canAccess } = useMyPermissions()
   const navigate = useNavigate()
   const location = useLocation()
+
+  const visibleNav = nav.filter((item) => canAccess(item.key))
+  const visibleShortcuts = topBarShortcuts.filter((item) => canAccess(item.key))
 
   useBrandTheme(company?.brand_color)
 
@@ -76,7 +87,7 @@ export default function DashboardLayout() {
           <CreateMenu />
         </div>
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {nav.map((item) => (
+          {visibleNav.map((item) => (
             <NavLink
               key={item.label}
               to={item.to}
@@ -135,7 +146,7 @@ export default function DashboardLayout() {
                 <CreateMenu />
               </div>
               <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
-                {nav.map((item) => (
+                {visibleNav.map((item) => (
                   <NavLink
                     key={item.label}
                     to={item.to}
@@ -171,6 +182,7 @@ export default function DashboardLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="relative flex h-16 items-center justify-end border-b border-ink-400/10 bg-cream-50/80 px-4 backdrop-blur sm:px-6 print:hidden">
           <div className="flex items-center gap-1">
+            {canAccess('settings') && (
             <NavLink
               to="/dashboard/settings"
               aria-label="Settings"
@@ -183,6 +195,7 @@ export default function DashboardLayout() {
             >
               <Settings size={18} />
             </NavLink>
+            )}
             <button
               onClick={() => setAppsOpen((a) => !a)}
               aria-label="Apps"
@@ -259,7 +272,7 @@ export default function DashboardLayout() {
                 transition={{ duration: 0.15 }}
                 className="absolute right-4 top-full mt-2 grid w-[27rem] max-w-[calc(100vw-2rem)] grid-cols-2 gap-1 overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 p-2 shadow-xl sm:right-6"
               >
-                {topBarShortcuts.map((item) => (
+                {visibleShortcuts.map((item) => (
                   <NavLink
                     key={item.label}
                     to={item.to}
