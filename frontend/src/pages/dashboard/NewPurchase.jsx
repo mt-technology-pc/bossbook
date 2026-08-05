@@ -12,6 +12,7 @@ import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
 import FormSkeleton from '../../components/ui/FormSkeleton'
+import Modal from '../../components/ui/Modal'
 
 let localId = 0
 const newLine = () => ({
@@ -58,6 +59,7 @@ export default function NewPurchase() {
   const [lines, setLines] = useState([newLine()])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [serialsModalKey, setSerialsModalKey] = useState(null)
 
   const getProduct = (productId) => products.find((p) => p.id === productId)
 
@@ -174,6 +176,9 @@ export default function NewPurchase() {
     (sum, l) => sum + (Number(l.quantity) || 0) * (Number(l.unitCost) || 0),
     0,
   )
+
+  const serialsModalLine = lines.find((l) => l.key === serialsModalKey)
+  const serialsModalProduct = serialsModalLine ? getProduct(serialsModalLine.productId) : null
 
   const validate = () => {
     if (lines.length === 0) return 'Add at least one line item.'
@@ -406,6 +411,16 @@ export default function NewPurchase() {
                               step="1"
                               value={line.quantity}
                               onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
+                              onBlur={() => {
+                                // Prompt for serials right away once a
+                                // quantity is entered for a tracked
+                                // product — matches how this always
+                                // worked, just as a popup instead of an
+                                // always-open inline block now.
+                                if (product?.tracks_serial && Number(line.quantity) > 0) {
+                                  setSerialsModalKey(line.key)
+                                }
+                              }}
                               placeholder="Qty"
                               className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-2 text-sm text-ink-900 outline-none focus:border-clay-500"
                             />
@@ -444,24 +459,25 @@ export default function NewPurchase() {
                             </div>
                           </div>
 
-                          {product?.tracks_serial && line.serials.length > 0 && (
-                            <div className="mt-3 rounded-lg border border-clay-500/20 bg-clay-500/5 p-3">
-                              <p className="flex items-center gap-1.5 text-[11px] font-medium text-clay-600">
-                                <ScanLine size={12} /> Enter each unit&apos;s serial / IMEI
-                              </p>
-                              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                {line.serials.map((s, i) => (
-                                  <input
-                                    key={i}
-                                    value={s}
-                                    onChange={(e) => updateSerial(line.key, i, e.target.value)}
-                                    placeholder={`Unit ${i + 1}`}
-                                    className="rounded-lg border border-ink-400/20 bg-cream-50 px-2.5 py-1.5 text-xs text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500"
-                                  />
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                          {product?.tracks_serial && line.serials.length > 0 && (() => {
+                            const filled = line.serials.filter((s) => s.trim()).length
+                            const complete = filled === line.serials.length
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => setSerialsModalKey(line.key)}
+                                className={`mt-3 flex w-full items-center gap-1.5 rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors ${
+                                  complete
+                                    ? 'border-clay-500/20 bg-clay-500/5 text-clay-600 hover:bg-clay-500/10'
+                                    : 'border-amber-500/30 bg-amber-500/5 text-amber-600 hover:bg-amber-500/10'
+                                }`}
+                              >
+                                <ScanLine size={12} />
+                                Enter each unit&apos;s serial / IMEI
+                                <span className="ml-auto font-semibold">{filled}/{line.serials.length}</span>
+                              </button>
+                            )
+                          })()}
                         </motion.div>
                       )
                     })}
@@ -518,6 +534,37 @@ export default function NewPurchase() {
           </div>
         </footer>
       )}
+
+      <Modal
+        open={Boolean(serialsModalLine)}
+        onClose={() => setSerialsModalKey(null)}
+        title="Serial / IMEI numbers"
+        subtitle={serialsModalProduct
+          ? `${serialsModalProduct.name} — ${serialsModalLine.serials.length} unit${serialsModalLine.serials.length === 1 ? '' : 's'}`
+          : undefined}
+      >
+        {serialsModalLine && (
+          <>
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {serialsModalLine.serials.map((s, i) => (
+                <input
+                  key={i}
+                  autoFocus={i === 0}
+                  value={s}
+                  onChange={(e) => updateSerial(serialsModalLine.key, i, e.target.value)}
+                  placeholder={`Unit ${i + 1}`}
+                  className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-1.5 text-xs text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500"
+                />
+              ))}
+            </div>
+            <div className="mt-5 flex justify-end">
+              <Button variant="primary" onClick={() => setSerialsModalKey(null)}>
+                Done
+              </Button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   )
 }
