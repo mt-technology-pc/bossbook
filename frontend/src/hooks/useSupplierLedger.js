@@ -7,6 +7,7 @@ export function useSupplierLedger(supplierId) {
   const { user } = useAuth()
   const [purchases, setPurchases] = useState([])
   const [payments, setPayments] = useState([])
+  const [returns, setReturns] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -14,12 +15,13 @@ export function useSupplierLedger(supplierId) {
     if (!user || !supplierId) {
       setPurchases([])
       setPayments([])
+      setReturns([])
       setLoading(false)
       return
     }
     setLoading(true)
 
-    const [purchasesRes, paymentsRes] = await Promise.all([
+    const [purchasesRes, paymentsRes, returnsRes] = await Promise.all([
       supabase
         .from('purchases')
         .select('*, purchase_items(id, quantity, unit_cost, subtotal)')
@@ -30,13 +32,24 @@ export function useSupplierLedger(supplierId) {
         .select('*')
         .eq('supplier_id', supplierId)
         .order('created_at', { ascending: false }),
+      // Goods returned to this supplier reduce what's actually owed — must
+      // be netted into the balance the same way supplier_balances (the
+      // view Suppliers.jsx/PayBill.jsx read) already does, or this page
+      // shows a different, overstated number for the same supplier.
+      supabase
+        .from('purchase_returns')
+        .select('*')
+        .eq('supplier_id', supplierId)
+        .order('created_at', { ascending: false }),
     ])
 
     if (purchasesRes.error) setError(purchasesRes.error.message)
     else if (paymentsRes.error) setError(paymentsRes.error.message)
+    else if (returnsRes.error) setError(returnsRes.error.message)
     else {
       setPurchases(purchasesRes.data ?? [])
       setPayments(paymentsRes.data ?? [])
+      setReturns(returnsRes.data ?? [])
       setError(null)
     }
     setLoading(false)
@@ -64,6 +77,7 @@ export function useSupplierLedger(supplierId) {
 
   const totalBilled = purchases.reduce((sum, p) => sum + Number(p.total_amount), 0)
   const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0)
+  const totalReturned = returns.reduce((sum, r) => sum + Number(r.total_amount), 0)
 
   const ledgerAscending = [
     ...purchases.map((p) => ({
@@ -82,19 +96,28 @@ export function useSupplierLedger(supplierId) {
       amount: Number(p.amount),
       note: p.note,
     })),
+    ...returns.map((r) => ({
+      kind: 'return',
+      id: r.id,
+      date: r.created_at,
+      amount: Number(r.total_amount),
+      reference: r.reference,
+      notes: r.notes,
+    })),
   ].sort((a, b) => new Date(a.date) - new Date(b.date))
 
   const withBalance = withRunningBalance(ledgerAscending, {
-    // Accounts payable is a liability: a bill increases what we owe (credit),
-    // a payment decreases it (debit).
-    debit: (row) => (row.kind === 'payment' ? row.amount : 0),
+    // Accounts payable is a liability: a bill increases what we owe
+    // (credit); a payment or a return of goods to the supplier both
+    // decrease it (debit).
+    debit: (row) => (row.kind === 'payment' || row.kind === 'return' ? row.amount : 0),
     credit: (row) => (row.kind === 'bill' ? row.amount : 0),
   })
   const ledger = withBalance.slice().reverse()
   const balance = ledger[0]?.balance ?? 0
 
   return {
-    ledger, totalBilled, totalPaid, balance, loading, error, addPayment,
+    ledger, totalBilled, totalPaid, totalReturned, balance, loading, error, addPayment,
     refetch: fetchLedger,
   }
 }

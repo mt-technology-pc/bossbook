@@ -8,6 +8,7 @@ import { uploadInvoiceToDrive, isRevokedTokenError } from '../lib/googleDrive.js
 import { sendPlainSms } from '../lib/textLk.js'
 import { buildDailySummaryMessage } from '../lib/dailySmsSummary.js'
 import { todayColombo } from '../lib/todayColombo.js'
+import { formatCurrency } from '../lib/formatCurrency.js'
 
 const router = Router()
 
@@ -149,6 +150,58 @@ router.post('/login-alert', requireAuth, async (req, res) => {
     console.error('login-alert SMS failed:', err.message)
     res.json({ sent: false, reason: 'error' })
   }
+})
+
+const paymentReminderSchema = z.object({
+  customerId: z.string().uuid('A valid customer is required.'),
+})
+
+// User-initiated (a button on Accounts Receivable), unlike login-alert —
+// errors here should surface to whoever clicked it, not be swallowed.
+router.post('/payment-reminder', requireAuth, validateBody(paymentReminderSchema), async (req, res) => {
+  const { customerId } = req.body
+  const supabase = supabaseForUser(req.accessToken)
+
+  const [
+    { data: sms, error: smsError },
+    { data: customer, error: customerError },
+    { data: company },
+    { data: balanceRow, error: balanceError },
+  ] = await Promise.all([
+    supabase.from('sms_settings').select('api_key, sender_id').maybeSingle(),
+    supabase.from('customers').select('id, name, phone').eq('id', customerId).maybeSingle(),
+    supabase.from('companies').select('name').maybeSingle(),
+    supabase.from('customer_balances').select('balance').eq('customer_id', customerId).maybeSingle(),
+  ])
+
+  if (smsError) return res.status(500).json({ error: smsError.message })
+  if (!sms) {
+    return res.status(400).json({
+      error: 'SMS isn’t configured yet — set it up in Settings → SMS first.',
+      code: 'sms_not_configured',
+    })
+  }
+  if (customerError) return res.status(500).json({ error: customerError.message })
+  if (!customer) return res.status(404).json({ error: 'Customer not found.' })
+  if (!customer.phone) {
+    return res.status(400).json({ error: 'This customer has no phone number saved.', code: 'no_phone' })
+  }
+  if (balanceError) return res.status(500).json({ error: balanceError.message })
+
+  const balance = Number(balanceRow?.balance) || 0
+  if (balance <= 0) {
+    return res.status(400).json({ error: 'This customer has no outstanding balance.', code: 'no_balance' })
+  }
+
+  const message = `Dear ${customer.name}, this is a friendly reminder that you have an outstanding balance of ${formatCurrency(balance)} with ${company?.name || 'us'}. Kindly settle at your earliest convenience. Thank you.`
+
+  try {
+    await sendPlainSms({ apiKey: sms.api_key, senderId: sms.sender_id, phone: customer.phone, message })
+  } catch (err) {
+    return res.status(502).json({ error: err.message || 'Could not send the SMS.', code: 'sms_error' })
+  }
+
+  res.json({ success: true })
 })
 
 export default router

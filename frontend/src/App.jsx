@@ -217,6 +217,14 @@ function App() {
           }
         />
         <Route
+          path="/dashboard/sales/credit-notes/:id"
+          element={
+            <ProtectedRoute>
+              <NewCreditNote />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard/purchases/purchase-returns/new"
           element={
             <ProtectedRoute>

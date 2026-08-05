@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Plus, Search, Contact, Wallet, Trash2, AlertCircle, ChevronRight } from 'lucide-react'
+import { Plus, Search, Contact, Wallet, Trash2, AlertCircle, ChevronRight, Pencil } from 'lucide-react'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useCustomerBalances } from '../../hooks/useCustomerBalances'
 import { formatCurrency } from '../../lib/currency'
@@ -9,9 +9,10 @@ import Button from '../../components/ui/Button'
 import AddCustomerModal from '../../components/customers/AddCustomerModal'
 
 export default function Customers() {
-  const { customers, loading, error, addCustomer, deleteCustomer } = useCustomers()
+  const { customers, loading, error, addCustomer, updateCustomer, deleteCustomer } = useCustomers()
   const { balances, refetch: refetchBalances } = useCustomerBalances()
   const [modalOpen, setModalOpen] = useState(false)
+  const [editCustomer, setEditCustomer] = useState(null)
   const [query, setQuery] = useState('')
   const navigate = useNavigate()
   const location = useLocation()
@@ -43,6 +44,12 @@ export default function Customers() {
 
   const handleAddCustomer = async (payload) => {
     const result = await addCustomer(payload)
+    if (!result.error) refetchBalances()
+    return result
+  }
+
+  const handleEditCustomer = async (payload) => {
+    const result = await updateCustomer(editCustomer.id, payload)
     if (!result.error) refetchBalances()
     return result
   }
@@ -193,6 +200,13 @@ export default function Customers() {
                       <td className="py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <button
+                            onClick={(e) => { e.stopPropagation(); setEditCustomer(c) }}
+                            aria-label={`Edit ${c.name}`}
+                            className="rounded-lg p-2 text-ink-400 transition-colors hover:bg-clay-500/10 hover:text-clay-600"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
                             onClick={(e) => handleDelete(e, c.id, c.name)}
                             aria-label={`Remove ${c.name}`}
                             className="rounded-lg p-2 text-ink-400 transition-colors hover:bg-red-500/10 hover:text-red-500"
@@ -215,6 +229,13 @@ export default function Customers() {
         open={modalOpen}
         onClose={() => setModalOpen(false)}
         onSubmit={handleAddCustomer}
+      />
+
+      <AddCustomerModal
+        open={Boolean(editCustomer)}
+        onClose={() => setEditCustomer(null)}
+        onSubmit={handleEditCustomer}
+        customer={editCustomer}
       />
     </div>
   )

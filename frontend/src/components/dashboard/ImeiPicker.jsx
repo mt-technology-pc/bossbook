@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { ScanLine, CheckSquare, Square, AlertCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 
-export default function ImeiPicker({ productId, saleId, purchaseId, value = [], onChange, mode, requiredCount }) {
+export default function ImeiPicker({
+  productId, saleId, purchaseId, value = [], onChange, mode, requiredCount, creditNoteId,
+}) {
   const [units, setUnits] = useState([])
   const [loading, setLoading] = useState(false)
   const [scanInput, setScanInput] = useState('')
@@ -20,7 +22,25 @@ export default function ImeiPicker({ productId, saleId, purchaseId, value = [], 
         .order('created_at', { ascending: false })
 
       if (mode === 'credit_note' && saleId) {
-        query = query.eq('sale_id', saleId).eq('status', 'sold')
+        // Units this exact credit note already returned are sitting at
+        // 'returned_by_customer', not 'sold' — editing the credit note
+        // must still let those be (re)selected, or a user could never
+        // save an edit that touches a serialized line without first
+        // being able to pick the units it already has.
+        let ownIds = []
+        if (creditNoteId) {
+          const { data: events } = await supabase
+            .from('product_unit_events')
+            .select('product_unit_id')
+            .eq('source_table', 'credit_notes')
+            .eq('source_id', creditNoteId)
+            .eq('event_type', 'customer_return')
+          ownIds = (events ?? []).map((e) => e.product_unit_id).filter(Boolean)
+        }
+        query = query.eq('sale_id', saleId)
+        query = ownIds.length > 0
+          ? query.or(`status.eq.sold,id.in.(${ownIds.join(',')})`)
+          : query.eq('status', 'sold')
       } else if (mode === 'purchase_return' && purchaseId) {
         query = query.eq('purchase_id', purchaseId).eq('status', 'in_stock')
       }
@@ -30,7 +50,7 @@ export default function ImeiPicker({ productId, saleId, purchaseId, value = [], 
       setLoading(false)
     }
     fetchUnits()
-  }, [productId, saleId, purchaseId, mode])
+  }, [productId, saleId, purchaseId, mode, creditNoteId])
 
   const toggle = (unitId) => {
     setScanError('')

@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Search, Wallet, Users, HandCoins, AlertCircle, ChevronRight, ArrowLeft,
+  Search, Wallet, Users, HandCoins, AlertCircle, ChevronRight, ArrowLeft, MessageSquare, Check,
 } from 'lucide-react'
 import { useCustomerBalances } from '../../hooks/useCustomerBalances'
 import { formatCurrency } from '../../lib/currency'
+import { apiFetch } from '../../lib/api'
 
 const ACCENT = '#2f6fed'
 const ACCENT_HOVER = '#2559c9'
@@ -41,6 +42,7 @@ function StatCard({ icon: Icon, value, label }) {
 export default function AccountsReceivable() {
   const { balances, loading, error } = useCustomerBalances()
   const [query, setQuery] = useState('')
+  const [reminderState, setReminderState] = useState({})
   const navigate = useNavigate()
 
   const owing = balances
@@ -54,6 +56,25 @@ export default function AccountsReceivable() {
   const receiveFrom = (e, customerId) => {
     e.stopPropagation()
     navigate('/dashboard/sales/receive-payment', { state: { customerId } })
+  }
+
+  const sendReminder = async (e, customerId) => {
+    e.stopPropagation()
+    if (reminderState[customerId] === 'sending') return
+    setReminderState((s) => ({ ...s, [customerId]: 'sending' }))
+    try {
+      await apiFetch('/api/sms/payment-reminder', {
+        method: 'POST',
+        body: JSON.stringify({ customerId }),
+      })
+      setReminderState((s) => ({ ...s, [customerId]: 'sent' }))
+      setTimeout(() => {
+        setReminderState((s) => ({ ...s, [customerId]: undefined }))
+      }, 3000)
+    } catch (err) {
+      setReminderState((s) => ({ ...s, [customerId]: undefined }))
+      window.alert(err.message || 'Could not send the reminder.')
+    }
   }
 
   return (
@@ -151,6 +172,25 @@ export default function AccountsReceivable() {
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={(e) => sendReminder(e, b.customer_id)}
+                          disabled={reminderState[b.customer_id] === 'sending'}
+                          className="flex items-center gap-1.5 rounded-md border border-[#dfe3e8] bg-white px-3 py-1.5 text-xs font-semibold text-[#4a5568] transition-colors hover:border-[#2f6fed] hover:text-[#2f6fed] disabled:opacity-60"
+                        >
+                          {reminderState[b.customer_id] === 'sent' ? (
+                            <>
+                              <Check size={13} className="text-emerald-600" /> Sent
+                            </>
+                          ) : reminderState[b.customer_id] === 'sending' ? (
+                            <>
+                              <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#dfe3e8] border-t-[#2f6fed]" /> Sending
+                            </>
+                          ) : (
+                            <>
+                              <MessageSquare size={13} /> Remind
+                            </>
+                          )}
+                        </button>
                         <button
                           onClick={(e) => receiveFrom(e, b.customer_id)}
                           className="flex items-center gap-1.5 rounded-md border border-[#dfe3e8] bg-white px-3 py-1.5 text-xs font-semibold text-[#4a5568] transition-colors hover:border-[#2f6fed] hover:text-[#2f6fed]"

@@ -52,6 +52,29 @@ export function useCreditNotes() {
     return { data }
   }
 
+  const updateCreditNote = async (creditNoteId, { customerId, saleId, reference, creditDate, notes, items }) => {
+    if (!user) return { error: new Error('Not signed in') }
+    const { data, error: rpcError } = await supabase.rpc('update_credit_note', {
+      p_credit_note_id: creditNoteId,
+      p_customer_id: customerId || null,
+      p_sale_id: saleId || null,
+      p_reference: reference || null,
+      p_credit_date: creditDate || null,
+      p_notes: notes || null,
+      p_items: items.map(i => ({
+        product_id: i.product_id || null,
+        description: i.description || null,
+        quantity: Number(i.quantity),
+        unit_price: Number(i.unit_price),
+        amount: Number(i.amount),
+        unit_ids: i.unit_ids || [],
+      })),
+    })
+    if (rpcError) return { error: rpcError }
+    await fetchCreditNotes()
+    return { data }
+  }
+
   const deleteCreditNote = async (creditNoteId) => {
     if (!user) return { error: new Error('Not signed in') }
     const { error: rpcError } = await supabase.rpc('delete_credit_note', {
@@ -61,5 +84,7 @@ export function useCreditNotes() {
     return { error: rpcError }
   }
 
-  return { creditNotes, loading, error, createCreditNote, deleteCreditNote, refetch: fetchCreditNotes }
+  return {
+    creditNotes, loading, error, createCreditNote, updateCreditNote, deleteCreditNote, refetch: fetchCreditNotes,
+  }
 }

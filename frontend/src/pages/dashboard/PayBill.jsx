@@ -22,6 +22,18 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
 }
 
+// supplier_balances.balance nets every bill, payment and return together
+// for a supplier — it can go negative (a credit, e.g. from a return or an
+// untied overpayment) even while a specific new bill is still completely
+// unpaid. Collapsing anything <= 0 down to the single word "Settled" (the
+// old behavior) hid that real balance instead of showing it; this always
+// surfaces the actual number, just labeled for which direction it runs.
+function describeBalance(balance) {
+  if (balance > 0) return `${formatCurrency(balance)} owed`
+  if (balance < 0) return `${formatCurrency(Math.abs(balance))} credit`
+  return 'Settled'
+}
+
 export default function PayBill() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -98,10 +110,7 @@ export default function PayBill() {
   const supplierOptions = suppliers.map((s) => ({
     id: s.id,
     label: s.name,
-    sublabel: (() => {
-      const b = balanceFor(s.id)
-      return b > 0 ? `${formatCurrency(b)} owed` : 'Settled'
-    })(),
+    sublabel: describeBalance(balanceFor(s.id)),
   }))
 
   const accountOptions = accounts.map((a) => ({
@@ -283,14 +292,14 @@ export default function PayBill() {
 
             <div className="text-right">
               <p className="text-xs font-medium uppercase tracking-wide text-ink-400">
-                {isEdit ? 'Balance owed' : 'Amount paid'}
+                {isEdit ? (balance < 0 ? 'Credit balance' : 'Balance owed') : 'Amount paid'}
               </p>
               <p className="font-heading text-3xl font-semibold text-ink-900">
-                {formatCurrency(isEdit ? balance : totalPaid)}
+                {formatCurrency(isEdit ? Math.abs(balance) : totalPaid)}
               </p>
               {!isEdit && supplierId && (
                 <p className="mt-0.5 text-xs text-ink-400">
-                  {formatCurrency(balance)} owed
+                  {describeBalance(balance)}
                 </p>
               )}
             </div>

@@ -3,17 +3,33 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft, Phone, Mail, MapPin, HandCoins, Trash2, AlertCircle,
-  ArrowDownRight, ArrowUpRight,
+  ArrowDownRight, ArrowUpRight, MessageSquare, Check, Pencil, ExternalLink,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useCustomerTransactions } from '../../hooks/useCustomerTransactions'
 import { formatCurrency } from '../../lib/currency'
 import { SRI_LANKA_DISTRICTS } from '../../lib/districts'
+import { apiFetch } from '../../lib/api'
 import Button from '../../components/ui/Button'
 import AddTransactionModal from '../../components/customers/AddTransactionModal'
+import AddCustomerModal from '../../components/customers/AddCustomerModal'
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
+}
+
+// Auto-generated transactions carry a sale_id and/or credit_note_id back
+// to the document that created them — this resolves which editor to send
+// the user to, or null for a standalone entry (e.g. a plain payment) with
+// nothing further to edit here.
+function editPathFor(t) {
+  if (t.credit_note_id) return `/dashboard/sales/credit-notes/${t.credit_note_id}`
+  if (t.sale_id) {
+    return t.sales?.type === 'receipt'
+      ? `/dashboard/sales/new-receipt/${t.sale_id}`
+      : `/dashboard/sales/new-invoice/${t.sale_id}`
+  }
+  return null
 }
 
 export default function CustomerDetail() {
@@ -23,8 +39,26 @@ export default function CustomerDetail() {
   const [loadingCustomer, setLoadingCustomer] = useState(true)
   const [notFound, setNotFound] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
+  const [reminderStatus, setReminderStatus] = useState(null)
 
   const { transactions, balance, totalCharged, totalPaid, loading, error, addTransaction } = useCustomerTransactions(id)
+
+  const sendReminder = async () => {
+    if (reminderStatus === 'sending') return
+    setReminderStatus('sending')
+    try {
+      await apiFetch('/api/sms/payment-reminder', {
+        method: 'POST',
+        body: JSON.stringify({ customerId: id }),
+      })
+      setReminderStatus('sent')
+      setTimeout(() => setReminderStatus(null), 3000)
+    } catch (err) {
+      setReminderStatus(null)
+      window.alert(err.message || 'Could not send the reminder.')
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -60,6 +94,18 @@ export default function CustomerDetail() {
       .select()
       .single()
     if (data) setCustomer(data)
+  }
+
+  const handleEditCustomer = async (payload) => {
+    const { data, error: updateError } = await supabase
+      .from('customers')
+      .update(payload)
+      .eq('id', id)
+      .select()
+      .single()
+    if (updateError) return { error: updateError }
+    setCustomer(data)
+    return { data }
   }
 
   if (loadingCustomer) {
@@ -148,6 +194,20 @@ export default function CustomerDetail() {
               </p>
             )}
           </div>
+          {balance > 0 && (
+            <Button onClick={sendReminder} variant="outline" disabled={reminderStatus === 'sending'}>
+              {reminderStatus === 'sent' ? (
+                <><Check size={16} className="text-emerald-600" /> Sent</>
+              ) : reminderStatus === 'sending' ? (
+                'Sending…'
+              ) : (
+                <><MessageSquare size={16} /> Send reminder</>
+              )}
+            </Button>
+          )}
+          <Button onClick={() => setEditOpen(true)} variant="outline">
+            <Pencil size={16} /> Edit
+          </Button>
           <Button onClick={() => setModalOpen(true)} variant="primary">
             <HandCoins size={16} /> Add transaction
           </Button>
@@ -227,14 +287,14 @@ export default function CustomerDetail() {
                   </span>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink-900">
-                      {t.type === 'charge' ? 'Charge' : 'Payment received'}
+                      {t.type === 'charge' ? 'Charge' : t.type === 'credit_note' ? 'Credit note' : 'Payment received'}
                     </p>
                     <p className="truncate text-xs text-ink-400">
                       {formatDate(t.created_at)}{t.note ? ` · ${t.note}` : ''}
                     </p>
                   </div>
                 </div>
-                <div className="flex shrink-0 justify-end gap-1.5 text-right text-xs sm:gap-2 sm:text-sm">
+                <div className="flex shrink-0 items-center justify-end gap-1.5 text-right text-xs sm:gap-2 sm:text-sm">
                   <span className={`w-[52px] sm:w-[76px] ${t.debit ? 'font-semibold text-clay-600' : 'text-ink-300'}`}>
                     {t.debit ? formatCurrency(t.debit) : '—'}
                   </span>
@@ -244,6 +304,16 @@ export default function CustomerDetail() {
                   <span className="w-[64px] font-semibold text-ink-900 sm:w-[92px]">
                     {formatCurrency(t.balance)}
                   </span>
+                  {editPathFor(t) && (
+                    <button
+                      onClick={() => navigate(editPathFor(t))}
+                      aria-label="Edit"
+                      title={t.type === 'credit_note' ? 'Edit credit note' : 'Edit sale'}
+                      className="rounded-lg p-1.5 text-ink-300 transition-colors hover:bg-clay-500/10 hover:text-clay-600"
+                    >
+                      <ExternalLink size={14} />
+                    </button>
+                  )}
                 </div>
               </motion.li>
             ))}
@@ -257,6 +327,13 @@ export default function CustomerDetail() {
         onClose={() => setModalOpen(false)}
         onSubmit={addTransaction}
         customer={{ customer_id: id, name: customer.name, balance }}
+      />
+
+      <AddCustomerModal
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSubmit={handleEditCustomer}
+        customer={customer}
       />
     </div>
   )

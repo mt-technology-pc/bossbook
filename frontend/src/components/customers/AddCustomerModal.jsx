@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AlertCircle } from 'lucide-react'
 import Modal from '../ui/Modal'
 import Button from '../ui/Button'
@@ -6,15 +6,36 @@ import { SRI_LANKA_DISTRICTS } from '../../lib/districts'
 
 const initialForm = { name: '', phone: '', email: '', address: '', district: '', notes: '' }
 
-export default function AddCustomerModal({ open, onClose, onSubmit }) {
+// `customer` is optional — passing one switches the modal into edit mode
+// (prefilled fields, "Save changes" instead of "Add customer"). Same form,
+// same onSubmit contract, so Customers.jsx and CustomerDetail.jsx can both
+// reuse this for add and edit instead of a second near-identical modal.
+export default function AddCustomerModal({ open, onClose, onSubmit, customer = null }) {
   const [form, setForm] = useState(initialForm)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const isEdit = Boolean(customer)
+
+  useEffect(() => {
+    if (!open) return
+    setForm(
+      customer
+        ? {
+            name: customer.name || '',
+            phone: customer.phone || '',
+            email: customer.email || '',
+            address: customer.address || '',
+            district: customer.district || '',
+            notes: customer.notes || '',
+          }
+        : initialForm,
+    )
+    setError(null)
+  }, [open, customer])
 
   const update = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
   const close = () => {
-    setForm(initialForm)
     setError(null)
     onClose()
   }
@@ -47,8 +68,10 @@ export default function AddCustomerModal({ open, onClose, onSubmit }) {
     <Modal
       open={open}
       onClose={close}
-      title="Add a customer"
-      subtitle="Save their details so you can invoice or bill them faster next time."
+      title={isEdit ? 'Edit customer' : 'Add a customer'}
+      subtitle={isEdit
+        ? 'Update their details.'
+        : 'Save their details so you can invoice or bill them faster next time.'}
     >
       {error && (
         <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
@@ -120,7 +143,7 @@ export default function AddCustomerModal({ open, onClose, onSubmit }) {
             Cancel
           </Button>
           <Button type="submit" variant="primary" disabled={loading}>
-            {loading ? 'Adding…' : 'Add customer'}
+            {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Add customer'}
           </Button>
         </div>
       </form>

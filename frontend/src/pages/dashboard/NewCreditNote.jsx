@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { X, Plus, Trash2, AlertCircle, RotateCcw } from 'lucide-react'
 import { useCreditNotes } from '../../hooks/useCreditNotes'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useProducts } from '../../hooks/useProducts'
 import { useSales } from '../../hooks/useSales'
+import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
 import SearchSelect from '../../components/ui/SearchSelect'
@@ -26,7 +27,9 @@ function todayISO() {
 
 export default function NewCreditNote() {
   const navigate = useNavigate()
-  const { createCreditNote } = useCreditNotes()
+  const { id } = useParams()
+  const isEdit = Boolean(id)
+  const { creditNotes, createCreditNote, updateCreditNote } = useCreditNotes()
   const { customers, addCustomer } = useCustomers()
   const { products } = useProducts()
   const { sales } = useSales()
@@ -39,6 +42,7 @@ export default function NewCreditNote() {
   const [lines, setLines] = useState([newLine()])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(!isEdit)
 
   const customerOptions = customers.map((c) => ({
     id: c.id,
@@ -63,12 +67,74 @@ export default function NewCreditNote() {
   }))
 
   const productMap = Object.fromEntries(products.map((p) => [p.id, p]))
-  const selectedSale = sales.find(s => s.id === saleId)
 
-  // Auto-populate lines when a sale is selected
+  // Load the existing credit note's fields + line items once, when editing.
+  // Serialized-product lines also need their previously-returned unit_ids
+  // resolved from product_unit_events, since credit_note_items itself
+  // doesn't store which specific IMEI units were picked.
   useEffect(() => {
-    if (!saleId || !selectedSale?.sale_items?.length) return
-    const autoLines = selectedSale.sale_items.map(item => {
+    if (!isEdit || loaded || creditNotes.length === 0) return
+    const existing = creditNotes.find((cn) => cn.id === id)
+    if (!existing) return
+
+    let cancelled = false
+    supabase
+      .from('product_unit_events')
+      .select('product_unit_id, product_id')
+      .eq('source_table', 'credit_notes')
+      .eq('source_id', id)
+      .eq('event_type', 'customer_return')
+      .then(({ data }) => {
+        if (cancelled) return
+        const events = data ?? []
+        const consumed = {}
+        const items = [...(existing.credit_note_items || [])].sort(
+          (a, b) => (a.created_at || '').localeCompare(b.created_at || ''),
+        )
+        const builtLines = items.map((item) => {
+          const already = consumed[item.product_id] || 0
+          const productEvents = events.filter((e) => e.product_id === item.product_id)
+          const unit_ids = productEvents
+            .slice(already, already + Number(item.quantity))
+            .map((e) => e.product_unit_id)
+          consumed[item.product_id] = already + Number(item.quantity)
+          return {
+            key: `line-${++localId}`,
+            productId: item.product_id || '',
+            description: item.description || '',
+            quantity: String(item.quantity),
+            unitPrice: String(item.unit_price ?? ''),
+            unit_ids,
+          }
+        })
+
+        setCustomerId(existing.customer_id || '')
+        setSaleId(existing.sale_id || '')
+        setReference(existing.reference || '')
+        setCreditDate(existing.credit_date || todayISO())
+        setNotes(existing.notes || '')
+        setLines(builtLines.length > 0 ? builtLines : [newLine()])
+        setLoaded(true)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEdit, loaded, creditNotes, id])
+
+  // Auto-populate lines when the user picks a sale — an explicit handler
+  // rather than a useEffect keyed on saleId, so the load effect above can
+  // set saleId from existing data (including back to '' or to the same
+  // value it already was) without also having to guess whether that
+  // reactive effect will fire this render to know if it needs suppressing.
+  const handleSaleSelect = (val) => {
+    setSaleId(val)
+    const sale = sales.find((s) => s.id === val)
+    if (!sale?.sale_items?.length) {
+      setLines([newLine()])
+      return
+    }
+    const autoLines = sale.sale_items.map(item => {
       const prod = productMap[item.product_id]
       return {
         key: `line-${++localId}`,
@@ -80,7 +146,7 @@ export default function NewCreditNote() {
       }
     })
     setLines(autoLines.length > 0 ? autoLines : [newLine()])
-  }, [saleId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }
 
   const updateLine = (key, patch) => {
     setLines((prev) =>
@@ -138,14 +204,18 @@ export default function NewCreditNote() {
       unit_ids: l.unit_ids,
     }))
 
-    const { error: submitError } = await createCreditNote({
+    const payload = {
       customerId: customerId || null,
       saleId: saleId || null,
       reference: reference.trim() || null,
       creditDate: creditDate || null,
       notes: notes.trim() || null,
       items,
-    })
+    }
+
+    const { error: submitError } = isEdit
+      ? await updateCreditNote(id, payload)
+      : await createCreditNote(payload)
 
     setLoading(false)
     if (submitError) { setError(submitError.message); return }
@@ -159,7 +229,9 @@ export default function NewCreditNote() {
           <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
             <RotateCcw size={16} />
           </span>
-          <h1 className="font-heading text-lg font-semibold text-ink-900">New Credit Note</h1>
+          <h1 className="font-heading text-lg font-semibold text-ink-900">
+            {isEdit ? 'Edit Credit Note' : 'New Credit Note'}
+          </h1>
         </div>
         <button
           onClick={() => navigate('/dashboard/sales/credit-notes')}
@@ -192,7 +264,7 @@ export default function NewCreditNote() {
                 <div className="mt-1.5">
                   <SearchSelect
                     value={saleId}
-                    onChange={setSaleId}
+                    onChange={handleSaleSelect}
                     options={saleOptions}
                     placeholder="Select invoice or receipt (optional)"
                   />
@@ -263,6 +335,7 @@ export default function NewCreditNote() {
                           mode="credit_note"
                           productId={l.productId}
                           saleId={saleId}
+                          creditNoteId={isEdit ? id : undefined}
                           value={l.unit_ids}
                           onChange={(ids) => updateLine(l.key, { unit_ids: ids })}
                           requiredCount={Math.round(Number(l.quantity))}
@@ -347,8 +420,8 @@ export default function NewCreditNote() {
         <Button variant="ghost" onClick={() => navigate('/dashboard/sales/credit-notes')}>
           Cancel
         </Button>
-        <Button variant="primary" onClick={submit} disabled={loading}>
-          {loading ? 'Saving…' : 'Issue Credit Note'}
+        <Button variant="primary" onClick={submit} disabled={loading || !loaded}>
+          {!loaded ? 'Loading…' : loading ? 'Saving…' : isEdit ? 'Save changes' : 'Issue Credit Note'}
         </Button>
       </footer>
     </div>

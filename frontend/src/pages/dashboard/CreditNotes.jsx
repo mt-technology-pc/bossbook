@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Plus, Search, RotateCcw, Trash2, AlertCircle, FileText } from 'lucide-react'
+import { Plus, Search, RotateCcw, Trash2, AlertCircle, FileText, Pencil } from 'lucide-react'
 import { useCreditNotes } from '../../hooks/useCreditNotes'
 import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
@@ -135,7 +135,8 @@ export default function CreditNotes() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
-                    className="border-b border-ink-400/10 last:border-0"
+                    onClick={() => navigate(`/dashboard/sales/credit-notes/${cn.id}`)}
+                    className="cursor-pointer border-b border-ink-400/10 last:border-0 hover:bg-cream-100"
                   >
                     <td className="py-3.5 pr-3 font-mono text-xs text-clay-600">
                       {cn.reference || '—'}
@@ -162,13 +163,22 @@ export default function CreditNotes() {
                       {formatCurrency(cn.total_amount)}
                     </td>
                     <td className="py-3.5 text-right">
-                      <button
-                        onClick={(e) => handleDelete(e, cn)}
-                        aria-label="Delete credit note"
-                        className="rounded-lg p-2 text-ink-400 transition-colors hover:bg-red-500/10 hover:text-red-500"
-                      >
-                        <Trash2 size={15} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/dashboard/sales/credit-notes/${cn.id}`) }}
+                          aria-label="Edit credit note"
+                          className="rounded-lg p-2 text-ink-400 transition-colors hover:bg-clay-500/10 hover:text-clay-600"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <button
+                          onClick={(e) => handleDelete(e, cn)}
+                          aria-label="Delete credit note"
+                          className="rounded-lg p-2 text-ink-400 transition-colors hover:bg-red-500/10 hover:text-red-500"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
                     </td>
                   </motion.tr>
                 ))}

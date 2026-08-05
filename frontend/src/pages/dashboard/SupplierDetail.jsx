@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ArrowLeft, Phone, Mail, MapPin, HandCoins, Trash2, AlertCircle,
-  Receipt, ChevronDown,
+  Receipt, ChevronDown, RotateCcw,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useSupplierLedger } from '../../hooks/useSupplierLedger'
@@ -13,6 +13,16 @@ import RecordPaymentModal from '../../components/suppliers/RecordPaymentModal'
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
+}
+
+// Net balance can be zero or negative (a credit, from a return or an
+// untied overpayment) while this supplier still has a bill genuinely
+// unpaid — "Settled" with no number shown hides that instead of showing
+// it, so always surface the real figure.
+function describeBalance(balance) {
+  if (balance > 0) return `${formatCurrency(balance)} owed`
+  if (balance < 0) return `${formatCurrency(Math.abs(balance))} credit`
+  return 'Settled'
 }
 
 export default function SupplierDetail() {
@@ -112,10 +122,10 @@ export default function SupplierDetail() {
                   : 'text-ink-700'
               }`}
             >
-              {balance > 0 ? `${formatCurrency(balance)} owed` : 'Settled'}
+              {describeBalance(balance)}
             </p>
           </div>
-          <Button onClick={() => setModalOpen(true)} variant="primary" disabled={balance <= 0}>
+          <Button onClick={() => setModalOpen(true)} variant="primary">
             <HandCoins size={16} /> Pay bill
           </Button>
         </div>
@@ -195,14 +205,20 @@ export default function SupplierDetail() {
                             : 'bg-ink-400/10 text-ink-500'
                         }`}
                       >
-                        {isBill ? <Receipt size={16} /> : <HandCoins size={16} />}
+                        {isBill ? <Receipt size={16} /> : entry.kind === 'return' ? <RotateCcw size={16} /> : <HandCoins size={16} />}
                       </span>
                       <div className="min-w-0">
                         <p className="truncate text-sm font-medium text-ink-900">
-                          {isBill ? (entry.reference || 'Bill') : 'Payment made'}
+                          {isBill
+                            ? (entry.reference || 'Bill')
+                            : entry.kind === 'return'
+                              ? (entry.reference || 'Purchase return')
+                              : 'Payment made'}
                         </p>
                         <p className="truncate text-xs text-ink-400">
-                          {formatDate(entry.date)}{!isBill && entry.note ? ` · ${entry.note}` : ''}
+                          {formatDate(entry.date)}
+                          {entry.kind === 'payment' && entry.note ? ` · ${entry.note}` : ''}
+                          {entry.kind === 'return' && entry.notes ? ` · ${entry.notes}` : ''}
                         </p>
                       </div>
                     </div>

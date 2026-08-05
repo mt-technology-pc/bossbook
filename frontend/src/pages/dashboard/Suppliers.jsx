@@ -8,6 +8,17 @@ import { formatCurrency } from '../../lib/currency'
 import Button from '../../components/ui/Button'
 import AddSupplierModal from '../../components/suppliers/AddSupplierModal'
 
+// supplier_balances.balance nets every bill, payment and return together —
+// it can go negative (a credit, e.g. from a return or an untied
+// overpayment) even while a specific bill is still completely unpaid.
+// Collapsing anything <= 0 down to the bare word "Settled" hides that real
+// balance instead of showing it; this always surfaces the actual number.
+function describeBalance(balance) {
+  if (balance > 0) return { text: `${formatCurrency(balance)} owed`, className: 'font-medium text-clay-600' }
+  if (balance < 0) return { text: `${formatCurrency(Math.abs(balance))} credit`, className: 'font-medium text-ink-500' }
+  return { text: 'Settled', className: 'text-ink-400' }
+}
+
 export default function Suppliers() {
   const { suppliers, loading, error, addSupplier, deleteSupplier } = useSuppliers()
   const { balances, balanceFor, refetch: refetchBalances } = useSupplierBalances()
@@ -167,13 +178,9 @@ export default function Suppliers() {
                         {s.phone || '—'}
                       </td>
                       <td className="py-3.5 pr-3">
-                        {balance > 0 ? (
-                          <span className="font-medium text-clay-600">
-                            {formatCurrency(balance)} owed
-                          </span>
-                        ) : (
-                          <span className="text-ink-400">Settled</span>
-                        )}
+                        <span className={describeBalance(balance).className}>
+                          {describeBalance(balance).text}
+                        </span>
                       </td>
                       <td className="py-3.5 text-right">
                         <div className="flex items-center justify-end gap-1">
