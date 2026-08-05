@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -60,6 +60,7 @@ export default function NewPurchase() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const [serialsModalKey, setSerialsModalKey] = useState(null)
+  const serialInputRefs = useRef([])
 
   const getProduct = (productId) => products.find((p) => p.id === productId)
 
@@ -549,9 +550,19 @@ export default function NewPurchase() {
               {serialsModalLine.serials.map((s, i) => (
                 <input
                   key={i}
+                  ref={(el) => { serialInputRefs.current[i] = el }}
                   autoFocus={i === 0}
                   value={s}
                   onChange={(e) => updateSerial(serialsModalLine.key, i, e.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter (what a barcode scanner sends after each code)
+                    // advances to the next unit's box instead of doing
+                    // nothing — same "scan, land on the next field" feel
+                    // as everywhere else serials get entered in this app.
+                    if (e.key !== 'Enter') return
+                    e.preventDefault()
+                    serialInputRefs.current[i + 1]?.focus()
+                  }}
                   placeholder={`Unit ${i + 1}`}
                   className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-1.5 text-xs text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500"
                 />
