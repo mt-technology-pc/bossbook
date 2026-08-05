@@ -149,14 +149,17 @@ export default function SerialSlotGrid({
   }
 
   const available = (product.stock_quantity || 0) + stockAdjustment
-  const allLocked = slots.length > 0 && slots.every((s) => s.status === 'locked')
-  const canGrow = allLocked && qty < available
+  // Growing no longer waits on every current slot being filled first —
+  // scanning/typing serials in here is optional, not a gate the sale has
+  // to clear, so there's no reason a slot left empty should also block
+  // adding room for more.
+  const canGrow = qty < available
   const lockedCount = slots.filter((s) => s.status === 'locked').length
 
   return (
     <div className="mt-3 rounded-lg border border-clay-500/20 bg-clay-500/5 p-3">
       <p className="flex items-center gap-1.5 text-[11px] font-medium text-clay-600">
-        <ScanLine size={12} /> Scan {qty} unit{qty === 1 ? '' : 's'} to sell
+        <ScanLine size={12} /> Scan serial/IMEI (optional)
         <span className="ml-auto font-semibold">{lockedCount}/{qty} scanned</span>
       </p>
 

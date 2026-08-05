@@ -31,8 +31,12 @@ export function validateSaleLines(lines, getProduct, originalQuantities = {}) {
     if (qty > available) {
       return `Only ${available} of ${product.name} in stock.`
     }
-    if (product.tracks_serial && line.unitIds.length !== qty) {
-      return `Select ${qty} serial/IMEI unit(s) for ${product.name}.`
+    // Scanning/typing IMEIs in is optional on a sale, not a precondition for
+    // it — a shop may not have every unit's serial to hand at checkout.
+    // Only guard against the one thing that would actually corrupt data:
+    // more serials attached than the line's own quantity.
+    if (product.tracks_serial && line.unitIds.length > qty) {
+      return `${product.name}: more serial/IMEI units selected than the quantity (${qty}).`
     }
   }
   return null

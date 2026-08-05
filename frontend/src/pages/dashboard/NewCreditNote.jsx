@@ -180,9 +180,12 @@ export default function NewCreditNote() {
       if (!(Number(l.unitPrice) >= 0)) return 'Enter a unit price for every line.'
       const prod = productMap[l.productId]
       if (prod?.tracks_serial && saleId) {
+        // IMEI selection is optional here too, same reasoning as sales —
+        // only block the one thing that would misrepresent the return:
+        // more units selected than the line actually claims.
         const qty = Math.round(Number(l.quantity))
-        if (l.unit_ids.length !== qty) {
-          return `${prod.name}: select exactly ${qty} IMEI unit${qty !== 1 ? 's' : ''} to return.`
+        if (l.unit_ids.length > qty) {
+          return `${prod.name}: more IMEI units selected than the quantity (${qty}).`
         }
       }
     }
