@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
   Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
-  ArrowDownToLine, ArrowUpFromLine, UserRound, DatabaseBackup, BookOpen,
+  BanknoteArrowDown, BanknoteArrowUp, UserRound, DatabaseBackup, BookOpen,
   RotateCcw, PackageX, LibraryBig, Users,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
@@ -42,8 +42,8 @@ const topBarShortcuts = [
   { label: 'Reports', desc: 'View business reports', to: '/dashboard/reports', icon: BarChart3, key: 'reports' },
   { label: 'Serial tracking', desc: 'Track items by serial number', to: '/dashboard/serial-tracking', icon: ScanLine, key: 'serial_tracking' },
   { label: 'Sales Reps', desc: 'Manage your sales team', to: '/dashboard/sales-reps', icon: UserRound, key: 'sales_reps' },
-  { label: 'Receivables', desc: 'Who currently owes you money', to: '/dashboard/receivables', icon: ArrowDownToLine, key: 'receivables' },
-  { label: 'Payables', desc: 'Who you currently owe money to', to: '/dashboard/payables', icon: ArrowUpFromLine, key: 'payables' },
+  { label: 'Receivables', desc: 'Who currently owes you money', to: '/dashboard/receivables', icon: BanknoteArrowDown, key: 'receivables' },
+  { label: 'Payables', desc: 'Who you currently owe money to', to: '/dashboard/payables', icon: BanknoteArrowUp, key: 'payables' },
   { label: 'Team', desc: 'Manage users and roles', to: '/dashboard/team', icon: Users, key: 'team' },
   { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup, key: 'backup' },
 ]
