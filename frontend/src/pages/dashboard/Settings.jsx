@@ -57,6 +57,7 @@ export default function Settings() {
   const [smsInitialized, setSmsInitialized] = useState(false)
   const [smsApiKey, setSmsApiKey] = useState('')
   const [smsSenderId, setSmsSenderId] = useState('')
+  const [smsNotifyPhone, setSmsNotifyPhone] = useState('')
   const [smsError, setSmsError] = useState(null)
   const [smsSaving, setSmsSaving] = useState(false)
   const [smsSaved, setSmsSaved] = useState(false)
@@ -100,6 +101,7 @@ export default function Settings() {
   useEffect(() => {
     if (!smsLoading && !smsInitialized) {
       setSmsSenderId(smsSettings?.sender_id || '')
+      setSmsNotifyPhone(smsSettings?.notify_phone || '')
       setSmsInitialized(true)
     }
   }, [smsLoading, smsSettings, smsInitialized])
@@ -305,11 +307,13 @@ export default function Settings() {
 
   const isSmsDirty = smsInitialized && (
     smsSenderId !== (smsSettings?.sender_id || '') ||
+    smsNotifyPhone !== (smsSettings?.notify_phone || '') ||
     smsApiKey !== ''
   )
 
   const handleSmsDiscard = () => {
     setSmsSenderId(smsSettings?.sender_id || '')
+    setSmsNotifyPhone(smsSettings?.notify_phone || '')
     setSmsApiKey('')
     setSmsError(null)
   }
@@ -330,6 +334,7 @@ export default function Settings() {
       companyId: company.id,
       apiKey: smsApiKey,
       sender_id: smsSenderId.trim(),
+      notify_phone: smsNotifyPhone.trim() || null,
     })
     setSmsSaving(false)
     if (saveError) {
@@ -701,6 +706,19 @@ export default function Settings() {
                 />
                 <p className="mt-1.5 text-xs text-ink-400">
                   Must be an approved sender ID or registered phone number — set this up in your text.lk account first.
+                </p>
+              </div>
+              <div>
+                <Field
+                  label="Notification phone number"
+                  type="tel"
+                  value={smsNotifyPhone}
+                  onChange={(e) => setSmsNotifyPhone(e.target.value)}
+                  disabled={!isOwner}
+                  placeholder="+94 7XX XXX XXX"
+                />
+                <p className="mt-1.5 text-xs text-ink-400">
+                  Where login and end-of-day sales/profit summary texts are sent — with country code.
                 </p>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { apiFetch } from '../lib/api'
 
 const AuthContext = createContext(undefined)
 
@@ -31,6 +32,14 @@ export function AuthProvider({ children }) {
 
   const signIn = async ({ email, password }) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (!error) {
+      // Fire-and-forget: a slow/failed SMS must never delay or block the
+      // login the user is actively waiting on. The backend itself is
+      // already silent on every non-happy path (no SMS configured,
+      // already sent today, etc.) — this catch is only for a genuine
+      // network failure reaching the endpoint at all.
+      apiFetch('/api/sms/login-alert', { method: 'POST' }).catch(() => {})
+    }
     return { data, error }
   }
 

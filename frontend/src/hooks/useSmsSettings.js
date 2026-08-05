@@ -6,7 +6,7 @@ import { useAuth } from '../context/AuthContext'
 // read by the backend (via the caller's own RLS-scoped session) at the
 // moment an SMS is actually sent, never by the browser. Same discipline
 // as useSmtpSettings.js's password column.
-const COLUMNS = 'company_id, sender_id, updated_at'
+const COLUMNS = 'company_id, sender_id, notify_phone, updated_at'
 
 export function useSmsSettings() {
   const { user } = useAuth()

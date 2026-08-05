@@ -5,11 +5,21 @@ import { validateBody } from '../middleware/validate.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
 import { getAppSecretOrNull } from '../lib/appSecrets.js'
 import { uploadInvoiceToDrive, isRevokedTokenError } from '../lib/googleDrive.js'
+import { sendPlainSms } from '../lib/textLk.js'
+import { buildDailySummaryMessage } from '../lib/dailySmsSummary.js'
+import { todayColombo } from '../lib/todayColombo.js'
 
 const router = Router()
 
 const PHONE_RE = /^\+?\d{9,15}$/
 const TEXTLK_SEND_URL = 'https://app.text.lk/api/v3/sms/send'
+
+async function getCallerCompanyId(accessToken) {
+  const supabase = supabaseForUser(accessToken)
+  const { data, error } = await supabase.rpc('current_company_id')
+  if (error) throw error
+  return data
+}
 
 const sendSmsSchema = z.object({
   // Strips spaces/dashes before the regex check, same cleanup the route
@@ -99,6 +109,45 @@ router.post('/send-invoice', requireAuth, validateBody(sendSmsSchema), async (re
     res.json({ success: true, link })
   } catch (err) {
     res.status(502).json({ error: err.message || 'Could not send the SMS.', code: 'sms_error' })
+  }
+})
+
+// Fired (fire-and-forget, not awaited) right after every successful login
+// — see frontend/src/context/AuthContext.jsx's signIn. Best-effort and
+// silent on anything short of a real success: this must never surface an
+// error to the user or slow down a login they're actively waiting on, so
+// every non-happy path here still responds 200 with `sent: false` rather
+// than an error status.
+router.post('/login-alert', requireAuth, async (req, res) => {
+  try {
+    const companyId = await getCallerCompanyId(req.accessToken)
+    if (!companyId) return res.json({ sent: false, reason: 'no_company' })
+
+    const supabase = supabaseForUser(req.accessToken)
+    const { data: sms, error: smsError } = await supabase
+      .from('sms_settings')
+      .select('api_key, sender_id, notify_phone, last_login_alert_sent_date')
+      .maybeSingle()
+    if (smsError) return res.json({ sent: false, reason: 'lookup_failed' })
+    if (!sms || !sms.notify_phone) return res.json({ sent: false, reason: 'sms_not_configured' })
+
+    const today = todayColombo()
+    if (sms.last_login_alert_sent_date === today) {
+      return res.json({ sent: false, reason: 'already_sent_today' })
+    }
+
+    const displayName = req.user.user_metadata?.full_name || req.user.email || 'A user'
+    const summary = await buildDailySummaryMessage(supabase, today)
+    const message = `${displayName} logged in.\n\n${summary}`
+
+    await sendPlainSms({ apiKey: sms.api_key, senderId: sms.sender_id, phone: sms.notify_phone, message })
+
+    await supabase.from('sms_settings').update({ last_login_alert_sent_date: today }).eq('company_id', companyId)
+
+    res.json({ sent: true })
+  } catch (err) {
+    console.error('login-alert SMS failed:', err.message)
+    res.json({ sent: false, reason: 'error' })
   }
 })
 

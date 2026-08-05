@@ -1,30 +1,13 @@
 import { Router } from 'express'
 import nodemailer from 'nodemailer'
+import { requireCronSecret } from '../middleware/requireCronSecret.js'
 import { supabaseAdmin } from '../lib/supabaseAdmin.js'
 import { todayColombo } from '../lib/todayColombo.js'
 import { formatCurrency } from '../lib/formatCurrency.js'
+import { buildDailySummaryMessage } from '../lib/dailySmsSummary.js'
+import { sendPlainSms } from '../lib/textLk.js'
 
 const router = Router()
-
-// No user session exists here — Vercel Cron calls this endpoint directly,
-// not on behalf of a logged-in user, so requireAuth (which verifies a
-// Supabase JWT) doesn't apply. Vercel automatically sends `Authorization:
-// Bearer $CRON_SECRET` on its own scheduled calls when CRON_SECRET is set
-// as an env var (see vercel.json's `crons` entry) — this just verifies
-// that's really what's calling, not requiring a full auth system for a
-// single service-to-service endpoint.
-function requireCronSecret(req, res, next) {
-  const expected = process.env.CRON_SECRET
-  if (!expected) {
-    console.warn('CRON_SECRET is not set — refusing all cron requests until it is configured.')
-    return res.status(500).json({ error: 'Cron endpoint is not configured' })
-  }
-  const header = req.headers.authorization || ''
-  if (header !== `Bearer ${expected}`) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
-  next()
-}
 
 // At most one notification per (company, type, related entity, calendar
 // day) — every check below in this file calls this before inserting, so a
@@ -263,6 +246,55 @@ router.get('/notifications', requireCronSecret, async (req, res, next) => {
     }
 
     res.json({ companiesProcessed, notificationsCreated })
+  } catch (err) {
+    next(err)
+  }
+})
+
+// Separate schedule from /notifications (see vercel.json — this one runs
+// late at night so it captures the full day's activity, /notifications
+// runs in the morning for balance/due-date checks that don't care what
+// time of day it is). Independent of the login-alert throttle in sms.js —
+// this always sends once per day regardless of whether a login already
+// triggered one earlier, since they answer different questions.
+router.get('/daily-summary', requireCronSecret, async (req, res, next) => {
+  try {
+    const today = todayColombo()
+    const { data: companies, error: companiesError } = await supabaseAdmin
+      .from('companies')
+      .select('id')
+    if (companiesError) throw companiesError
+
+    let companiesProcessed = 0
+    let sent = 0
+
+    for (const company of companies || []) {
+      const { data: sms, error: smsError } = await supabaseAdmin
+        .from('sms_settings')
+        .select('api_key, sender_id, notify_phone, last_daily_summary_sent_date')
+        .eq('company_id', company.id)
+        .maybeSingle()
+
+      if (smsError) {
+        console.error(`sms_settings lookup failed for company ${company.id}:`, smsError.message)
+        continue
+      }
+      if (!sms || !sms.notify_phone) continue
+      if (sms.last_daily_summary_sent_date === today) continue
+
+      companiesProcessed += 1
+
+      try {
+        const message = await buildDailySummaryMessage(supabaseAdmin, today, company.id)
+        await sendPlainSms({ apiKey: sms.api_key, senderId: sms.sender_id, phone: sms.notify_phone, message })
+        await supabaseAdmin.from('sms_settings').update({ last_daily_summary_sent_date: today }).eq('company_id', company.id)
+        sent += 1
+      } catch (err) {
+        console.error(`daily-summary SMS failed for company ${company.id}:`, err.message)
+      }
+    }
+
+    res.json({ companiesProcessed, sent })
   } catch (err) {
     next(err)
   }
