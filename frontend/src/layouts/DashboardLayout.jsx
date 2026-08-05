@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
   Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
-  BanknoteArrowDown, BanknoteArrowUp, UserRound, DatabaseBackup, BookOpen,
+  BanknoteArrowDown, BanknoteArrowUp, Banknote, UserRound, DatabaseBackup, BookOpen,
   RotateCcw, PackageX, LibraryBig, Users,
 } from 'lucide-react'
 import Logo from '../components/ui/Logo'
@@ -42,16 +42,22 @@ const topBarShortcuts = [
   { label: 'Reports', desc: 'View business reports', to: '/dashboard/reports', icon: BarChart3, key: 'reports' },
   { label: 'Serial tracking', desc: 'Track items by serial number', to: '/dashboard/serial-tracking', icon: ScanLine, key: 'serial_tracking' },
   { label: 'Sales Reps', desc: 'Manage your sales team', to: '/dashboard/sales-reps', icon: UserRound, key: 'sales_reps' },
-  { label: 'Receivables', desc: 'Who currently owes you money', to: '/dashboard/receivables', icon: BanknoteArrowDown, key: 'receivables' },
-  { label: 'Payables', desc: 'Who you currently owe money to', to: '/dashboard/payables', icon: BanknoteArrowUp, key: 'payables' },
   { label: 'Team', desc: 'Manage users and roles', to: '/dashboard/team', icon: Users, key: 'team' },
   { label: 'Backup', desc: 'Export or restore your data', to: '/dashboard/backup', icon: DatabaseBackup, key: 'backup' },
+]
+
+// Its own dedicated top bar icon (a banknote) rather than living in the
+// apps launcher popover above — money-owed pages get faster access.
+const moneyShortcuts = [
+  { label: 'Receivables', desc: 'Who currently owes you money', to: '/dashboard/receivables', icon: BanknoteArrowDown, key: 'receivables' },
+  { label: 'Payables', desc: 'Who you currently owe money to', to: '/dashboard/payables', icon: BanknoteArrowUp, key: 'payables' },
 ]
 
 export default function DashboardLayout() {
   const [open, setOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [appsOpen, setAppsOpen] = useState(false)
+  const [moneyOpen, setMoneyOpen] = useState(false)
   const { user, fullName, signOut } = useAuth()
   const { company } = useCompany()
   const { canAccess } = useMyPermissions()
@@ -60,12 +66,14 @@ export default function DashboardLayout() {
 
   const visibleNav = nav.filter((item) => canAccess(item.key))
   const visibleShortcuts = topBarShortcuts.filter((item) => canAccess(item.key))
+  const visibleMoneyShortcuts = moneyShortcuts.filter((item) => canAccess(item.key))
 
   useBrandTheme(company?.brand_color)
 
   useEffect(() => {
     setOpen(false)
     setAppsOpen(false)
+    setMoneyOpen(false)
   }, [location.pathname])
 
   const displayName = fullName || user?.email?.split('@')[0] || 'there'
@@ -197,7 +205,17 @@ export default function DashboardLayout() {
             </NavLink>
             )}
             <button
-              onClick={() => setAppsOpen((a) => !a)}
+              onClick={() => { setMoneyOpen((m) => !m); setAppsOpen(false); setMenuOpen(false) }}
+              aria-label="Receivables and payables"
+              title="Receivables and payables"
+              className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                moneyOpen ? 'bg-cream-200 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
+              }`}
+            >
+              <Banknote size={18} />
+            </button>
+            <button
+              onClick={() => { setAppsOpen((a) => !a); setMoneyOpen(false); setMenuOpen(false) }}
               aria-label="Apps"
               title="Apps"
               className={`relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full transition-colors ${
@@ -219,7 +237,7 @@ export default function DashboardLayout() {
             </button>
             <div className="relative ml-2">
               <button
-                onClick={() => setMenuOpen((m) => !m)}
+                onClick={() => { setMenuOpen((m) => !m); setAppsOpen(false); setMoneyOpen(false) }}
                 className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-cream-200"
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-clay-400 to-clay-600 text-sm font-semibold text-cream-50">
@@ -277,6 +295,39 @@ export default function DashboardLayout() {
                     key={item.label}
                     to={item.to}
                     onClick={() => setAppsOpen(false)}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 rounded-xl p-2.5 transition-colors ${
+                        isActive ? 'bg-clay-500/10' : 'hover:bg-cream-200'
+                      }`
+                    }
+                  >
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
+                      <item.icon size={16} />
+                    </span>
+                    <span className="min-w-0">
+                      <p className="truncate text-sm font-medium text-ink-900">{item.label}</p>
+                      <p className="truncate text-xs text-ink-400">{item.desc}</p>
+                    </span>
+                  </NavLink>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {moneyOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-4 top-full mt-2 w-64 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 p-2 shadow-xl sm:right-6"
+              >
+                {visibleMoneyShortcuts.map((item) => (
+                  <NavLink
+                    key={item.label}
+                    to={item.to}
+                    onClick={() => setMoneyOpen(false)}
                     className={({ isActive }) =>
                       `flex items-center gap-3 rounded-xl p-2.5 transition-colors ${
                         isActive ? 'bg-clay-500/10' : 'hover:bg-cream-200'
