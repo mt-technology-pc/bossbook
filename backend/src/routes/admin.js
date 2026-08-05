@@ -1,7 +1,9 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { ZipArchive } from 'archiver'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireAdmin } from '../middleware/requireAdmin.js'
+import { validateBody } from '../middleware/validate.js'
 import { supabaseAdmin } from '../lib/supabaseAdmin.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
 import { BACKUP_TABLES } from '../lib/backupTables.js'
@@ -11,6 +13,29 @@ import { buildBackupWorkbook } from '../lib/buildBackupWorkbook.js'
 const router = Router()
 
 router.use(requireAuth, requireAdmin)
+
+// amount was previously passed straight to the RPC with no validation at
+// all — z.coerce.number() still accepts a numeric string (in case the
+// frontend ever sends one from a form field) while rejecting anything
+// that isn't actually a number, instead of the RPC surfacing a confusing
+// Postgres type-cast error for bad input.
+const receivePaymentSchema = z.object({
+  customerId: z.string().uuid(),
+  accountId: z.string().uuid(),
+  amount: z.coerce.number().positive(),
+  note: z.string().trim().optional().nullable(),
+  paymentDate: z.string().trim().optional().nullable(),
+  saleId: z.string().uuid().optional().nullable(),
+})
+
+const payBillSchema = z.object({
+  supplierId: z.string().uuid(),
+  accountId: z.string().uuid(),
+  amount: z.coerce.number().positive(),
+  note: z.string().trim().optional().nullable(),
+  paymentDate: z.string().trim().optional().nullable(),
+  purchaseId: z.string().uuid().optional().nullable(),
+})
 
 // List every company, with a registered-user count per company — the
 // service-role client bypasses RLS, which is exactly what a cross-tenant
@@ -333,9 +358,9 @@ router.get('/companies/:id/outstanding', async (req, res, next) => {
 // admin_receive_payment for why this can't just call the regular
 // receive_payment RPC (it derives the company from the CALLER's own
 // session, which for an admin would be the admin's own company).
-router.post('/companies/:id/receive-payment', async (req, res, next) => {
+router.post('/companies/:id/receive-payment', validateBody(receivePaymentSchema), async (req, res, next) => {
   try {
-    const { customerId, accountId, amount, note, paymentDate, saleId } = req.body || {}
+    const { customerId, accountId, amount, note, paymentDate, saleId } = req.body
     const supabase = supabaseForUser(req.accessToken)
     const { data, error } = await supabase.rpc('admin_receive_payment', {
       p_company_id: req.params.id,
@@ -353,9 +378,9 @@ router.post('/companies/:id/receive-payment', async (req, res, next) => {
   }
 })
 
-router.post('/companies/:id/pay-bill', async (req, res, next) => {
+router.post('/companies/:id/pay-bill', validateBody(payBillSchema), async (req, res, next) => {
   try {
-    const { supplierId, accountId, amount, note, paymentDate, purchaseId } = req.body || {}
+    const { supplierId, accountId, amount, note, paymentDate, purchaseId } = req.body
     const supabase = supabaseForUser(req.accessToken)
     const { data, error } = await supabase.rpc('admin_pay_bill', {
       p_company_id: req.params.id,

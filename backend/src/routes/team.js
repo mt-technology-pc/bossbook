@@ -1,12 +1,37 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireTeamManager } from '../middleware/requireTeamManager.js'
+import { validateBody } from '../middleware/validate.js'
 import { supabaseAdmin } from '../lib/supabaseAdmin.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
 
 const router = Router()
 
 router.use(requireAuth)
+
+// A bare uuid() check, not .uuid() alone — an empty string or missing
+// value should mean "no role", not a validation error, since the UI's
+// "No role assigned" option sends exactly that.
+const roleIdField = z.string().uuid().nullable().optional()
+
+const addUserSchema = z.object({
+  email: z.string().trim().toLowerCase().email(),
+  password: z.string().min(8, 'Temporary password must be at least 8 characters'),
+  roleId: roleIdField,
+})
+
+const setUserRoleSchema = z.object({ roleId: roleIdField })
+
+const roleSchema = z.object({
+  name: z.string().trim().min(1, 'Role name is required').max(100),
+  fullAccess: z.boolean().optional().default(false),
+  pageKeys: z.array(z.string()).optional().default([]),
+})
+
+// PATCH allows a partial rename (name omitted = keep existing) — mirrors
+// the route's pre-existing behavior of only sending `name` when provided.
+const updateRoleSchema = roleSchema.partial({ name: true })
 
 async function getCallerCompanyId(accessToken) {
   const supabase = supabaseForUser(accessToken)
@@ -101,18 +126,12 @@ router.get('/roles', async (req, res, next) => {
 // user-creation route (backend/src/routes/admin.js), scoped to the caller's
 // own company instead of a URL param, and can only ever create staff (never
 // owner) — promoting someone to owner stays a platform-admin-only action.
-router.post('/users', requireTeamManager, async (req, res, next) => {
+router.post('/users', requireTeamManager, validateBody(addUserSchema), async (req, res, next) => {
   try {
     const companyId = await getCallerCompanyId(req.accessToken)
     if (!companyId) return res.status(400).json({ error: 'No company found for this account' })
 
-    const { email, password, roleId } = req.body || {}
-    if (!email || !password) {
-      return res.status(400).json({ error: 'email and password are required' })
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Temporary password must be at least 8 characters' })
-    }
+    const { email, password, roleId } = req.body
     if (roleId) {
       const { data: role } = await supabaseAdmin
         .from('roles').select('id').eq('id', roleId).eq('company_id', companyId).maybeSingle()
@@ -162,11 +181,11 @@ router.post('/users', requireTeamManager, async (req, res, next) => {
 
 // Reassigns a staff member's role. No-ops (400s) on an owner row — an
 // owner's access never depends on role_id.
-router.patch('/users/:userId', requireTeamManager, async (req, res, next) => {
+router.patch('/users/:userId', requireTeamManager, validateBody(setUserRoleSchema), async (req, res, next) => {
   try {
     const companyId = await getCallerCompanyId(req.accessToken)
     const { userId } = req.params
-    const { roleId } = req.body || {}
+    const { roleId } = req.body
 
     const { data: membership, error: membershipError } = await supabaseAdmin
       .from('company_users').select('role').eq('company_id', companyId).eq('user_id', userId).maybeSingle()
@@ -226,15 +245,14 @@ router.delete('/users/:userId', requireTeamManager, async (req, res, next) => {
 // supabaseAdmin) — the roles/role_permissions RLS policies (migration 007)
 // already enforce is_team_manager() + company scoping, so this is a real
 // second layer, not just the middleware above.
-router.post('/roles', requireTeamManager, async (req, res, next) => {
+router.post('/roles', requireTeamManager, validateBody(roleSchema), async (req, res, next) => {
   try {
-    const { name, fullAccess, pageKeys } = req.body || {}
-    if (!name?.trim()) return res.status(400).json({ error: 'Role name is required' })
+    const { name, fullAccess, pageKeys } = req.body
 
     const supabase = supabaseForUser(req.accessToken)
     const { data: role, error: roleError } = await supabase
       .from('roles')
-      .insert({ name: name.trim(), full_access: !!fullAccess })
+      .insert({ name, full_access: fullAccess })
       .select()
       .single()
     if (roleError) {
@@ -255,10 +273,10 @@ router.post('/roles', requireTeamManager, async (req, res, next) => {
   }
 })
 
-router.patch('/roles/:id', requireTeamManager, async (req, res, next) => {
+router.patch('/roles/:id', requireTeamManager, validateBody(updateRoleSchema), async (req, res, next) => {
   try {
     const { id } = req.params
-    const { name, fullAccess, pageKeys } = req.body || {}
+    const { name, fullAccess, pageKeys } = req.body
     const supabase = supabaseForUser(req.accessToken)
 
     const { data: existing, error: fetchError } = await supabase
@@ -269,7 +287,7 @@ router.patch('/roles/:id', requireTeamManager, async (req, res, next) => {
 
     const { error: updateError } = await supabase
       .from('roles')
-      .update({ name: name?.trim(), full_access: !!fullAccess })
+      .update({ name, full_access: fullAccess })
       .eq('id', id)
     if (updateError) {
       const duplicate = updateError.code === '23505'

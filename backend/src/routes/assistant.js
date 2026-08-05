@@ -1,6 +1,8 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import rateLimit from 'express-rate-limit'
 import { requireAuth } from '../middleware/requireAuth.js'
+import { validateBody } from '../middleware/validate.js'
 import { supabaseForUser } from '../lib/supabaseForUser.js'
 import { ai, AI_MODEL, AI_MODEL_FALLBACKS } from '../lib/aiClient.js'
 import { toolDeclarations, executeTool } from '../lib/assistantTools.js'
@@ -12,6 +14,25 @@ const router = Router()
 const MAX_TOOL_ROUNDS = 8
 const MAX_MESSAGES = 50
 const MAX_TOTAL_CHARS = 20000
+
+// text required as a real string (not just "truthy") matters here beyond
+// the usual 400-vs-crash reasoning: chatMessages below does `content:
+// m.text` with no defensive coercion, so a missing/non-string text field
+// previously reached the OpenAI SDK as-is rather than failing cleanly here.
+const chatSchema = z.object({
+  messages: z.array(z.object({
+    role: z.string().optional(),
+    text: z.string(),
+    createdAt: z.string().optional(),
+  }))
+    .min(1, 'messages must be a non-empty array')
+    .max(MAX_MESSAGES, `Conversation is too long (max ${MAX_MESSAGES} messages) — start a new chat.`)
+    .refine(
+      (msgs) => msgs.reduce((sum, m) => sum + m.text.length, 0) <= MAX_TOTAL_CHARS,
+      { message: 'Conversation is too long — start a new chat.' },
+    ),
+  conversationId: z.string().optional().nullable(),
+})
 
 // Stricter than the app-wide limiter (index.js) — this endpoint calls a
 // paid LLM, and can loop up to MAX_TOOL_ROUNDS times per single request,
@@ -229,19 +250,8 @@ router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
   res.json({ messages: data })
 })
 
-router.post('/chat', chatLimiter, requireAuth, async (req, res) => {
+router.post('/chat', chatLimiter, requireAuth, validateBody(chatSchema), async (req, res) => {
   const { messages, conversationId } = req.body
-
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return res.status(400).json({ error: 'messages must be a non-empty array' })
-  }
-  if (messages.length > MAX_MESSAGES) {
-    return res.status(400).json({ error: `Conversation is too long (max ${MAX_MESSAGES} messages) — start a new chat.` })
-  }
-  const totalChars = messages.reduce((sum, m) => sum + String(m?.text || '').length, 0)
-  if (totalChars > MAX_TOTAL_CHARS) {
-    return res.status(400).json({ error: 'Conversation is too long — start a new chat.' })
-  }
 
   const supabase = supabaseForUser(req.accessToken)
 

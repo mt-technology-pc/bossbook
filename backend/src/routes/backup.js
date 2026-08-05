@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import { z } from 'zod'
 import multer from 'multer'
 import { ZipArchive } from 'archiver'
 import { requireAuth } from '../middleware/requireAuth.js'
@@ -10,6 +11,18 @@ import { parseBackupSql, parseBackupWorkbook } from '../lib/parseBackupFile.js'
 
 const router = Router()
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } })
+
+// Not a validateBody() middleware — this route takes a multipart file
+// upload, not a JSON body; the "payload" to check only exists after
+// parsing. parseBackupSql/parseBackupWorkbook already reject unknown
+// table names and unparseable rows on their own, so this is a defense-in-
+// depth shape check (every value is an array of plain row objects) before
+// the parsed result reaches the restore_company_backup RPC, not the
+// primary line of defense.
+const backupPayloadSchema = z.record(
+  z.enum(BACKUP_TABLES),
+  z.array(z.record(z.string(), z.unknown())),
+)
 
 router.get('/download', requireAuth, async (req, res, next) => {
   try {
@@ -72,6 +85,12 @@ router.post('/import', requireAuth, upload.single('file'), async (req, res, next
     const totalRows = Object.values(payload).reduce((sum, rows) => sum + rows.length, 0)
     if (totalRows === 0) {
       res.status(400).json({ error: 'This backup file has no data to restore.' })
+      return
+    }
+
+    const shapeCheck = backupPayloadSchema.safeParse(payload)
+    if (!shapeCheck.success) {
+      res.status(400).json({ error: 'This backup file is malformed — could not verify its structure.' })
       return
     }
 
