@@ -9,6 +9,7 @@ import meRouter from './routes/me.js'
 import assistantRouter from './routes/assistant.js'
 import backupRouter from './routes/backup.js'
 import teamRouter from './routes/team.js'
+import cronRouter from './routes/cron.js'
 import adminRouter from './routes/admin.js'
 import emailRouter from './routes/email.js'
 import smsRouter from './routes/sms.js'
@@ -79,6 +80,7 @@ app.use('/api/me', meRouter)
 app.use('/api/assistant', assistantRouter)
 app.use('/api/backup', backupRouter)
 app.use('/api/team', teamRouter)
+app.use('/api/cron', cronRouter)
 app.use('/api/admin', adminRouter)
 app.use('/api/email', emailRouter)
 app.use('/api/sms', smsRouter)

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   LayoutDashboard, Package, Receipt, ScanLine, BarChart3, Settings, Contact,
-  Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown,
+  Truck, ShoppingBag, Wallet, Menu, X, LogOut, ChevronDown, Bell,
   BanknoteArrowDown, BanknoteArrowUp, Banknote, UserRound, DatabaseBackup, BookOpen,
   RotateCcw, PackageX, LibraryBig, Users,
 } from 'lucide-react'
@@ -15,6 +15,24 @@ import { useAuth } from '../context/AuthContext'
 import { useCompany } from '../hooks/useCompany'
 import { useBrandTheme, resetBrandTheme } from '../hooks/useBrandTheme'
 import { useMyPermissions } from '../hooks/useMyPermissions'
+import { useNotifications } from '../hooks/useNotifications'
+
+const NOTIFICATION_SEVERITY_DOT = {
+  info: 'bg-sky-500',
+  warning: 'bg-amber-500',
+  critical: 'bg-red-500',
+}
+
+function timeAgo(dateStr) {
+  const seconds = Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000))
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
 // `key` matches a page_key a role's permissions are granted against (see
 // supabase/migrations/007_team_roles_permissions.sql and Team.jsx's role
@@ -58,9 +76,11 @@ export default function DashboardLayout() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [appsOpen, setAppsOpen] = useState(false)
   const [moneyOpen, setMoneyOpen] = useState(false)
+  const [notifOpen, setNotifOpen] = useState(false)
   const { user, fullName, signOut } = useAuth()
   const { company } = useCompany()
   const { canAccess } = useMyPermissions()
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -74,6 +94,7 @@ export default function DashboardLayout() {
     setOpen(false)
     setAppsOpen(false)
     setMoneyOpen(false)
+    setNotifOpen(false)
   }, [location.pathname])
 
   const displayName = fullName || user?.email?.split('@')[0] || 'there'
@@ -205,7 +226,22 @@ export default function DashboardLayout() {
             </NavLink>
             )}
             <button
-              onClick={() => { setMoneyOpen((m) => !m); setAppsOpen(false); setMenuOpen(false) }}
+              onClick={() => { setNotifOpen((n) => !n); setAppsOpen(false); setMoneyOpen(false); setMenuOpen(false) }}
+              aria-label="Notifications"
+              title="Notifications"
+              className={`relative flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                notifOpen ? 'bg-cream-200 text-clay-600' : 'text-ink-500 hover:bg-cream-200'
+              }`}
+            >
+              <Bell size={18} />
+              {unreadCount > 0 && (
+                <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold leading-none text-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { setMoneyOpen((m) => !m); setAppsOpen(false); setMenuOpen(false); setNotifOpen(false) }}
               aria-label="Receivables and payables"
               title="Receivables and payables"
               className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
@@ -215,7 +251,7 @@ export default function DashboardLayout() {
               <Banknote size={18} />
             </button>
             <button
-              onClick={() => { setAppsOpen((a) => !a); setMoneyOpen(false); setMenuOpen(false) }}
+              onClick={() => { setAppsOpen((a) => !a); setMoneyOpen(false); setMenuOpen(false); setNotifOpen(false) }}
               aria-label="Apps"
               title="Apps"
               className={`relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-full transition-colors ${
@@ -237,7 +273,7 @@ export default function DashboardLayout() {
             </button>
             <div className="relative ml-2">
               <button
-                onClick={() => { setMenuOpen((m) => !m); setAppsOpen(false); setMoneyOpen(false) }}
+                onClick={() => { setMenuOpen((m) => !m); setAppsOpen(false); setMoneyOpen(false); setNotifOpen(false) }}
                 className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-3 transition-colors hover:bg-cream-200"
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-clay-400 to-clay-600 text-sm font-semibold text-cream-50">
@@ -343,6 +379,52 @@ export default function DashboardLayout() {
                     </span>
                   </NavLink>
                 ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {notifOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-4 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-ink-400/15 bg-cream-50 shadow-xl sm:right-6"
+              >
+                <div className="flex items-center justify-between border-b border-ink-400/10 px-3.5 py-2.5">
+                  <p className="text-sm font-medium text-ink-900">Notifications</p>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={() => markAllRead()}
+                      className="text-xs font-medium text-clay-600 hover:text-clay-700"
+                    >
+                      Mark all read
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-96 overflow-y-auto p-2">
+                  {notifications.length === 0 ? (
+                    <p className="px-2 py-6 text-center text-sm text-ink-400">No notifications yet</p>
+                  ) : (
+                    notifications.map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => !n.is_read && markRead(n.id)}
+                        className={`flex w-full items-start gap-2.5 rounded-xl p-2.5 text-left transition-colors hover:bg-cream-200 ${
+                          n.is_read ? '' : 'bg-clay-500/5'
+                        }`}
+                      >
+                        <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.is_read ? 'bg-transparent' : NOTIFICATION_SEVERITY_DOT[n.severity] || 'bg-ink-400'}`} />
+                        <span className="min-w-0">
+                          <p className="truncate text-sm font-medium text-ink-900">{n.title}</p>
+                          <p className="line-clamp-2 text-xs text-ink-500">{n.message}</p>
+                          <p className="mt-0.5 text-[11px] text-ink-400">{timeAgo(n.created_at)}</p>
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

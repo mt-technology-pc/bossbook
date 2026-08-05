@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Palette, ImagePlus, Trash2, RotateCcw, AlertCircle, Check, ShieldAlert, Building2, Mail,
-  MessageSquare, Keyboard,
+  MessageSquare, Keyboard, Bell,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { formatCurrency } from '../../lib/currency'
@@ -10,6 +10,7 @@ import { useCompany } from '../../hooks/useCompany'
 import { useCompanyRole } from '../../hooks/useCompanyRole'
 import { useSmtpSettings } from '../../hooks/useSmtpSettings'
 import { useSmsSettings } from '../../hooks/useSmsSettings'
+import { useNotificationSettings } from '../../hooks/useNotificationSettings'
 import { useQuickSwitchShortcut, DEFAULT_SHORTCUT } from '../../hooks/useQuickSwitchShortcut'
 import { deriveShades, isValidHex, getContrastRatio } from '../../lib/brandColor'
 import Button from '../../components/ui/Button'
@@ -24,6 +25,7 @@ export default function Settings() {
   const { isOwner, loading: roleLoading } = useCompanyRole()
   const { settings: smtpSettings, loading: smtpLoading, saveSettings: saveSmtpSettings } = useSmtpSettings()
   const { settings: smsSettings, loading: smsLoading, saveSettings: saveSmsSettings } = useSmsSettings()
+  const { settings: notifSettings, loading: notifLoading, saveSettings: saveNotifSettings } = useNotificationSettings()
   const [quickSwitchShortcut, setQuickSwitchShortcut] = useQuickSwitchShortcut()
   const isMac = /Mac/i.test(navigator.platform)
 
@@ -59,6 +61,17 @@ export default function Settings() {
   const [smsSaving, setSmsSaving] = useState(false)
   const [smsSaved, setSmsSaved] = useState(false)
 
+  const [notifInitialized, setNotifInitialized] = useState(false)
+  const [notifThresholdBank, setNotifThresholdBank] = useState('')
+  const [notifThresholdCash, setNotifThresholdCash] = useState('')
+  const [notifSwingPercent, setNotifSwingPercent] = useState('')
+  const [notifDaysBefore, setNotifDaysBefore] = useState('3')
+  const [notifDigestFrequency, setNotifDigestFrequency] = useState('daily')
+  const [notifChannelEmail, setNotifChannelEmail] = useState(false)
+  const [notifError, setNotifError] = useState(null)
+  const [notifSaving, setNotifSaving] = useState(false)
+  const [notifSaved, setNotifSaved] = useState(false)
+
   // Sync the draft from the saved company exactly once, when it first
   // loads — not on every refetch, so a Save-triggered refetch mid-edit
   // can't clobber unsaved changes the user is still looking at.
@@ -90,6 +103,18 @@ export default function Settings() {
       setSmsInitialized(true)
     }
   }, [smsLoading, smsSettings, smsInitialized])
+
+  useEffect(() => {
+    if (!notifLoading && !notifInitialized) {
+      setNotifThresholdBank(notifSettings?.threshold_bank_balance ?? '')
+      setNotifThresholdCash(notifSettings?.threshold_cash_balance ?? '')
+      setNotifSwingPercent(notifSettings?.balance_swing_percent ?? '')
+      setNotifDaysBefore(String(notifSettings?.days_before_due_alert ?? 3))
+      setNotifDigestFrequency(notifSettings?.digest_frequency || 'daily')
+      setNotifChannelEmail((notifSettings?.channels || []).includes('email'))
+      setNotifInitialized(true)
+    }
+  }, [notifLoading, notifSettings, notifInitialized])
 
   const isDirty =
     logoFile !== null ||
@@ -314,6 +339,47 @@ export default function Settings() {
     setSmsApiKey('')
     setSmsSaved(true)
     setTimeout(() => setSmsSaved(false), 2500)
+  }
+
+  const isNotifDirty = notifInitialized && (
+    notifThresholdBank !== (notifSettings?.threshold_bank_balance ?? '') ||
+    notifThresholdCash !== (notifSettings?.threshold_cash_balance ?? '') ||
+    notifSwingPercent !== (notifSettings?.balance_swing_percent ?? '') ||
+    notifDaysBefore !== String(notifSettings?.days_before_due_alert ?? 3) ||
+    notifDigestFrequency !== (notifSettings?.digest_frequency || 'daily') ||
+    notifChannelEmail !== (notifSettings?.channels || []).includes('email')
+  )
+
+  const handleNotifDiscard = () => {
+    setNotifThresholdBank(notifSettings?.threshold_bank_balance ?? '')
+    setNotifThresholdCash(notifSettings?.threshold_cash_balance ?? '')
+    setNotifSwingPercent(notifSettings?.balance_swing_percent ?? '')
+    setNotifDaysBefore(String(notifSettings?.days_before_due_alert ?? 3))
+    setNotifDigestFrequency(notifSettings?.digest_frequency || 'daily')
+    setNotifChannelEmail((notifSettings?.channels || []).includes('email'))
+    setNotifError(null)
+  }
+
+  const handleNotifSave = async () => {
+    if (!company) return
+    setNotifSaving(true)
+    setNotifError(null)
+    const { error: saveError } = await saveNotifSettings({
+      companyId: company.id,
+      threshold_bank_balance: notifThresholdBank === '' ? null : Number(notifThresholdBank),
+      threshold_cash_balance: notifThresholdCash === '' ? null : Number(notifThresholdCash),
+      balance_swing_percent: notifSwingPercent === '' ? null : Number(notifSwingPercent),
+      days_before_due_alert: Number(notifDaysBefore) || 3,
+      digest_frequency: notifDigestFrequency,
+      channels: notifChannelEmail ? ['in_app', 'email'] : ['in_app'],
+    })
+    setNotifSaving(false)
+    if (saveError) {
+      setNotifError(saveError.message)
+      return
+    }
+    setNotifSaved(true)
+    setTimeout(() => setNotifSaved(false), 2500)
   }
 
   if (!company || roleLoading) {
@@ -645,6 +711,100 @@ export default function Settings() {
                   {smsSaving ? 'Saving…' : smsSaved ? <><Check size={14} /> Saved</> : 'Save SMS settings'}
                 </Button>
                 <Button type="button" variant="ghost" size="sm" disabled={!isSmsDirty || smsSaving} onClick={handleSmsDiscard}>
+                  Discard
+                </Button>
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-2xl border border-ink-400/15 bg-cream-50 p-5 sm:p-6">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
+                <Bell size={16} />
+              </span>
+              <h2 className="font-heading text-base font-semibold text-ink-900">Notifications</h2>
+            </div>
+            <p className="mt-1 text-xs text-ink-400">
+              Alerts for low balances and bills/invoices due — a daily check, not real-time. Leave a threshold blank to skip that alert.
+            </p>
+
+            {notifError && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3.5 py-2.5 text-sm text-red-600">
+                <AlertCircle size={16} className="mt-0.5 shrink-0" />
+                {notifError}
+              </div>
+            )}
+
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <Field
+                label="Bank balance threshold"
+                type="number"
+                min="0"
+                step="0.01"
+                value={notifThresholdBank}
+                onChange={(e) => setNotifThresholdBank(e.target.value)}
+                disabled={!isOwner}
+                placeholder="e.g. 10000"
+              />
+              <Field
+                label="Cash balance threshold"
+                type="number"
+                min="0"
+                step="0.01"
+                value={notifThresholdCash}
+                onChange={(e) => setNotifThresholdCash(e.target.value)}
+                disabled={!isOwner}
+                placeholder="e.g. 5000"
+              />
+              <Field
+                label="Balance swing alert (%)"
+                type="number"
+                min="0"
+                step="1"
+                value={notifSwingPercent}
+                onChange={(e) => setNotifSwingPercent(e.target.value)}
+                disabled={!isOwner}
+                placeholder="Optional"
+              />
+              <Field
+                label="Days before due to alert"
+                type="number"
+                min="0"
+                step="1"
+                value={notifDaysBefore}
+                onChange={(e) => setNotifDaysBefore(e.target.value)}
+                disabled={!isOwner}
+              />
+              <label className="block">
+                <span className="text-xs font-medium text-ink-500">Digest frequency</span>
+                <select
+                  value={notifDigestFrequency}
+                  onChange={(e) => setNotifDigestFrequency(e.target.value)}
+                  disabled={!isOwner}
+                  className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20 disabled:opacity-50"
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                </select>
+              </label>
+              <label className="flex items-center gap-2.5 self-end pb-2.5">
+                <input
+                  type="checkbox"
+                  checked={notifChannelEmail}
+                  onChange={(e) => setNotifChannelEmail(e.target.checked)}
+                  disabled={!isOwner}
+                  className="h-4 w-4 rounded border-ink-400/30 text-clay-500 focus:ring-clay-500"
+                />
+                <span className="text-sm text-ink-700">Also email the owner {smtpSettings ? '' : '(set up Email above first)'}</span>
+              </label>
+            </div>
+
+            {isOwner && (
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <Button type="button" variant="primary" size="sm" disabled={!isNotifDirty || notifSaving} onClick={handleNotifSave}>
+                  {notifSaving ? 'Saving…' : notifSaved ? <><Check size={14} /> Saved</> : 'Save notification settings'}
+                </Button>
+                <Button type="button" variant="ghost" size="sm" disabled={!isNotifDirty || notifSaving} onClick={handleNotifDiscard}>
                   Discard
                 </Button>
               </div>
