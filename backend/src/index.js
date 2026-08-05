@@ -16,10 +16,16 @@ import googleDriveRouter from './routes/googleDrive.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
-// Stripped of any trailing slash: browsers send the Origin header without
-// one, so a trailing slash in the env var (an easy copy-paste mistake)
-// would make cors()'s exact-match check reject every real request.
-const allowedOrigin = (process.env.CLIENT_ORIGIN || 'http://localhost:5173').replace(/\/+$/, '')
+// CLIENT_ORIGIN is comma-separated — this app is legitimately served from
+// more than one live frontend origin at once (multiple Vercel deployments
+// + a custom domain). Each is stripped of any trailing slash: browsers
+// send the Origin header without one, so a trailing slash in the env var
+// (an easy copy-paste mistake) would make an exact-match check reject
+// every real request from that origin.
+const allowedOrigins = (process.env.CLIENT_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean)
 
 // Vercel (and most PaaS hosts) sit in front of this app as a reverse
 // proxy, setting X-Forwarded-For to the real client IP. Without this,
@@ -34,7 +40,14 @@ if (process.env.VERCEL) {
 // X-Content-Type-Options, disabling X-Powered-By, etc.) apply cleanly
 // with no route-specific tuning needed.
 app.use(helmet())
-app.use(cors({ origin: allowedOrigin }))
+app.use(cors({
+  origin(origin, callback) {
+    // No Origin header at all (curl, server-to-server, same-origin) — let
+    // it through; there's nothing to check against.
+    if (!origin) return callback(null, true)
+    callback(null, allowedOrigins.includes(origin))
+  },
+}))
 // 10mb (not the default ~100kb): invoice/receipt PDFs are uploaded as
 // base64 JSON for the email-sending route, which is meaningfully bigger
 // than every other request body this API handles.
