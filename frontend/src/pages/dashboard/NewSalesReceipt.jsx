@@ -25,6 +25,7 @@ import PrintFormatToggle from '../../components/sales/PrintFormatToggle'
 import PrintLetterheadModal from '../../components/sales/PrintLetterheadModal'
 import EmailInvoiceModal from '../../components/sales/EmailInvoiceModal'
 import SmsInvoiceModal from '../../components/sales/SmsInvoiceModal'
+import WalkInCustomerModal from '../../components/sales/WalkInCustomerModal'
 import FormSkeleton from '../../components/ui/FormSkeleton'
 import Toast from '../../components/ui/Toast'
 
@@ -37,7 +38,7 @@ export default function NewSalesReceipt() {
   const location = useLocation()
   const { id } = useParams()
   const isEdit = Boolean(id)
-  const { sales, createSale, updateSale } = useSales()
+  const { sales, createSale, updateSale, attachCustomer } = useSales()
   const { products, loading: productsLoading, refetch: refetchProducts } = useProducts()
   const { customers, addCustomer } = useCustomers()
   const { balanceFor: customerBalanceFor, refetch: refetchCustomerBalances } = useCustomerBalances()
@@ -48,6 +49,8 @@ export default function NewSalesReceipt() {
   const [printFormat, setPrintFormat] = usePrintFormat()
   const [emailModalOpen, setEmailModalOpen] = useState(false)
   const [smsModalOpen, setSmsModalOpen] = useState(false)
+  const [walkInModalOpen, setWalkInModalOpen] = useState(false)
+  const [walkInChannel, setWalkInChannel] = useState('sms')
   // Not persisted like printFormat — asked fresh every print (Formal
   // format only) rather than silently remembered, since the right choice
   // can differ print to print (customer-facing copy vs. internal reprint).
@@ -168,6 +171,23 @@ export default function NewSalesReceipt() {
       return null
     }
     return { id: data.id }
+  }
+
+  // Walk-in capture: create the customer, attach them to this already-
+  // saved receipt (pure relabeling — see attach_customer_to_sale), then
+  // hand off to whichever channel's modal was actually requested. Errors
+  // surface inline in WalkInCustomerModal via its own { error } handling.
+  const handleWalkInSubmit = async (payload) => {
+    const { data: newCustomer, error: createError } = await addCustomer(payload)
+    if (createError) return { error: createError }
+
+    const existingSale = findSaleByRouteId(id)
+    const { error: attachError } = await attachCustomer(existingSale?.id, newCustomer.id)
+    if (attachError) return { error: attachError }
+
+    if (walkInChannel === 'sms') setSmsModalOpen(true)
+    else setEmailModalOpen(true)
+    return { data: true }
   }
 
   const handleCreateSalesRep = async (name) => {
@@ -371,18 +391,32 @@ export default function NewSalesReceipt() {
                 <Printer size={18} />
               </button>
               <button
-                onClick={() => setEmailModalOpen(true)}
-                disabled={!documentData.customer?.email}
-                title={documentData.customer?.email ? 'Email to customer' : 'Add an email address for this customer first'}
+                onClick={() => {
+                  if (documentData.customer) setEmailModalOpen(true)
+                  else { setWalkInChannel('email'); setWalkInModalOpen(true) }
+                }}
+                disabled={documentData.customer && !documentData.customer.email}
+                title={
+                  documentData.customer
+                    ? (documentData.customer.email ? 'Email to customer' : 'Add an email address for this customer first')
+                    : 'Save this walk-in customer’s email to send them the receipt'
+                }
                 aria-label="Email to customer"
                 className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 disabled:opacity-50"
               >
                 <Mail size={18} />
               </button>
               <button
-                onClick={() => setSmsModalOpen(true)}
-                disabled={!documentData.customer?.phone}
-                title={documentData.customer?.phone ? 'Send SMS to customer' : 'Add a phone number for this customer first'}
+                onClick={() => {
+                  if (documentData.customer) setSmsModalOpen(true)
+                  else { setWalkInChannel('sms'); setWalkInModalOpen(true) }
+                }}
+                disabled={documentData.customer && !documentData.customer.phone}
+                title={
+                  documentData.customer
+                    ? (documentData.customer.phone ? 'Send SMS to customer' : 'Add a phone number for this customer first')
+                    : 'Save this walk-in customer’s phone number to text them the receipt'
+                }
                 aria-label="Send SMS to customer"
                 className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 disabled:opacity-50"
               >
@@ -578,6 +612,13 @@ export default function NewSalesReceipt() {
       <PrintLetterheadModal open={letterheadPromptOpen} onChoose={handleLetterheadChoice} />
 
       <Toast open={savedToastOpen} message="Receipt saved" onClose={() => setSavedToastOpen(false)} />
+
+      <WalkInCustomerModal
+        open={walkInModalOpen}
+        onClose={() => setWalkInModalOpen(false)}
+        channel={walkInChannel}
+        onSubmit={handleWalkInSubmit}
+      />
 
       <EmailInvoiceModal
         open={emailModalOpen}

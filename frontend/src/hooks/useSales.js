@@ -79,5 +79,24 @@ export function useSales() {
     return { error: rpcError }
   }
 
-  return { sales, loading, error, createSale, updateSale, deleteSale, refetch: fetchSales }
+  // Relabels an already-saved sale with a customer — for attaching a
+  // just-created walk-in customer after the fact. Pure relabeling (a
+  // receipt's charge+payment already net to zero regardless of whose
+  // name is on it), so no other fields change. A dedicated RPC because
+  // public.sales has no UPDATE RLS policy — every sales mutation in this
+  // app goes through a security-definer RPC instead.
+  const attachCustomer = async (saleId, customerId) => {
+    if (!user) return { error: new Error('Not signed in') }
+
+    const { error: rpcError } = await supabase.rpc('attach_customer_to_sale', {
+      p_sale_id: saleId,
+      p_customer_id: customerId,
+    })
+    if (!rpcError) await fetchSales()
+    return { error: rpcError }
+  }
+
+  return {
+    sales, loading, error, createSale, updateSale, deleteSale, attachCustomer, refetch: fetchSales,
+  }
 }
