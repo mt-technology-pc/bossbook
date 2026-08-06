@@ -1,39 +1,29 @@
-import { useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Plus, Trash2, Copy } from 'lucide-react'
+import { Plus, Trash2, Copy, ScanLine } from 'lucide-react'
 import { formatCurrency } from '../../lib/currency'
 import { newSaleLine } from '../../lib/saleLines'
 import SearchSelect from '../ui/SearchSelect'
-import SerialSlotGrid from './SerialSlotGrid'
+import SaleImeiModal from './SaleImeiModal'
 
 export default function SaleLineItemsEditor({
-  lines, setLines, products, availableUnits, priceLabel = 'Rate', stockAdjustments = {}, onAllLinesComplete,
+  lines, setLines, products, availableUnits, priceLabel = 'Rate', stockAdjustments = {},
 }) {
   const getProduct = (id) => products.find((p) => p.id === id)
 
-  // Focuses the newly-selected product's first scan slot without making it
-  // part of line state (must never survive a duplicateLine spread or reach
-  // buildSaleItems). Cleared after every render — child mount effects run
-  // first, so SerialSlotGrid always sees it before it's gone.
-  const autoFocusKeyRef = useRef(null)
-  useEffect(() => {
-    autoFocusKeyRef.current = null
-  })
+  const [imeiModalKey, setImeiModalKey] = useState(null)
 
-  // line.key -> SerialSlotGrid imperative handle, so a completed line can
-  // hand focus to the next serialized line (or the page's submit button).
-  const lineRefs = useRef(new Map())
-  const handleLineComplete = (fromKey) => {
-    const idx = lines.findIndex((l) => l.key === fromKey)
-    for (let i = idx + 1; i < lines.length; i += 1) {
-      const next = lines[i]
-      const nextProduct = getProduct(next.productId)
-      if (nextProduct?.tracks_serial && Number(next.quantity) > 0) {
-        lineRefs.current.get(next.key)?.focusFirstEmptySlot()
-        return
-      }
+  // Units already picked on this sale's OTHER lines — never offered again
+  // on this one, so the same physical unit can't end up on two lines of
+  // the same draft (nothing in the DB stops that on its own: every
+  // not-yet-saved unit is still just sitting at status 'in_stock').
+  const usedElsewhereFor = (key) => {
+    const s = new Set()
+    for (const l of lines) {
+      if (l.key === key) continue
+      for (const id of l.unitIds) s.add(id)
     }
-    onAllLinesComplete?.()
+    return s
   }
 
   const productOptions = products.map((p) => ({
@@ -55,7 +45,6 @@ export default function SaleLineItemsEditor({
             if (!next.unitPrice) next.unitPrice = String(product.price)
             if (!next.quantity) next.quantity = '1'
           }
-          autoFocusKeyRef.current = key
         }
         if (product?.tracks_serial) {
           const qty = Math.max(0, Number(next.quantity) || 0)
@@ -108,11 +97,6 @@ export default function SaleLineItemsEditor({
           {lines.map((line) => {
             const product = getProduct(line.productId)
             const qty = Math.max(0, Number(line.quantity) || 0)
-            const usedElsewhere = new Set()
-            for (const l of lines) {
-              if (l.key === line.key) continue
-              for (const id of l.unitIds) usedElsewhere.add(id)
-            }
 
             return (
               <motion.div
@@ -127,7 +111,15 @@ export default function SaleLineItemsEditor({
                   <div className="col-span-2 sm:col-span-1">
                     <SearchSelect
                       value={line.productId}
-                      onChange={(val) => updateLine(line.key, { productId: val })}
+                      onChange={(val) => {
+                        updateLine(line.key, { productId: val })
+                        // Quantity defaults to 1 the moment a product is
+                        // picked (see updateLine above) — for a serialized
+                        // product that alone is enough to need a unit
+                        // selected, so prompt immediately rather than
+                        // waiting on the qty field ever being touched.
+                        if (getProduct(val)?.tracks_serial) setImeiModalKey(line.key)
+                      }}
                       options={productOptions}
                       placeholder="Select a product…"
                     />
@@ -138,6 +130,11 @@ export default function SaleLineItemsEditor({
                     step="1"
                     value={line.quantity}
                     onChange={(e) => updateLine(line.key, { quantity: e.target.value })}
+                    onBlur={() => {
+                      if (product?.tracks_serial && Number(line.quantity) > 0) {
+                        setImeiModalKey(line.key)
+                      }
+                    }}
                     placeholder="Qty"
                     className="rounded-lg border border-ink-400/20 bg-cream-100 px-2.5 py-2 text-sm text-ink-900 outline-none focus:border-clay-500"
                   />
@@ -177,21 +174,19 @@ export default function SaleLineItemsEditor({
                 </div>
 
                 {product?.tracks_serial && qty > 0 && (
-                  <SerialSlotGrid
-                    ref={(el) => {
-                      if (el) lineRefs.current.set(line.key, el)
-                      else lineRefs.current.delete(line.key)
-                    }}
-                    line={line}
-                    product={product}
-                    availableUnits={availableUnits}
-                    stockAdjustment={stockAdjustments[product.id] || 0}
-                    usedElsewhere={usedElsewhere}
-                    autoFocus={autoFocusKeyRef.current === line.key}
-                    onChangeUnitIds={(unitIds) => updateLine(line.key, { unitIds })}
-                    onGrowQuantity={(nextQty) => updateLine(line.key, { quantity: String(nextQty) })}
-                    onLineComplete={() => handleLineComplete(line.key)}
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setImeiModalKey(line.key)}
+                    className={`mt-3 flex w-full items-center gap-1.5 rounded-lg border px-3 py-2 text-[11px] font-medium transition-colors ${
+                      line.unitIds.length > 0
+                        ? 'border-clay-500/20 bg-clay-500/5 text-clay-600 hover:bg-clay-500/10'
+                        : 'border-amber-500/30 bg-amber-500/5 text-amber-600 hover:bg-amber-500/10'
+                    }`}
+                  >
+                    <ScanLine size={12} />
+                    Select serial / IMEI
+                    <span className="ml-auto font-semibold">{line.unitIds.length}/{qty}</span>
+                  </button>
                 )}
               </motion.div>
             )
@@ -206,6 +201,26 @@ export default function SaleLineItemsEditor({
           <Plus size={15} /> Add lines
         </button>
       </div>
+
+      {(() => {
+        const imeiModalLine = lines.find((l) => l.key === imeiModalKey)
+        const imeiModalProduct = imeiModalLine ? getProduct(imeiModalLine.productId) : null
+        const imeiModalUnits = imeiModalProduct
+          ? availableUnits.forProduct(imeiModalProduct.id)
+            .filter((u) => !usedElsewhereFor(imeiModalKey).has(u.id))
+          : []
+        return (
+          <SaleImeiModal
+            open={Boolean(imeiModalLine)}
+            onClose={() => setImeiModalKey(null)}
+            product={imeiModalProduct}
+            units={imeiModalUnits}
+            value={imeiModalLine?.unitIds || []}
+            onChange={(unitIds) => updateLine(imeiModalKey, { unitIds })}
+            requiredCount={Math.max(0, Number(imeiModalLine?.quantity) || 0)}
+          />
+        )
+      })()}
     </div>
   )
 }

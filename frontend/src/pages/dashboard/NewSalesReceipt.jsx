@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { X, Plus, AlertCircle, Receipt, ShoppingBag, Download, Printer, Mail, MessageSquare } from 'lucide-react'
 import { useSales } from '../../hooks/useSales'
@@ -59,7 +59,6 @@ export default function NewSalesReceipt() {
   const [loaded, setLoaded] = useState(!isEdit)
   const [ownUnits, setOwnUnits] = useState([])
   const [originalQuantities, setOriginalQuantities] = useState({})
-  const submitButtonRef = useRef(null)
 
   const getProduct = (id) => products.find((p) => p.id === id)
 
@@ -441,7 +440,6 @@ export default function NewSalesReceipt() {
                   availableUnits={mergedAvailableUnits}
                   priceLabel="Rate"
                   stockAdjustments={originalQuantities}
-                  onAllLinesComplete={() => submitButtonRef.current?.focus()}
                 />
                 <div className="mt-3 flex justify-end">
                   <p className="text-sm text-ink-500">
@@ -482,7 +480,7 @@ export default function NewSalesReceipt() {
             <Button variant="outline" disabled={loading} onClick={() => submit({ andPrint: true })}>
               <Printer size={15} /> {loading ? 'Saving…' : 'Save & Print'}
             </Button>
-            <Button ref={submitButtonRef} variant="primary" disabled={loading} onClick={() => submit({ andNew: false })}>
+            <Button variant="primary" disabled={loading} onClick={() => submit({ andNew: false })}>
               {loading ? 'Saving…' : isEdit ? 'Save changes' : 'Save'}
             </Button>
           </div>
