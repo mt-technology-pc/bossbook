@@ -61,18 +61,43 @@ export default function ImeiPicker({
     }
   }
 
+  // Narrows the visible list as the user types — a real search, not just
+  // an all-or-nothing exact match — so finding the right unit by eye (no
+  // scanner in hand) doesn't mean scrolling a long, unfiltered list.
+  const query = scanInput.trim().toLowerCase()
+  const filteredUnits = query
+    ? units.filter(u => u.serial_number.toLowerCase().includes(query))
+    : units
+
   const handleScan = (e) => {
     if (e.key !== 'Enter' && e.key !== 'Tab') return
     e.preventDefault()
     const serial = scanInput.trim()
     if (!serial) return
-    const match = units.find(u => u.serial_number === serial)
+
+    // A full scan/paste of the exact code is the common case (barcode
+    // scanners send the whole thing at once) — try that first.
+    let match = units.find(u => u.serial_number === serial)
+
+    // Manual typing rarely reaches the full code before Enter feels
+    // natural — if what's typed so far narrows the list (searching, as
+    // above) down to exactly one not-yet-selected unit, treat Enter as
+    // picking that one too, same as a full exact match would.
     if (!match) {
-      setScanError(`IMEI "${serial}" not found in this ${mode === 'credit_note' ? 'invoice' : 'bill'}`)
+      const selectable = filteredUnits.filter(u => !value.includes(u.id))
+      if (selectable.length === 1) match = selectable[0]
+    }
+
+    if (!match) {
+      setScanError(
+        filteredUnits.length > 1
+          ? `Multiple matches for "${serial}" — keep typing or tap the one you want.`
+          : `IMEI "${serial}" not found in this ${mode === 'credit_note' ? 'invoice' : 'bill'}`,
+      )
       return
     }
     if (value.includes(match.id)) {
-      setScanError(`IMEI "${serial}" already selected`)
+      setScanError(`IMEI "${match.serial_number}" already selected`)
       return
     }
     onChange([...value, match.id])
@@ -125,9 +150,13 @@ export default function ImeiPicker({
         <p className="py-2 text-center text-xs text-ink-400">
           No IMEI units found for this {mode === 'credit_note' ? 'invoice' : 'bill'}
         </p>
+      ) : filteredUnits.length === 0 ? (
+        <p className="py-2 text-center text-xs text-ink-400">
+          No match for &quot;{scanInput.trim()}&quot;
+        </p>
       ) : (
         <div className="max-h-40 space-y-0.5 overflow-y-auto">
-          {units.map(u => {
+          {filteredUnits.map(u => {
             const selected = value.includes(u.id)
             return (
               <button
