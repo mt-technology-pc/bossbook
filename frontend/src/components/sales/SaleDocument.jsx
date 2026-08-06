@@ -14,17 +14,30 @@ function formatDate(dateStr) {
 // saleDocumentPdf.js mirrors this same content/order independently, since
 // jsPDF can't render this DOM directly.
 export default function SaleDocument({ data }) {
+  // Defaults to true (full letterhead) for every caller that doesn't pass
+  // this explicitly — the PDF/email/SMS document paths, which this prop
+  // doesn't currently reach — so only the on-screen Print flow's own
+  // choice (see PrintLetterheadModal) can turn it off.
+  const showLetterhead = data.showLetterhead !== false
   return (
     <div className="bg-white p-10 text-ink-900">
       <div className="flex items-start justify-between border-b border-ink-900/15 pb-6">
         <div>
-          <img src={data.companyLogoUrl || logoSrc} alt="BossBooks" className="h-12 w-auto object-contain" />
-          {(data.companyAddress || data.companyEmail || data.companyPhone) && (
-            <div className="mt-2 text-xs text-ink-500">
-              {data.companyAddress && <p>{data.companyAddress}</p>}
-              {data.companyPhone && <p>{data.companyPhone}</p>}
-              {data.companyEmail && <p>{data.companyEmail}</p>}
-            </div>
+          {showLetterhead ? (
+            <>
+              <img src={data.companyLogoUrl || logoSrc} alt="BossBooks" className="h-12 w-auto object-contain" />
+              {(data.companyAddress || data.companyEmail || data.companyPhone) && (
+                <div className="mt-2 text-xs text-ink-500">
+                  {data.companyAddress && <p>{data.companyAddress}</p>}
+                  {data.companyPhone && <p>{data.companyPhone}</p>}
+                  {data.companyEmail && <p>{data.companyEmail}</p>}
+                </div>
+              )}
+            </>
+          ) : (
+            data.companyName && (
+              <p className="font-heading text-lg font-semibold text-ink-900">{data.companyName}</p>
+            )
           )}
         </div>
         <div className="text-right">

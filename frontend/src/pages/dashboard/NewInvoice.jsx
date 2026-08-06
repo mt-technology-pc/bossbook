@@ -22,6 +22,7 @@ import SaleLineItemsEditor from '../../components/sales/SaleLineItemsEditor'
 import SaleDocument from '../../components/sales/SaleDocument'
 import SaleDocumentPos from '../../components/sales/SaleDocumentPos'
 import PrintFormatToggle from '../../components/sales/PrintFormatToggle'
+import PrintLetterheadModal from '../../components/sales/PrintLetterheadModal'
 import EmailInvoiceModal from '../../components/sales/EmailInvoiceModal'
 import SmsInvoiceModal from '../../components/sales/SmsInvoiceModal'
 import FormSkeleton from '../../components/ui/FormSkeleton'
@@ -52,6 +53,12 @@ export default function NewInvoice() {
   const [printFormat, setPrintFormat] = usePrintFormat()
   const [emailModalOpen, setEmailModalOpen] = useState(false)
   const [smsModalOpen, setSmsModalOpen] = useState(false)
+  // Not persisted like printFormat — asked fresh every print (Formal
+  // format only) rather than silently remembered, since the right choice
+  // can differ print to print (customer-facing copy vs. internal reprint).
+  const [letterheadPromptOpen, setLetterheadPromptOpen] = useState(false)
+  const [withLetterhead, setWithLetterhead] = useState(true)
+  const [printTrigger, setPrintTrigger] = useState(0)
 
   const [customerId, setCustomerId] = useState('')
   const [salesRepId, setSalesRepId] = useState('')
@@ -185,17 +192,40 @@ export default function NewInvoice() {
     return buildSaleDocumentData({ sale: existing, customer, products, balance: balances[id], customerBalance, company })
   }, [isEdit, loaded, sales, id, customers, products, balances, customerBalanceFor, company])
 
+  const requestPrint = () => {
+    if (printFormat === 'formal') setLetterheadPromptOpen(true)
+    else window.print()
+  }
+
   // "Save & Print" lands here (edit URL, replace: true) with
   // state.autoPrint set — once the just-saved record's documentData is
-  // actually ready, trigger the browser's print dialog automatically.
+  // actually ready, trigger the same letterhead-choice flow as the Print
+  // button (or print immediately for POS, which has no such choice).
   // Cleared from history state immediately after so navigating back here
   // later (e.g. via browser back) doesn't re-trigger it.
   useEffect(() => {
     if (!location.state?.autoPrint || !documentData) return
-    window.print()
+    requestPrint()
     navigate(location.pathname, { replace: true, state: {} })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.state, documentData])
+
+  // window.print() has to fire after the render that applies the chosen
+  // withLetterhead value has actually committed to the DOM — calling it
+  // synchronously right after setWithLetterhead would still print
+  // whatever was on screen before the choice. Tying it to this effect
+  // (rather than a callback/setTimeout) guarantees that ordering.
+  useEffect(() => {
+    if (printTrigger === 0) return
+    window.print()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printTrigger])
+
+  const handleLetterheadChoice = (choice) => {
+    setWithLetterhead(choice)
+    setLetterheadPromptOpen(false)
+    setPrintTrigger((n) => n + 1)
+  }
 
   const handleDownloadPdf = async () => {
     if (!documentData) return
@@ -290,7 +320,7 @@ export default function NewInvoice() {
                 <Download size={18} />
               </button>
               <button
-                onClick={() => window.print()}
+                onClick={requestPrint}
                 title="Print"
                 aria-label="Print"
                 className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600"
@@ -498,10 +528,12 @@ export default function NewInvoice() {
           <div className="hidden print:block">
             {printFormat === 'pos'
               ? <SaleDocumentPos data={documentData} companyName={company?.name} />
-              : <SaleDocument data={documentData} />}
+              : <SaleDocument data={{ ...documentData, showLetterhead: withLetterhead }} />}
           </div>
         </>
       )}
+
+      <PrintLetterheadModal open={letterheadPromptOpen} onChoose={handleLetterheadChoice} />
 
       <EmailInvoiceModal
         open={emailModalOpen}

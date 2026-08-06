@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -18,6 +18,7 @@ import Button from '../../components/ui/Button'
 import SaleDocument from '../../components/sales/SaleDocument'
 import SaleDocumentPos from '../../components/sales/SaleDocumentPos'
 import PrintFormatToggle from '../../components/sales/PrintFormatToggle'
+import PrintLetterheadModal from '../../components/sales/PrintLetterheadModal'
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
@@ -34,6 +35,9 @@ export default function Sales() {
   const [expanded, setExpanded] = useState(null)
   const [query, setQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [letterheadPromptOpen, setLetterheadPromptOpen] = useState(false)
+  const [withLetterhead, setWithLetterhead] = useState(true)
+  const [printTrigger, setPrintTrigger] = useState(0)
   const navigate = useNavigate()
 
   const filtered = sales.filter((s) => {
@@ -76,7 +80,21 @@ export default function Sales() {
 
   const handlePrintSelected = () => {
     if (selectedDocuments.length === 0) return
+    if (printFormat === 'formal') setLetterheadPromptOpen(true)
+    else window.print()
+  }
+
+  // window.print() has to fire after the render that applies the chosen
+  // withLetterhead value has actually committed to the DOM.
+  useEffect(() => {
+    if (printTrigger === 0) return
     window.print()
+  }, [printTrigger])
+
+  const handleLetterheadChoice = (choice) => {
+    setWithLetterhead(choice)
+    setLetterheadPromptOpen(false)
+    setPrintTrigger((n) => n + 1)
   }
 
   const editPathFor = (s) => (s.type === 'invoice' ? `/dashboard/sales/new-invoice/${s.id}` : `/dashboard/sales/new-receipt/${s.id}`)
@@ -335,12 +353,14 @@ export default function Sales() {
               <div key={i} className={i < selectedDocuments.length - 1 ? 'break-after-page' : ''}>
                 {printFormat === 'pos'
                   ? <SaleDocumentPos data={doc} companyName={company?.name} />
-                  : <SaleDocument data={doc} />}
+                  : <SaleDocument data={{ ...doc, showLetterhead: withLetterhead }} />}
               </div>
             ))}
           </div>
         </>
       )}
+
+      <PrintLetterheadModal open={letterheadPromptOpen} onChoose={handleLetterheadChoice} />
     </div>
   )
 }
