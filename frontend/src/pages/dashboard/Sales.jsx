@@ -97,7 +97,12 @@ export default function Sales() {
     setPrintTrigger((n) => n + 1)
   }
 
-  const editPathFor = (s) => (s.type === 'invoice' ? `/dashboard/sales/new-invoice/${s.id}` : `/dashboard/sales/new-receipt/${s.id}`)
+  // Prefer the human-readable reference over the raw UUID in the URL —
+  // falls back to the id for the rare sale with no reference at all.
+  const editPathFor = (s) => {
+    const urlId = s.reference || s.id
+    return s.type === 'invoice' ? `/dashboard/sales/new-invoice/${urlId}` : `/dashboard/sales/new-receipt/${urlId}`
+  }
 
   const handleDelete = async (e, s) => {
     e.stopPropagation()

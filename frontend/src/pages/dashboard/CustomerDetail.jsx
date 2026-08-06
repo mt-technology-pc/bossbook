@@ -25,9 +25,12 @@ function formatDate(dateStr) {
 function editPathFor(t) {
   if (t.credit_note_id) return `/dashboard/sales/credit-notes/${t.credit_note_id}`
   if (t.sale_id) {
+    // Prefer the human-readable reference over the raw UUID in the URL —
+    // falls back to the id for the rare sale with no reference at all.
+    const urlId = t.sales?.reference || t.sale_id
     return t.sales?.type === 'receipt'
-      ? `/dashboard/sales/new-receipt/${t.sale_id}`
-      : `/dashboard/sales/new-invoice/${t.sale_id}`
+      ? `/dashboard/sales/new-receipt/${urlId}`
+      : `/dashboard/sales/new-invoice/${urlId}`
   }
   return null
 }

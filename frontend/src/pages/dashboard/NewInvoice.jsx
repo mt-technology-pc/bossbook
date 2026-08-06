@@ -75,13 +75,22 @@ export default function NewInvoice() {
 
   const getProduct = (id) => products.find((p) => p.id === id)
 
+  // The URL param is the sale's reference (e.g. "S3") when it has one —
+  // a raw database UUID is a poor thing to put in an address bar — with
+  // the actual id as a fallback, both for sales that somehow have no
+  // reference and for any link/bookmark still pointing at the old
+  // UUID-only URL. Every backend call below still needs the real id
+  // (`existing.id`), never this route param directly.
+  const findSaleByRouteId = (routeId) =>
+    sales.find((s) => s.reference && s.reference === routeId) || sales.find((s) => s.id === routeId)
+
   useEffect(() => {
     if (!isEdit || loaded || sales.length === 0 || productsLoading) return
-    const existing = sales.find((s) => s.id === id)
+    const existing = findSaleByRouteId(id)
     if (!existing) return
 
     let cancelled = false
-    supabase.from('product_units').select('id, product_id, serial_number').eq('sale_id', id)
+    supabase.from('product_units').select('id, product_id, serial_number').eq('sale_id', existing.id)
       .then(({ data }) => {
         if (cancelled) return
         const units = data ?? []
@@ -176,7 +185,7 @@ export default function NewInvoice() {
   // current balance already includes the original (pre-edit) charge, so
   // that gets backed out first to avoid double-counting it.
   const selectedCustomer = customers.find((c) => c.id === customerId) || null
-  const originalInvoiceTotal = isEdit ? Number(sales.find((s) => s.id === id)?.total_amount || 0) : 0
+  const originalInvoiceTotal = isEdit ? Number(findSaleByRouteId(id)?.total_amount || 0) : 0
   const projectedCustomerBalance = customerId
     ? customerBalanceFor(customerId) - originalInvoiceTotal + total
     : 0
@@ -185,11 +194,12 @@ export default function NewInvoice() {
 
   const documentData = useMemo(() => {
     if (!isEdit || !loaded) return null
-    const existing = sales.find((s) => s.id === id)
+    const existing = findSaleByRouteId(id)
     if (!existing) return null
     const customer = customers.find((c) => c.id === existing.customer_id) || null
     const customerBalance = customer ? customerBalanceFor(customer.id) : null
-    return buildSaleDocumentData({ sale: existing, customer, products, balance: balances[id], customerBalance, company })
+    return buildSaleDocumentData({ sale: existing, customer, products, balance: balances[existing.id], customerBalance, company })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, loaded, sales, id, customers, products, balances, customerBalanceFor, company])
 
   const requestPrint = () => {
@@ -266,8 +276,15 @@ export default function NewInvoice() {
       items: buildSaleItems(lines, getProduct),
     }
 
+    const existingSale = isEdit ? findSaleByRouteId(id) : null
+    if (isEdit && !existingSale) {
+      setLoading(false)
+      setError('Could not find this invoice.')
+      return
+    }
+
     const { data, error: submitError } = isEdit
-      ? await updateSale(id, payload)
+      ? await updateSale(existingSale.id, payload)
       : await createSale(payload)
 
     setLoading(false)
@@ -286,8 +303,14 @@ export default function NewInvoice() {
     await Promise.all([refetchBalances(), refetchCustomerBalances()])
 
     if (andPrint) {
-      const savedId = isEdit ? id : data
-      navigate(`/dashboard/sales/new-invoice/${savedId}`, { replace: true, state: { autoPrint: true } })
+      const savedId = isEdit ? existingSale.id : data
+      // A brand-new invoice's reference may have just been auto-assigned
+      // server-side (create_sale fills it in when left blank) — the
+      // client has no way to know that value without asking, so fetch it
+      // back rather than assuming what was typed (or nothing) is final.
+      const { data: savedRow } = await supabase.from('sales').select('reference').eq('id', savedId).single()
+      const urlId = savedRow?.reference || savedId
+      navigate(`/dashboard/sales/new-invoice/${urlId}`, { replace: true, state: { autoPrint: true } })
       return
     }
 

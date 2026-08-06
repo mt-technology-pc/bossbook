@@ -18,7 +18,7 @@ export function useCustomerTransactions(customerId) {
     setLoading(true)
     const { data, error: fetchError } = await supabase
       .from('customer_transactions')
-      .select('*, sales(type)')
+      .select('*, sales(type, reference)')
       .eq('customer_id', customerId)
       .order('created_at', { ascending: true })
 
