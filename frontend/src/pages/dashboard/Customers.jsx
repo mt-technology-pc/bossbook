@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Plus, Search, Contact, Wallet, Trash2, AlertCircle, ChevronRight, Pencil } from 'lucide-react'
+import { Plus, Search, Contact, Wallet, Trash2, AlertCircle, ChevronRight, Pencil, Users } from 'lucide-react'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useCustomerBalances } from '../../hooks/useCustomerBalances'
 import { formatCurrency } from '../../lib/currency'
@@ -70,9 +70,14 @@ export default function Customers() {
             Keep track of who you sell to and what they owe you.
           </p>
         </div>
-        <Button onClick={() => setModalOpen(true)} variant="primary">
-          <Plus size={16} /> Add customer
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => navigate('/dashboard/customers/walk-in')} variant="ghost">
+            <Users size={16} /> Walk-in customers
+          </Button>
+          <Button onClick={() => setModalOpen(true)} variant="primary">
+            <Plus size={16} /> Add customer
+          </Button>
+        </div>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">

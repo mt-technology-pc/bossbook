@@ -48,6 +48,7 @@ export default function WalkInCustomerModal({ open, onClose, channel, onSubmit }
       phone: cleanedPhone || null,
       email: email.trim() || null,
       nic: nic.trim() || null,
+      source: 'walk_in',
     })
     setLoading(false)
 

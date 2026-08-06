@@ -8,6 +8,7 @@ import Inventory from './pages/dashboard/Inventory'
 import LabelGenerator from './pages/dashboard/LabelGenerator'
 import Customers from './pages/dashboard/Customers'
 import CustomerDetail from './pages/dashboard/CustomerDetail'
+import WalkInCustomers from './pages/dashboard/WalkInCustomers'
 import Suppliers from './pages/dashboard/Suppliers'
 import SupplierDetail from './pages/dashboard/SupplierDetail'
 import Purchases from './pages/dashboard/Purchases'
@@ -323,6 +324,7 @@ function App() {
           <Route path="inventory" element={<Inventory />} />
           <Route path="inventory/labels" element={<LabelGenerator />} />
           <Route path="customers" element={<Customers />} />
+          <Route path="customers/walk-in" element={<WalkInCustomers />} />
           <Route path="customers/:id" element={<CustomerDetail />} />
           <Route path="suppliers" element={<Suppliers />} />
           <Route path="suppliers/:id" element={<SupplierDetail />} />
