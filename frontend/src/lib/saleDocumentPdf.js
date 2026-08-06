@@ -141,12 +141,12 @@ export async function buildSaleDocumentPdf(data) {
     doc.text(data.salesRep, rightX, repY, { align: 'right' })
   }
 
-  const body = data.lineItems.map((li) => [
-    li.sku ? `${li.name}\n${li.sku}` : li.name,
-    String(li.quantity),
-    formatCurrency(li.unitPrice),
-    formatCurrency(li.subtotal),
-  ])
+  const body = data.lineItems.map((li) => {
+    const lines = [li.name]
+    if (li.sku) lines.push(li.sku)
+    if (li.serials?.length > 0) lines.push(`IMEI: ${li.serials.join(', ')}`)
+    return [lines.join('\n'), String(li.quantity), formatCurrency(li.unitPrice), formatCurrency(li.subtotal)]
+  })
 
   autoTable(doc, {
     startY: cursorY + 4,

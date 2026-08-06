@@ -13,11 +13,15 @@ import { useCompany } from '../../hooks/useCompany'
 // is the browser's own native print header/footer ("Headers and footers"
 // toggle in the print dialog), which is outside this app's control anyway.
 
-export function PrintFooter() {
+// `hideCompanyName` — SaleDocument.jsx's own "plain header" print choice
+// (see PrintLetterheadModal) means no company details anywhere on the
+// page, including here; every other caller (reports, via PrintFrame
+// below) has no such concept and keeps the name shown.
+export function PrintFooter({ hideCompanyName = false }) {
   const { company } = useCompany()
   return (
     <div className="hidden print:mt-4 print:block print:border-t print:border-ink-900/10 print:pt-2 print:text-center print:text-[10px] print:text-ink-400">
-      {company?.name}
+      {!hideCompanyName && company?.name}
     </div>
   )
 }

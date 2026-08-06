@@ -5,6 +5,7 @@ import {
   Plus, FileText, Receipt, TrendingUp, AlertCircle, ChevronDown, Wallet, Landmark, HandCoins,
   Pencil, Trash2, ListChecks, Search, Printer, RotateCcw,
 } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { useSales } from '../../hooks/useSales'
 import { useCustomers } from '../../hooks/useCustomers'
 import { useProducts } from '../../hooks/useProducts'
@@ -38,6 +39,7 @@ export default function Sales() {
   const [letterheadPromptOpen, setLetterheadPromptOpen] = useState(false)
   const [withLetterhead, setWithLetterhead] = useState(true)
   const [printTrigger, setPrintTrigger] = useState(0)
+  const [selectedUnits, setSelectedUnits] = useState([])
   const navigate = useNavigate()
 
   const filtered = sales.filter((s) => {
@@ -46,6 +48,27 @@ export default function Sales() {
     const hay = `${s.reference ?? ''} ${s.customers?.name ?? ''} ${s.notes ?? ''}`.toLowerCase()
     return hay.includes(q)
   })
+
+  // Serial/IMEI numbers for whatever's currently checked, so the printed
+  // documents below can show them per line item — fetched separately since
+  // useSales()'s own sale rows don't carry this.
+  useEffect(() => {
+    if (selectedIds.size === 0) {
+      setSelectedUnits([])
+      return
+    }
+    let cancelled = false
+    supabase
+      .from('product_units')
+      .select('id, product_id, sale_id, serial_number')
+      .in('sale_id', [...selectedIds])
+      .then(({ data }) => {
+        if (!cancelled) setSelectedUnits(data ?? [])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedIds])
 
   const toggleSelected = (id) => {
     setSelectedIds((prev) => {
@@ -73,9 +96,10 @@ export default function Sales() {
             balance: balances[sale.id],
             customerBalance: customer ? customerBalanceFor(customer.id) : null,
             company,
+            units: selectedUnits.filter((u) => u.sale_id === sale.id),
           })
         }),
-    [selectedIds, sales, customers, products, balances, customerBalanceFor, company],
+    [selectedIds, sales, customers, products, balances, customerBalanceFor, company, selectedUnits],
   )
 
   const handlePrintSelected = () => {

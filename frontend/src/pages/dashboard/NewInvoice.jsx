@@ -26,6 +26,7 @@ import PrintLetterheadModal from '../../components/sales/PrintLetterheadModal'
 import EmailInvoiceModal from '../../components/sales/EmailInvoiceModal'
 import SmsInvoiceModal from '../../components/sales/SmsInvoiceModal'
 import FormSkeleton from '../../components/ui/FormSkeleton'
+import Toast from '../../components/ui/Toast'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -59,6 +60,7 @@ export default function NewInvoice() {
   const [letterheadPromptOpen, setLetterheadPromptOpen] = useState(false)
   const [withLetterhead, setWithLetterhead] = useState(true)
   const [printTrigger, setPrintTrigger] = useState(0)
+  const [savedToastOpen, setSavedToastOpen] = useState(false)
 
   const [customerId, setCustomerId] = useState('')
   const [salesRepId, setSalesRepId] = useState('')
@@ -69,7 +71,17 @@ export default function NewInvoice() {
   const [lines, setLines] = useState([newSaleLine()])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
-  const [loaded, setLoaded] = useState(!isEdit)
+  // Tracked per route id (not a plain boolean) — Save's post-save navigate
+  // (see submit()) moves from the id-less create URL to this same sale's
+  // edit URL via history replace, which React Router resolves to the SAME
+  // component instance rather than a remount. A plain "have I loaded
+  // once" boolean would stay stuck true from the create-mode default and
+  // never fire the load effect below for the sale that just appeared in
+  // the URL — confirmed live: ownUnits (and so serials on the printed
+  // document) silently stayed empty after Save even though everything
+  // else on the page looked correctly loaded.
+  const [loadedForRouteId, setLoadedForRouteId] = useState(null)
+  const loaded = !isEdit || loadedForRouteId === id
   const [ownUnits, setOwnUnits] = useState([])
   const [originalQuantities, setOriginalQuantities] = useState({})
 
@@ -121,7 +133,7 @@ export default function NewInvoice() {
         setLines(builtLines.length > 0 ? builtLines : [newSaleLine()])
         setOwnUnits(units)
         setOriginalQuantities(quantities)
-        setLoaded(true)
+        setLoadedForRouteId(id)
       })
     return () => {
       cancelled = true
@@ -198,9 +210,11 @@ export default function NewInvoice() {
     if (!existing) return null
     const customer = customers.find((c) => c.id === existing.customer_id) || null
     const customerBalance = customer ? customerBalanceFor(customer.id) : null
-    return buildSaleDocumentData({ sale: existing, customer, products, balance: balances[existing.id], customerBalance, company })
+    return buildSaleDocumentData({
+      sale: existing, customer, products, balance: balances[existing.id], customerBalance, company, units: ownUnits,
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isEdit, loaded, sales, id, customers, products, balances, customerBalanceFor, company])
+  }, [isEdit, loaded, sales, id, customers, products, balances, customerBalanceFor, company, ownUnits])
 
   const requestPrint = () => {
     if (printFormat === 'formal') setLetterheadPromptOpen(true)
@@ -314,8 +328,20 @@ export default function NewInvoice() {
       return
     }
 
-    if (andNew && !isEdit) resetForm()
-    else navigate('/dashboard/sales')
+    if (andNew && !isEdit) {
+      resetForm()
+      return
+    }
+
+    // Plain Save stays on this invoice (its own edit view, so the saved
+    // record — including any IMEIs just attached — is right there to
+    // confirm) instead of leaving to the list, with a toast standing in
+    // for the "closed the page" confirmation a navigate-away used to give.
+    const savedId = isEdit ? existingSale.id : data
+    const { data: savedRow } = await supabase.from('sales').select('reference').eq('id', savedId).single()
+    const urlId = savedRow?.reference || savedId
+    setSavedToastOpen(true)
+    navigate(`/dashboard/sales/new-invoice/${urlId}`, { replace: true })
   }
 
   return (
@@ -557,6 +583,8 @@ export default function NewInvoice() {
       )}
 
       <PrintLetterheadModal open={letterheadPromptOpen} onChoose={handleLetterheadChoice} />
+
+      <Toast open={savedToastOpen} message="Invoice saved" onClose={() => setSavedToastOpen(false)} />
 
       <EmailInvoiceModal
         open={emailModalOpen}

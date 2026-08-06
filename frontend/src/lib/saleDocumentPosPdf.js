@@ -30,6 +30,10 @@ function estimateHeight(data, companyName) {
   for (const li of data.lineItems) {
     const nameLines = Math.max(1, Math.ceil(li.name.length / 32))
     h += nameLines * 3.5 + 4.5
+    if (li.serials?.length > 0) {
+      const serialText = `IMEI: ${li.serials.join(', ')}`
+      h += Math.max(1, Math.ceil(serialText.length / 32)) * 3.5
+    }
   }
   h += 4 // divider
 
@@ -114,6 +118,11 @@ export async function buildSaleDocumentPosPdf(data, companyName) {
     y += nameLines.length * 3.5
 
     doc.setFont('helvetica', 'normal')
+    if (li.serials?.length > 0) {
+      const serialLines = doc.splitTextToSize(`IMEI: ${li.serials.join(', ')}`, WIDTH - MARGIN * 2)
+      doc.text(serialLines, MARGIN, y)
+      y += serialLines.length * 3.5
+    }
     doc.text(`${li.quantity} x ${formatCurrency(li.unitPrice)}`, MARGIN, y)
     doc.text(formatCurrency(li.subtotal), WIDTH - MARGIN, y, { align: 'right' })
     y += 4.5

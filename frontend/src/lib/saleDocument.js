@@ -2,17 +2,29 @@
 // print layout (SaleDocument.jsx) and the PDF builder (saleDocumentPdf.js)
 // draw from, so the two stay in sync from one source instead of each
 // re-deriving line items/totals independently.
-export function buildSaleDocumentData({ sale, customer, products, balance, customerBalance, company }) {
+export function buildSaleDocumentData({ sale, customer, products, balance, customerBalance, company, units = [] }) {
   const isInvoice = sale.type === 'invoice'
 
+  // A sale can have more than one line for the same serialized product
+  // (rare, but possible) — track how many of that product's units this
+  // sale's own units list has already been assigned to earlier lines, so
+  // each line only claims the serials that actually belong to it.
+  const consumed = {}
   const lineItems = (sale.sale_items || []).map((item) => {
     const product = products.find((p) => p.id === item.product_id)
+    const already = consumed[item.product_id] || 0
+    const ownProductUnits = units.filter((u) => u.product_id === item.product_id)
+    const serials = product?.tracks_serial
+      ? ownProductUnits.slice(already, already + item.quantity).map((u) => u.serial_number)
+      : []
+    consumed[item.product_id] = already + item.quantity
     return {
       name: product?.name || 'Unknown product',
       sku: product?.sku || '',
       quantity: item.quantity,
       unitPrice: Number(item.unit_price) || 0,
       subtotal: Number(item.subtotal) || 0,
+      serials,
     }
   })
 

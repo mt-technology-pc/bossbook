@@ -43,6 +43,9 @@ export default function SaleDocumentPos({ data, companyName }) {
         {data.lineItems.map((li, i) => (
           <div key={i} className="mb-1.5 last:mb-0">
             <p className="font-medium">{li.name}</p>
+            {li.serials?.length > 0 && (
+              <p className="text-[10px]">IMEI: {li.serials.join(', ')}</p>
+            )}
             <div className="flex justify-between text-[10px]">
               <span>{li.quantity} x {formatCurrency(li.unitPrice)}</span>
               <span className="font-medium">{formatCurrency(li.subtotal)}</span>

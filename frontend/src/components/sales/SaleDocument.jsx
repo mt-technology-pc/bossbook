@@ -34,11 +34,7 @@ export default function SaleDocument({ data }) {
                 </div>
               )}
             </>
-          ) : (
-            data.companyName && (
-              <p className="font-heading text-lg font-semibold text-ink-900">{data.companyName}</p>
-            )
-          )}
+          ) : null}
         </div>
         <div className="text-right">
           <p className="font-heading text-2xl font-semibold uppercase tracking-wide text-ink-900">
@@ -90,6 +86,9 @@ export default function SaleDocument({ data }) {
               <td className="py-2.5 pr-3">
                 <p className="font-medium text-ink-900">{li.name}</p>
                 {li.sku && <p className="font-mono text-xs text-ink-400">{li.sku}</p>}
+                {li.serials?.length > 0 && (
+                  <p className="font-mono text-xs text-ink-500">IMEI: {li.serials.join(', ')}</p>
+                )}
               </td>
               <td className="py-2.5 pr-3 text-right">{li.quantity}</td>
               <td className="py-2.5 pr-3 text-right">{formatCurrency(li.unitPrice)}</td>
@@ -137,7 +136,7 @@ export default function SaleDocument({ data }) {
         </div>
       )}
 
-      <PrintFooter />
+      <PrintFooter hideCompanyName={!showLetterhead} />
     </div>
   )
 }
