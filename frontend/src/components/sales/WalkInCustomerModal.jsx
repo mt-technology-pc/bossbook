@@ -15,6 +15,7 @@ export default function WalkInCustomerModal({ open, onClose, channel, onSubmit }
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [nic, setNic] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -22,6 +23,7 @@ export default function WalkInCustomerModal({ open, onClose, channel, onSubmit }
     setName('')
     setPhone('')
     setEmail('')
+    setNic('')
     setError(null)
     onClose()
   }
@@ -45,6 +47,7 @@ export default function WalkInCustomerModal({ open, onClose, channel, onSubmit }
       name: name.trim() || 'Walk-in customer',
       phone: cleanedPhone || null,
       email: email.trim() || null,
+      nic: nic.trim() || null,
     })
     setLoading(false)
 
@@ -103,6 +106,15 @@ export default function WalkInCustomerModal({ open, onClose, channel, onSubmit }
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
+            placeholder="Optional"
+            className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+          />
+        </label>
+        <label className="block">
+          <span className="text-xs font-medium text-ink-500">NIC (optional)</span>
+          <input
+            value={nic}
+            onChange={(e) => setNic(e.target.value)}
             placeholder="Optional"
             className="mt-1.5 w-full rounded-xl border border-ink-400/20 bg-cream-100 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
           />
