@@ -21,6 +21,14 @@ const logoCache = new Map()
 // times over. 500px is comfortably sharp even at large print sizes.
 const MAX_LOGO_PX = 500
 
+// A thrown error inside img.onload/onerror (a plain DOM event callback,
+// not the Promise executor itself) does NOT reject the promise — it's an
+// uncaught exception the browser just logs, and the promise then hangs
+// forever with no resolve/reject ever called. Confirmed live: a real
+// company logo hosted on Supabase Storage without permissive-enough CORS
+// taints the canvas, canvas.toDataURL() throws inside onload, and every
+// caller (Download PDF, Email, SMS) just silently hung — no error, no
+// timeout, nothing sent — until this was wrapped properly.
 function loadLogoDataUrl(url) {
   const key = url || 'default'
   if (logoCache.has(key)) return Promise.resolve(logoCache.get(key))
@@ -31,19 +39,31 @@ function loadLogoDataUrl(url) {
     // no-op for the same-origin bundled default.
     img.crossOrigin = 'anonymous'
     img.onload = () => {
-      const scale = Math.min(1, MAX_LOGO_PX / Math.max(img.naturalWidth, img.naturalHeight))
-      const canvas = document.createElement('canvas')
-      canvas.width = img.naturalWidth * scale
-      canvas.height = img.naturalHeight * scale
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-      const result = {
-        dataUrl: canvas.toDataURL('image/png'),
-        ratio: img.naturalHeight / img.naturalWidth,
+      try {
+        const scale = Math.min(1, MAX_LOGO_PX / Math.max(img.naturalWidth, img.naturalHeight))
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth * scale
+        canvas.height = img.naturalHeight * scale
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+        const result = {
+          dataUrl: canvas.toDataURL('image/png'),
+          ratio: img.naturalHeight / img.naturalWidth,
+        }
+        logoCache.set(key, result)
+        resolve(result)
+      } catch (err) {
+        // Canvas got tainted, or some other draw-time failure — fall back
+        // to the bundled default rather than let a cosmetic logo problem
+        // hang/fail the whole document. Only actually rejects if even the
+        // bundled default (same-origin, never tainted) somehow fails too.
+        if (url) loadLogoDataUrl(null).then(resolve).catch(reject)
+        else reject(err)
       }
-      logoCache.set(key, result)
-      resolve(result)
     }
-    img.onerror = reject
+    img.onerror = () => {
+      if (url) loadLogoDataUrl(null).then(resolve).catch(reject)
+      else reject(new Error('Could not load the default logo image.'))
+    }
     img.src = url || logoSrc
   })
 }

@@ -29,6 +29,7 @@ import SmsInvoiceModal from '../../components/sales/SmsInvoiceModal'
 import WalkInCustomerModal from '../../components/sales/WalkInCustomerModal'
 import FormSkeleton from '../../components/ui/FormSkeleton'
 import Toast from '../../components/ui/Toast'
+import { sendSaleDocumentSms, sendSaleDocumentEmail } from '../../lib/sendSaleDocument'
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -60,9 +61,16 @@ export default function NewSalesReceipt() {
   const [withLetterhead, setWithLetterhead] = useState(true)
   const [printTrigger, setPrintTrigger] = useState(0)
   const [savedToastOpen, setSavedToastOpen] = useState(false)
+  const [toastMessage, setToastMessage] = useState('Receipt saved')
 
   const [customerId, setCustomerId] = useState('')
   const [salesRepId, setSalesRepId] = useState('')
+  // Only meaningful when customerId is empty (a walk-in sale) — filling
+  // either in and saving auto-sends the receipt once it's saved; leaving
+  // both blank sends nothing. See submit()'s handleWalkInAutoSend.
+  const [walkInPhone, setWalkInPhone] = useState('')
+  const [walkInEmail, setWalkInEmail] = useState('')
+  const [walkInNic, setWalkInNic] = useState('')
   const [reference, setReference] = useState('')
   const [saleDate, setSaleDate] = useState(todayISO())
   const [depositAccountId, setDepositAccountId] = useState('')
@@ -175,11 +183,13 @@ export default function NewSalesReceipt() {
     return { id: data.id }
   }
 
-  // Walk-in capture: save the contact info against this receipt (its own
-  // table — see useWalkInCustomers.js for why this is never
-  // useCustomers()/addCustomer), then hand off to whichever channel's
-  // modal was actually requested. Errors surface inline in
-  // WalkInCustomerModal via its own { error } handling.
+  // Walk-in capture from the Mail/SMS icon buttons on an already-saved
+  // receipt (manual fallback for when the inline fields on the create
+  // form — see handleWalkInAutoSend — were left blank at save time):
+  // save the contact info against this receipt (its own table — see
+  // useWalkInCustomers.js for why this is never useCustomers()/
+  // addCustomer), then hand off to whichever channel's review modal was
+  // actually requested.
   const handleWalkInSubmit = async (payload) => {
     const existingSale = findSaleByRouteId(id)
     const { error: createError } = await createWalkInCustomer({ saleId: existingSale?.id, ...payload })
@@ -188,6 +198,57 @@ export default function NewSalesReceipt() {
     if (walkInChannel === 'sms') setSmsModalOpen(true)
     else setEmailModalOpen(true)
     return { data: true }
+  }
+
+  // Called from submit() right after a brand-new walk-in receipt is
+  // saved, only when the inline "Walk-in customer" phone/email fields
+  // (near Sales rep) were actually filled in — sends immediately, no
+  // review step. documentData can't be used here: it's derived from the
+  // route id, which for a just-created receipt is still the id-less
+  // create URL at this point in submit() (the navigate to its real URL
+  // happens after), so this fetches the just-saved sale fresh instead.
+  const handleWalkInAutoSend = async (saleId) => {
+    const { data: saleRow } = await supabase
+      .from('sales')
+      .select('*, sale_items(id, product_id, quantity, unit_price, subtotal)')
+      .eq('id', saleId)
+      .single()
+    if (!saleRow) return
+
+    const { data: units } = await supabase
+      .from('product_units')
+      .select('id, product_id, serial_number')
+      .eq('sale_id', saleId)
+
+    const freshDocumentData = buildSaleDocumentData({
+      sale: saleRow, customer: null, products, customerBalance: null, company, units: units || [],
+    })
+
+    const { error: createError } = await createWalkInCustomer({
+      saleId,
+      name: 'Walk-in customer',
+      phone: walkInPhone.trim() || null,
+      email: walkInEmail.trim() || null,
+      nic: walkInNic.trim() || null,
+    })
+    if (createError) {
+      setToastMessage(`Saved, but couldn’t save the contact: ${createError.message}`)
+      setSavedToastOpen(true)
+      return
+    }
+
+    try {
+      if (walkInPhone.trim()) {
+        await sendSaleDocumentSms({ documentData: freshDocumentData, printFormat, company, phone: walkInPhone.trim() })
+      }
+      if (walkInEmail.trim()) {
+        await sendSaleDocumentEmail({ documentData: freshDocumentData, printFormat, company, email: walkInEmail.trim() })
+      }
+      setToastMessage('Receipt sent')
+    } catch (err) {
+      setToastMessage(`Saved, but couldn’t send: ${err.message || 'unknown error'}`)
+    }
+    setSavedToastOpen(true)
   }
 
   const handleCreateSalesRep = async (name) => {
@@ -217,6 +278,9 @@ export default function NewSalesReceipt() {
     setNotes('')
     setLines([newSaleLine()])
     setError(null)
+    setWalkInPhone('')
+    setWalkInEmail('')
+    setWalkInNic('')
   }
 
   const total = saleLineTotal(lines)
@@ -344,8 +408,17 @@ export default function NewSalesReceipt() {
     // state before navigating into the auto-print view.
     await refetchCustomerBalances()
 
+    const savedId = isEdit ? existingSale.id : data
+
+    // Auto-send: only for a brand-new walk-in receipt (not an edit, no
+    // customer selected) where the inline phone/email fields near Sales
+    // rep were actually filled in. Sets its own toast — see
+    // handleWalkInAutoSend — so the branches below skip their own
+    // "Receipt saved" toast when this already ran.
+    const didAutoSend = !isEdit && !customerId && (walkInPhone.trim() || walkInEmail.trim())
+    if (didAutoSend) await handleWalkInAutoSend(savedId)
+
     if (andPrint) {
-      const savedId = isEdit ? existingSale.id : data
       // A brand-new receipt's reference may have just been auto-assigned
       // server-side (create_sale fills it in when left blank) — the
       // client has no way to know that value without asking, so fetch it
@@ -365,10 +438,12 @@ export default function NewSalesReceipt() {
     // record — including any IMEIs just attached — is right there to
     // confirm) instead of leaving to the list, with a toast standing in
     // for the "closed the page" confirmation a navigate-away used to give.
-    const savedId = isEdit ? existingSale.id : data
     const { data: savedRow } = await supabase.from('sales').select('reference').eq('id', savedId).single()
     const urlId = savedRow?.reference || savedId
-    setSavedToastOpen(true)
+    if (!didAutoSend) {
+      setToastMessage(isEdit ? 'Receipt updated' : 'Receipt saved')
+      setSavedToastOpen(true)
+    }
     navigate(`/dashboard/sales/new-receipt/${urlId}`, { replace: true })
   }
 
@@ -516,6 +591,36 @@ export default function NewSalesReceipt() {
                 </div>
               </div>
 
+              {!customerId && (
+                <div className="mt-6 rounded-xl border border-ink-400/15 bg-cream-100/60 p-4">
+                  <p className="text-xs font-medium text-ink-500">
+                    Walk-in customer <span className="font-normal text-ink-400">(optional — fill in to auto-send the receipt once saved)</span>
+                  </p>
+                  <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <input
+                      type="tel"
+                      value={walkInPhone}
+                      onChange={(e) => setWalkInPhone(e.target.value)}
+                      placeholder="Phone (e.g. 94710000000)"
+                      className="w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+                    />
+                    <input
+                      type="email"
+                      value={walkInEmail}
+                      onChange={(e) => setWalkInEmail(e.target.value)}
+                      placeholder="Email"
+                      className="w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+                    />
+                    <input
+                      value={walkInNic}
+                      onChange={(e) => setWalkInNic(e.target.value)}
+                      placeholder="NIC (optional)"
+                      className="w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <label className="block">
                   <span className="text-xs font-medium text-ink-500">Sale date</span>
@@ -625,7 +730,7 @@ export default function NewSalesReceipt() {
 
       <PrintLetterheadModal open={letterheadPromptOpen} onChoose={handleLetterheadChoice} />
 
-      <Toast open={savedToastOpen} message="Receipt saved" onClose={() => setSavedToastOpen(false)} />
+      <Toast open={savedToastOpen} message={toastMessage} onClose={() => setSavedToastOpen(false)} />
 
       <WalkInCustomerModal
         open={walkInModalOpen}
