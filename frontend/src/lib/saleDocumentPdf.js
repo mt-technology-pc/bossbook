@@ -76,24 +76,30 @@ function formatDate(dateStr) {
 // data: output of buildSaleDocumentData() in saleDocument.js — this mirrors
 // SaleDocument.jsx's content/order so the PDF and the printed page agree,
 // even though jsPDF can't render that component's DOM directly.
-export async function buildSaleDocumentPdf(data) {
+// showLetterhead mirrors SaleDocument.jsx's own prop of the same name —
+// false skips the logo and company address block entirely (just the doc
+// type/reference/date on the right), matching "Plain header" print mode.
+export async function buildSaleDocumentPdf(data, { showLetterhead = true } = {}) {
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const rightX = pageWidth - MARGIN
 
-  const logo = await loadLogoDataUrl(data.companyLogoUrl)
-  const logoWidth = 32
-  doc.addImage(logo.dataUrl, 'PNG', MARGIN, MARGIN, logoWidth, logoWidth * logo.ratio)
+  let companyY = MARGIN
+  if (showLetterhead) {
+    const logo = await loadLogoDataUrl(data.companyLogoUrl)
+    const logoWidth = 32
+    doc.addImage(logo.dataUrl, 'PNG', MARGIN, MARGIN, logoWidth, logoWidth * logo.ratio)
 
-  let companyY = MARGIN + logoWidth * logo.ratio + 4
-  const companyLines = [data.companyAddress, data.companyPhone, data.companyEmail].filter(Boolean)
-  if (companyLines.length > 0) {
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.setTextColor(110, 105, 95)
-    for (const line of companyLines) {
-      doc.text(line, MARGIN, companyY)
-      companyY += 3.8
+    companyY = MARGIN + logoWidth * logo.ratio + 4
+    const companyLines = [data.companyAddress, data.companyPhone, data.companyEmail].filter(Boolean)
+    if (companyLines.length > 0) {
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.setTextColor(110, 105, 95)
+      for (const line of companyLines) {
+        doc.text(line, MARGIN, companyY)
+        companyY += 3.8
+      }
     }
   }
 

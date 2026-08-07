@@ -17,15 +17,15 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
 }
 
-async function buildPdfBase64(documentData, printFormat, companyName) {
+async function buildPdfBase64(documentData, printFormat, companyName, showLetterhead) {
   const doc = printFormat === 'pos'
     ? await buildSaleDocumentPosPdf(documentData, companyName)
-    : await buildSaleDocumentPdf(documentData)
+    : await buildSaleDocumentPdf(documentData, { showLetterhead })
   return doc.output('datauristring').split(',')[1]
 }
 
-export async function sendSaleDocumentSms({ documentData, printFormat, company, phone }) {
-  const pdfBase64 = await buildPdfBase64(documentData, printFormat, company?.name)
+export async function sendSaleDocumentSms({ documentData, printFormat, company, phone, withLetterhead = true }) {
+  const pdfBase64 = await buildPdfBase64(documentData, printFormat, company?.name, withLetterhead)
   const message = `Hi ${documentData.customer?.name || 'there'}, here's your ${documentData.docTypeLabel.toLowerCase()} ${documentData.reference} for ${formatCurrency(documentData.total)} from ${company?.name || 'us'}.`
 
   await apiFetch('/api/sms/send-invoice', {
@@ -39,8 +39,8 @@ export async function sendSaleDocumentSms({ documentData, printFormat, company, 
   })
 }
 
-export async function sendSaleDocumentEmail({ documentData, printFormat, company, email }) {
-  const pdfBase64 = await buildPdfBase64(documentData, printFormat, company?.name)
+export async function sendSaleDocumentEmail({ documentData, printFormat, company, email, withLetterhead = true }) {
+  const pdfBase64 = await buildPdfBase64(documentData, printFormat, company?.name, withLetterhead)
   const lines = [
     `Hi ${documentData.customer?.name || 'there'},`,
     '',

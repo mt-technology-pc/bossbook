@@ -65,12 +65,16 @@ export default function NewSalesReceipt() {
 
   const [customerId, setCustomerId] = useState('')
   const [salesRepId, setSalesRepId] = useState('')
-  // Only meaningful when customerId is empty (a walk-in sale) — filling
-  // either in and saving auto-sends the receipt once it's saved; leaving
-  // both blank sends nothing. See submit()'s handleWalkInAutoSend.
+  // Only meaningful when customerId is empty (a walk-in sale). Filling any
+  // of these in saves a walk_in_customers record once the sale is saved;
+  // actually sending it by SMS/email also requires walkInWantsSend to be
+  // ticked (having a phone/email on file doesn't by itself mean "send
+  // now" — see submit()'s handleWalkInAutoSend).
+  const [walkInName, setWalkInName] = useState('')
   const [walkInPhone, setWalkInPhone] = useState('')
   const [walkInEmail, setWalkInEmail] = useState('')
   const [walkInNic, setWalkInNic] = useState('')
+  const [walkInWantsSend, setWalkInWantsSend] = useState(false)
   const [reference, setReference] = useState('')
   const [saleDate, setSaleDate] = useState(todayISO())
   const [depositAccountId, setDepositAccountId] = useState('')
@@ -201,13 +205,37 @@ export default function NewSalesReceipt() {
   }
 
   // Called from submit() right after a brand-new walk-in receipt is
-  // saved, only when the inline "Walk-in customer" phone/email fields
-  // (near Sales rep) were actually filled in — sends immediately, no
-  // review step. documentData can't be used here: it's derived from the
-  // route id, which for a just-created receipt is still the id-less
-  // create URL at this point in submit() (the navigate to its real URL
-  // happens after), so this fetches the just-saved sale fresh instead.
+  // saved, whenever any of the inline "Walk-in customer" fields (near
+  // Sales rep) were filled in. Always saves the contact; only actually
+  // sends by SMS/email if walkInWantsSend was ticked AND a phone/email
+  // was given — filling contact info alone no longer implies "send now".
+  // Owns its own toast in every case (submit() skips its default one
+  // whenever this runs), so the outcome — saved, sent, or a failure at
+  // either step — is always the one shown. documentData can't be used
+  // for the send: it's derived from the route id, which for a
+  // just-created receipt is still the id-less create URL at this point
+  // in submit() (the navigate to its real URL happens after), so this
+  // fetches the just-saved sale fresh instead.
   const handleWalkInAutoSend = async (saleId) => {
+    const { error: createError } = await createWalkInCustomer({
+      saleId,
+      name: walkInName.trim() || 'Walk-in customer',
+      phone: walkInPhone.trim() || null,
+      email: walkInEmail.trim() || null,
+      nic: walkInNic.trim() || null,
+    })
+    if (createError) {
+      setToastMessage(`Saved, but couldn’t save the contact: ${createError.message}`)
+      setSavedToastOpen(true)
+      return
+    }
+
+    if (!walkInWantsSend || !(walkInPhone.trim() || walkInEmail.trim())) {
+      setToastMessage(isEdit ? 'Receipt updated' : 'Receipt saved')
+      setSavedToastOpen(true)
+      return
+    }
+
     const { data: saleRow } = await supabase
       .from('sales')
       .select('*, sale_items(id, product_id, quantity, unit_price, subtotal)')
@@ -224,25 +252,12 @@ export default function NewSalesReceipt() {
       sale: saleRow, customer: null, products, customerBalance: null, company, units: units || [],
     })
 
-    const { error: createError } = await createWalkInCustomer({
-      saleId,
-      name: 'Walk-in customer',
-      phone: walkInPhone.trim() || null,
-      email: walkInEmail.trim() || null,
-      nic: walkInNic.trim() || null,
-    })
-    if (createError) {
-      setToastMessage(`Saved, but couldn’t save the contact: ${createError.message}`)
-      setSavedToastOpen(true)
-      return
-    }
-
     try {
       if (walkInPhone.trim()) {
-        await sendSaleDocumentSms({ documentData: freshDocumentData, printFormat, company, phone: walkInPhone.trim() })
+        await sendSaleDocumentSms({ documentData: freshDocumentData, printFormat, company, phone: walkInPhone.trim(), withLetterhead })
       }
       if (walkInEmail.trim()) {
-        await sendSaleDocumentEmail({ documentData: freshDocumentData, printFormat, company, email: walkInEmail.trim() })
+        await sendSaleDocumentEmail({ documentData: freshDocumentData, printFormat, company, email: walkInEmail.trim(), withLetterhead })
       }
       setToastMessage('Receipt sent')
     } catch (err) {
@@ -278,9 +293,11 @@ export default function NewSalesReceipt() {
     setNotes('')
     setLines([newSaleLine()])
     setError(null)
+    setWalkInName('')
     setWalkInPhone('')
     setWalkInEmail('')
     setWalkInNic('')
+    setWalkInWantsSend(false)
   }
 
   const total = saleLineTotal(lines)
@@ -410,13 +427,15 @@ export default function NewSalesReceipt() {
 
     const savedId = isEdit ? existingSale.id : data
 
-    // Auto-send: only for a brand-new walk-in receipt (not an edit, no
-    // customer selected) where the inline phone/email fields near Sales
-    // rep were actually filled in. Sets its own toast — see
-    // handleWalkInAutoSend — so the branches below skip their own
-    // "Receipt saved" toast when this already ran.
-    const didAutoSend = !isEdit && !customerId && (walkInPhone.trim() || walkInEmail.trim())
-    if (didAutoSend) await handleWalkInAutoSend(savedId)
+    // Only for a brand-new walk-in receipt (not an edit, no customer
+    // selected) where any of the inline walk-in fields near Sales rep
+    // were actually filled in. handleWalkInAutoSend always sets its own
+    // toast once it runs (saved / sent / a failure at either step), so
+    // the branches below skip their own "Receipt saved" toast whenever
+    // this ran.
+    const hasWalkInInfo = !isEdit && !customerId
+      && (walkInName.trim() || walkInPhone.trim() || walkInEmail.trim() || walkInNic.trim())
+    if (hasWalkInInfo) await handleWalkInAutoSend(savedId)
 
     if (andPrint) {
       // A brand-new receipt's reference may have just been auto-assigned
@@ -440,7 +459,7 @@ export default function NewSalesReceipt() {
     // for the "closed the page" confirmation a navigate-away used to give.
     const { data: savedRow } = await supabase.from('sales').select('reference').eq('id', savedId).single()
     const urlId = savedRow?.reference || savedId
-    if (!didAutoSend) {
+    if (!hasWalkInInfo) {
       setToastMessage(isEdit ? 'Receipt updated' : 'Receipt saved')
       setSavedToastOpen(true)
     }
@@ -594,9 +613,15 @@ export default function NewSalesReceipt() {
               {!customerId && (
                 <div className="mt-6 rounded-xl border border-ink-400/15 bg-cream-100/60 p-4">
                   <p className="text-xs font-medium text-ink-500">
-                    Walk-in customer <span className="font-normal text-ink-400">(optional — fill in to auto-send the receipt once saved)</span>
+                    Walk-in customer <span className="font-normal text-ink-400">(optional)</span>
                   </p>
-                  <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <input
+                      value={walkInName}
+                      onChange={(e) => setWalkInName(e.target.value)}
+                      placeholder="Name"
+                      className="w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
+                    />
                     <input
                       type="tel"
                       value={walkInPhone}
@@ -617,6 +642,44 @@ export default function NewSalesReceipt() {
                       placeholder="NIC (optional)"
                       className="w-full rounded-xl border border-ink-400/20 bg-cream-50 px-3.5 py-2.5 text-sm text-ink-900 placeholder:text-ink-400 outline-none focus:border-clay-500 focus:ring-2 focus:ring-clay-500/20"
                     />
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <label className="flex items-center gap-2 text-sm text-ink-700">
+                      <input
+                        type="checkbox"
+                        checked={walkInWantsSend}
+                        onChange={(e) => setWalkInWantsSend(e.target.checked)}
+                        className="h-4 w-4 rounded border-ink-400/30 text-clay-600 focus:ring-2 focus:ring-clay-500/30"
+                      />
+                      Send this receipt by SMS/email once saved
+                    </label>
+
+                    {/* POS receipts have no letterhead concept (see
+                        PrintLetterheadModal) — only relevant for Formal
+                        format. Shares the same withLetterhead state the
+                        Print button's own letterhead prompt uses. */}
+                    {printFormat === 'formal' && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-ink-500">Header</span>
+                        <div className="flex overflow-hidden rounded-lg border border-ink-400/20">
+                          <button
+                            type="button"
+                            onClick={() => setWithLetterhead(true)}
+                            className={`px-2.5 py-1 text-xs font-medium transition-colors ${withLetterhead ? 'bg-clay-500 text-white' : 'bg-cream-50 text-ink-500 hover:bg-cream-200'}`}
+                          >
+                            With letterhead
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setWithLetterhead(false)}
+                            className={`px-2.5 py-1 text-xs font-medium transition-colors ${!withLetterhead ? 'bg-clay-500 text-white' : 'bg-cream-50 text-ink-500 hover:bg-cream-200'}`}
+                          >
+                            Plain
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
