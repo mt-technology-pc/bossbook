@@ -4,6 +4,7 @@ import { X, Plus, AlertCircle, Receipt, ShoppingBag, Download, Printer, Mail, Me
 import { useSales } from '../../hooks/useSales'
 import { useProducts } from '../../hooks/useProducts'
 import { useCustomers } from '../../hooks/useCustomers'
+import { useWalkInCustomers } from '../../hooks/useWalkInCustomers'
 import { useCustomerBalances } from '../../hooks/useCustomerBalances'
 import { useSalesReps } from '../../hooks/useSalesReps'
 import { useAccounts } from '../../hooks/useAccounts'
@@ -38,9 +39,10 @@ export default function NewSalesReceipt() {
   const location = useLocation()
   const { id } = useParams()
   const isEdit = Boolean(id)
-  const { sales, createSale, updateSale, attachCustomer } = useSales()
+  const { sales, createSale, updateSale } = useSales()
   const { products, loading: productsLoading, refetch: refetchProducts } = useProducts()
   const { customers, addCustomer } = useCustomers()
+  const { create: createWalkInCustomer, forSale: walkInContactForSale } = useWalkInCustomers()
   const { balanceFor: customerBalanceFor, refetch: refetchCustomerBalances } = useCustomerBalances()
   const { salesReps, addSalesRep } = useSalesReps()
   const { accounts, addAccount, refetch: refetchAccounts } = useAccounts()
@@ -173,17 +175,15 @@ export default function NewSalesReceipt() {
     return { id: data.id }
   }
 
-  // Walk-in capture: create the customer, attach them to this already-
-  // saved receipt (pure relabeling — see attach_customer_to_sale), then
-  // hand off to whichever channel's modal was actually requested. Errors
-  // surface inline in WalkInCustomerModal via its own { error } handling.
+  // Walk-in capture: save the contact info against this receipt (its own
+  // table — see useWalkInCustomers.js for why this is never
+  // useCustomers()/addCustomer), then hand off to whichever channel's
+  // modal was actually requested. Errors surface inline in
+  // WalkInCustomerModal via its own { error } handling.
   const handleWalkInSubmit = async (payload) => {
-    const { data: newCustomer, error: createError } = await addCustomer(payload)
-    if (createError) return { error: createError }
-
     const existingSale = findSaleByRouteId(id)
-    const { error: attachError } = await attachCustomer(existingSale?.id, newCustomer.id)
-    if (attachError) return { error: attachError }
+    const { error: createError } = await createWalkInCustomer({ saleId: existingSale?.id, ...payload })
+    if (createError) return { error: createError }
 
     if (walkInChannel === 'sms') setSmsModalOpen(true)
     else setEmailModalOpen(true)
@@ -232,6 +232,20 @@ export default function NewSalesReceipt() {
     return buildSaleDocumentData({ sale: existing, customer, products, customerBalance, company, units: ownUnits })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit, loaded, sales, id, customers, products, customerBalanceFor, company, ownUnits])
+
+  // Walk-in contact captured for this exact receipt, if any — kept
+  // entirely separate from `documentData.customer` (which stays null for
+  // a walk-in sale, by design: see useWalkInCustomers.js). Only used to
+  // pre-fill the Email/SMS modals below; the printed/downloaded document
+  // itself (SaleDocument/SaleDocumentPos/PDF) always reads `documentData`
+  // as-is and still shows "Walk-in customer".
+  const walkInContact = documentData && !documentData.customer
+    ? walkInContactForSale(findSaleByRouteId(id)?.id)
+    : null
+
+  const sendDocumentData = documentData && !documentData.customer && walkInContact
+    ? { ...documentData, customer: { name: walkInContact.name, phone: walkInContact.phone, email: walkInContact.email, address: null } }
+    : documentData
 
   const requestPrint = () => {
     if (printFormat === 'formal') setLetterheadPromptOpen(true)
@@ -392,14 +406,14 @@ export default function NewSalesReceipt() {
               </button>
               <button
                 onClick={() => {
-                  if (documentData.customer) setEmailModalOpen(true)
+                  if (documentData.customer || walkInContact) setEmailModalOpen(true)
                   else { setWalkInChannel('email'); setWalkInModalOpen(true) }
                 }}
                 disabled={documentData.customer && !documentData.customer.email}
                 title={
                   documentData.customer
                     ? (documentData.customer.email ? 'Email to customer' : 'Add an email address for this customer first')
-                    : 'Save this walk-in customer’s email to send them the receipt'
+                    : 'Add an email so you can send them this receipt'
                 }
                 aria-label="Email to customer"
                 className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 disabled:opacity-50"
@@ -408,14 +422,14 @@ export default function NewSalesReceipt() {
               </button>
               <button
                 onClick={() => {
-                  if (documentData.customer) setSmsModalOpen(true)
+                  if (documentData.customer || walkInContact) setSmsModalOpen(true)
                   else { setWalkInChannel('sms'); setWalkInModalOpen(true) }
                 }}
                 disabled={documentData.customer && !documentData.customer.phone}
                 title={
                   documentData.customer
                     ? (documentData.customer.phone ? 'Send SMS to customer' : 'Add a phone number for this customer first')
-                    : 'Save this walk-in customer’s phone number to text them the receipt'
+                    : 'Add a phone number so you can text them this receipt'
                 }
                 aria-label="Send SMS to customer"
                 className="rounded-full p-2 text-ink-400 transition-colors hover:bg-cream-200 hover:text-ink-600 disabled:opacity-50"
@@ -623,7 +637,7 @@ export default function NewSalesReceipt() {
       <EmailInvoiceModal
         open={emailModalOpen}
         onClose={() => setEmailModalOpen(false)}
-        documentData={documentData}
+        documentData={sendDocumentData}
         printFormat={printFormat}
         company={company}
       />
@@ -631,7 +645,7 @@ export default function NewSalesReceipt() {
       <SmsInvoiceModal
         open={smsModalOpen}
         onClose={() => setSmsModalOpen(false)}
-        documentData={documentData}
+        documentData={sendDocumentData}
         printFormat={printFormat}
         company={company}
       />

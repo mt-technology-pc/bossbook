@@ -5,12 +5,11 @@ import Button from '../ui/Button'
 
 const PHONE_RE = /^\+?\d{9,15}$/
 
-// Purely a form — no data fetching of its own. The caller already has
-// useCustomers()/useSales() instantiated (NewSalesReceipt.jsx does, for
-// its own "Add new customer" quick-create), so `onSubmit` is the same
-// { error } | { data } contract AddCustomerModal.jsx already uses,
-// letting the caller own creating the customer, attaching it to the
-// sale, and deciding what opens next.
+// Purely a form — no data fetching of its own. The caller owns actually
+// saving this (useWalkInCustomers().create — a dedicated table, NOT
+// useCustomers()/public.customers; see that hook's comment for why) and
+// deciding what opens next, via the same { error } | { data } contract
+// AddCustomerModal.jsx already uses for its own onSubmit.
 export default function WalkInCustomerModal({ open, onClose, channel, onSubmit }) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -48,7 +47,6 @@ export default function WalkInCustomerModal({ open, onClose, channel, onSubmit }
       phone: cleanedPhone || null,
       email: email.trim() || null,
       nic: nic.trim() || null,
-      source: 'walk_in',
     })
     setLoading(false)
 
@@ -63,11 +61,11 @@ export default function WalkInCustomerModal({ open, onClose, channel, onSubmit }
     <Modal
       open={open}
       onClose={close}
-      title="Save this customer"
+      title="Send this receipt"
       subtitle={
         channel === 'sms'
-          ? 'Add their phone number so you can text them this receipt — saved as a customer for next time too.'
-          : 'Add their email so you can send them this receipt — saved as a customer for next time too.'
+          ? 'Add their phone number so you can text them this receipt.'
+          : 'Add their email so you can send them this receipt.'
       }
     >
       {error && (

@@ -2,26 +2,22 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { ArrowLeft, Search, Users, AlertCircle, ChevronRight, IdCard } from 'lucide-react'
-import { useCustomers } from '../../hooks/useCustomers'
+import { useWalkInCustomers } from '../../hooks/useWalkInCustomers'
 
 function formatDate(dateStr) {
   if (!dateStr) return '—'
   return new Date(dateStr).toLocaleDateString('en-LK', { dateStyle: 'medium' })
 }
 
-// Customers created through WalkInCustomerModal.jsx (Sales Receipts'
-// quick-capture form for a walk-in with no customer selected) — flagged
-// via customers.source = 'walk_in' at creation, nothing else sets that
-// column, so this is a plain filter over the same customers list every
-// other customer page already reads.
+// Reads useWalkInCustomers() — its own dedicated table, entirely separate
+// from public.customers (see that hook's comment for why: a walk-in
+// capture is contact info for one receipt, not a real customer).
 export default function WalkInCustomers() {
-  const { customers, loading, error } = useCustomers()
+  const { walkInCustomers, loading, error } = useWalkInCustomers()
   const [query, setQuery] = useState('')
   const navigate = useNavigate()
 
-  const walkIns = customers.filter((c) => c.source === 'walk_in')
-
-  const filtered = walkIns.filter((c) => {
+  const filtered = walkInCustomers.filter((c) => {
     const q = query.trim().toLowerCase()
     if (!q) return true
     return (
@@ -47,7 +43,8 @@ export default function WalkInCustomers() {
             Walk-in Customers
           </h1>
           <p className="mt-1 text-sm text-ink-500">
-            Everyone captured through the quick save-and-send prompt on a walk-in sales receipt.
+            Everyone captured through the quick save-and-send prompt on a walk-in sales receipt —
+            kept separate from your regular customer list.
           </p>
         </div>
       </div>
@@ -62,7 +59,7 @@ export default function WalkInCustomers() {
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-clay-500/10 text-clay-600">
             <Users size={17} />
           </span>
-          <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">{walkIns.length}</p>
+          <p className="mt-3 font-heading text-2xl font-semibold text-ink-900">{walkInCustomers.length}</p>
           <p className="mt-0.5 text-xs text-ink-400">Walk-in customers captured</p>
         </motion.div>
       </div>
@@ -95,23 +92,24 @@ export default function WalkInCustomers() {
               <IdCard size={20} />
             </span>
             <p className="mt-4 text-sm font-medium text-ink-600">
-              {walkIns.length === 0 ? 'No walk-in customers yet' : 'No matches'}
+              {walkInCustomers.length === 0 ? 'No walk-in customers yet' : 'No matches'}
             </p>
             <p className="mt-1 max-w-xs text-xs text-ink-400">
-              {walkIns.length === 0
+              {walkInCustomers.length === 0
                 ? 'When someone without a saved customer record is texted or emailed a receipt, they’ll show up here.'
                 : 'Try a different search term.'}
             </p>
           </div>
         ) : (
           <div className="mt-5 overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left text-sm">
+            <table className="w-full min-w-[820px] text-left text-sm">
               <thead>
                 <tr className="border-b border-ink-400/10 text-xs text-ink-400">
-                  <th className="pb-3 font-medium">Customer</th>
+                  <th className="pb-3 font-medium">Name</th>
                   <th className="pb-3 font-medium">Phone</th>
                   <th className="pb-3 font-medium">Email</th>
                   <th className="pb-3 font-medium">NIC</th>
+                  <th className="pb-3 font-medium">Receipt</th>
                   <th className="pb-3 font-medium">Captured</th>
                   <th className="pb-3 font-medium" />
                 </tr>
@@ -123,8 +121,8 @@ export default function WalkInCustomers() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.3, delay: Math.min(i * 0.04, 0.4) }}
-                    onClick={() => navigate(`/dashboard/customers/${c.id}`)}
-                    className="cursor-pointer border-b border-ink-400/10 last:border-0 hover:bg-cream-100"
+                    onClick={() => c.sales?.reference && navigate(`/dashboard/sales/new-receipt/${c.sales.reference}`)}
+                    className={`border-b border-ink-400/10 last:border-0 ${c.sales?.reference ? 'cursor-pointer hover:bg-cream-100' : ''}`}
                   >
                     <td className="py-3.5 pr-3">
                       <div className="flex items-center gap-2.5">
@@ -137,9 +135,10 @@ export default function WalkInCustomers() {
                     <td className="py-3.5 pr-3 text-ink-500">{c.phone || '—'}</td>
                     <td className="py-3.5 pr-3 text-ink-500">{c.email || '—'}</td>
                     <td className="py-3.5 pr-3 font-mono text-xs text-ink-500">{c.nic || '—'}</td>
+                    <td className="py-3.5 pr-3 font-mono text-xs text-clay-600">{c.sales?.reference || '—'}</td>
                     <td className="py-3.5 pr-3 text-ink-500">{formatDate(c.created_at)}</td>
                     <td className="py-3.5 text-right">
-                      <ChevronRight size={15} className="text-ink-300" />
+                      {c.sales?.reference && <ChevronRight size={15} className="text-ink-300" />}
                     </td>
                   </motion.tr>
                 ))}
