@@ -1,6 +1,7 @@
 import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
+import cookieParser from 'cookie-parser'
 import morgan from 'morgan'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
@@ -14,6 +15,9 @@ import adminRouter from './routes/admin.js'
 import emailRouter from './routes/email.js'
 import smsRouter from './routes/sms.js'
 import googleDriveRouter from './routes/googleDrive.js'
+import authRouter from './routes/auth.js'
+import dbProxyRouter from './routes/dbProxy.js'
+import { requireCsrf } from './middleware/requireCsrf.js'
 
 const app = express()
 const PORT = process.env.PORT || 4000
@@ -48,12 +52,33 @@ app.use(cors({
     if (!origin) return callback(null, true)
     callback(null, allowedOrigins.includes(origin))
   },
+  // The app is same-origin by design in every real deployment (see
+  // frontend/vercel.json's /db-api and /api rewrites, which make the
+  // browser see this backend as its own origin) — credentials:true here
+  // is defense-in-depth for any direct cross-origin caller still hitting
+  // this API under the CLIENT_ORIGIN allowlist, not the primary path.
+  credentials: true,
 }))
+app.use(cookieParser())
+
+// Mounted BEFORE express.json() — the DB/Storage proxy needs the exact
+// raw request bytes (including non-JSON bodies, e.g. a multipart Storage
+// upload) to forward untouched; a JSON body parser ahead of it would
+// already have consumed/mangled the stream. It captures its own raw body
+// internally (see dbProxy.js).
+app.use('/db-proxy', dbProxyRouter)
+
 // 10mb (not the default ~100kb): invoice/receipt PDFs are uploaded as
 // base64 JSON for the email-sending route, which is meaningfully bigger
 // than every other request body this API handles.
 app.use(express.json({ limit: '10mb' }))
 app.use(morgan('dev'))
+
+// Applies to every /api/* route below (auth routes are exempted inside
+// requireCsrf itself — login has no session yet, refresh/logout don't
+// mutate tenant data). The DB proxy above has its own copy of this same
+// check, since it's mounted ahead of this line.
+app.use(requireCsrf)
 
 // Generous baseline (this isn't a public-signup service — every route is
 // either auth-gated or trivial) with a per-route stricter limit layered
@@ -75,6 +100,7 @@ app.get('/favicon.ico', (req, res) => {
   res.status(204).end()
 })
 
+app.use('/api/auth', authRouter)
 app.use('/api/health', healthRouter)
 app.use('/api/me', meRouter)
 app.use('/api/assistant', assistantRouter)

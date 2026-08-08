@@ -1,31 +1,31 @@
-import { supabase } from './supabase'
+// Every request is same-origin — in prod via vercel.json's /api rewrite,
+// in dev via vite.config.js's matching server.proxy entry — so the
+// browser is never told a separate backend host at all. Every call site
+// still passes its path starting with "/api/..." (unchanged from before
+// this file's own auth rework), so this is just the site's own origin,
+// not the origin *plus* "/api" — that prefix already lives in every
+// caller's path string. Auth rides along automatically via the httpOnly
+// session cookie (credentials:'include' below), not a header this client
+// reads from anywhere — there's no client-side session left to read (see
+// supabase.js's persistSession:false).
+const API_URL = window.location.origin
 
-// The localhost fallback only makes sense in dev — VITE_API_URL is baked in
-// at build time, so a production build shipped without it would otherwise
-// silently point every API call at localhost forever (this exact bug was
-// live on one deployment: the build succeeded, the login page loaded, and
-// every API call failed with no clue why). This runs at module-evaluation
-// time, before React even mounts — too early for the ErrorBoundary in
-// App.jsx to catch (that only catches render-time errors) — so this writes
-// directly to the page itself before throwing, rather than relying on a
-// React error screen that would never actually appear for this case.
-if (import.meta.env.PROD && !import.meta.env.VITE_API_URL) {
-  const message = 'Configuration error: VITE_API_URL is not set. This deployment has no backend to talk to — set it in the environment variables and rebuild.'
-  document.body.innerHTML = `<div style="font-family:sans-serif;max-width:32rem;margin:4rem auto;padding:1.5rem;border:1px solid #fca5a5;background:#fef2f2;color:#b91c1c;border-radius:0.5rem;">${message}</div>`
-  throw new Error(message)
+// Read once per call, not stored — the csrf cookie can rotate (a login,
+// a refresh) between calls, and this always needs whatever's current.
+// Not httpOnly by design (see backend/src/lib/authCookies.js) so this is
+// the one piece of session-related state this app is allowed to read.
+function csrfHeader() {
+  const match = document.cookie.match(/(?:^|; )bb_csrf=([^;]+)/)
+  return match ? { 'X-CSRF-Token': decodeURIComponent(match[1]) } : {}
 }
 
-const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:4000').replace(/\/+$/, '')
-
 export async function apiFetch(path, options = {}) {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
+      ...csrfHeader(),
       ...options.headers,
     },
   })
@@ -44,17 +44,13 @@ export async function apiFetch(path, options = {}) {
 }
 
 export async function apiUploadFile(path, file) {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-
   const formData = new FormData()
   formData.append('file', file)
 
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: {
-      ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    credentials: 'include',
+    headers: csrfHeader(),
     body: formData,
   })
 
@@ -67,13 +63,11 @@ export async function apiUploadFile(path, file) {
 }
 
 export async function apiFetchBlob(path, options = {}) {
-  const { data } = await supabase.auth.getSession()
-  const token = data.session?.access_token
-
   const res = await fetch(`${API_URL}${path}`, {
     ...options,
+    credentials: 'include',
     headers: {
-      ...(token && { Authorization: `Bearer ${token}` }),
+      ...csrfHeader(),
       ...options.headers,
     },
   })

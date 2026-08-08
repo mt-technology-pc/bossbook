@@ -1,6 +1,7 @@
 {
   "rewrites": [
-    { "source": "/db-api/:path*", "destination": "https://trgdrracbywhcauodwms.supabase.co/:path*" },
+    { "source": "/db-api/:path*", "destination": "https://bossbook-r4zz.vercel.app/db-proxy/:path*" },
+    { "source": "/api/:path*", "destination": "https://bossbook-r4zz.vercel.app/api/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

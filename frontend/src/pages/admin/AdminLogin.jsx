@@ -16,7 +16,7 @@ export default function AdminLogin() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
-  const { signIn } = useAuth()
+  const { signIn, signOut } = useAuth()
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
@@ -39,7 +39,7 @@ export default function AdminLogin() {
     setLoading(false)
 
     if (!isAdmin) {
-      await supabase.auth.signOut()
+      await signOut()
       setError('This account is not a platform admin.')
       return
     }
