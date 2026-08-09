@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import express from 'express'
+import { Readable } from 'node:stream'
 import { requireAuth } from '../middleware/requireAuth.js'
 import { requireCsrf } from '../middleware/requireCsrf.js'
 
@@ -43,9 +44,9 @@ const FORWARDED_REQUEST_HEADERS = [
 
 // Hop-by-hop / identity-changing headers that must not be relayed back
 // verbatim — content-encoding/transfer-encoding describe the upstream
-// connection's own framing (we've already fully buffered the body by the
-// time we re-send it, so re-declaring these would lie about the actual
-// bytes going out), and content-length is recalculated by Express itself.
+// connection's own framing, which streaming straight through doesn't
+// preserve 1:1 (Node re-frames the outgoing bytes itself), and
+// content-length is recalculated by Express/Node for the same reason.
 const SKIPPED_RESPONSE_HEADERS = new Set([
   'content-encoding', 'transfer-encoding', 'connection', 'content-length', 'set-cookie',
 ])
@@ -84,8 +85,29 @@ async function forward(req, res, { anonKeyOnly = false } = {}) {
   upstream.headers.forEach((value, key) => {
     if (!SKIPPED_RESPONSE_HEADERS.has(key.toLowerCase())) res.setHeader(key, value)
   })
-  const body = Buffer.from(await upstream.arrayBuffer())
-  res.send(body)
+
+  // Streamed, not buffered — the previous `Buffer.from(await
+  // upstream.arrayBuffer())` waited for Supabase's ENTIRE response body
+  // to arrive before sending the client a single byte, which is real
+  // added latency on anything larger than a typical small PostgREST JSON
+  // row (Storage downloads, big report/export queries). A HEAD request
+  // or a 204/304 has no body to stream at all.
+  if (!upstream.body) {
+    res.end()
+    return
+  }
+
+  const upstreamStream = Readable.fromWeb(upstream.body)
+  // Status/headers are already flushed by the time any of this runs, so
+  // a failure here can no longer become a clean JSON error response —
+  // the best this can do is drop the connection rather than hang it, or
+  // silently produce a truncated-looking response with a 200 still
+  // attached.
+  upstreamStream.on('error', (err) => {
+    console.error('db-proxy stream error:', err)
+    res.destroy(err)
+  })
+  upstreamStream.pipe(res)
 }
 
 // Public logo/asset URLs (`company.logo_url`, persisted as

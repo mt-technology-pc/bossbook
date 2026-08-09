@@ -83,11 +83,16 @@ app.use(requireCsrf)
 // Generous baseline (this isn't a public-signup service — every route is
 // either auth-gated or trivial) with a per-route stricter limit layered
 // on top where it actually matters (the paid-LLM assistant endpoint).
+// /api/health is exempt: an external keep-warm pinger (see deployment
+// notes) hits it every few minutes from one fixed IP specifically to
+// keep this function warm — nowhere near this limit in practice, but no
+// reason to let it share a budget with real traffic at all.
 app.use(rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === '/api/health',
 }))
 
 // A friendly response for anyone hitting the bare domain directly (this is
